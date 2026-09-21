@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Input Bahan — Prakasa Group</title>
+<style>
+  :root{
+    --blue:#2563eb; --blue-dark:#1d4ed8; --green:#16a34a; --red:#dc2626; --amber:#d97706;
+    --bg:#f1f5f9; --card:#ffffff; --ink:#0f172a; --sub:#64748b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);}
+  #app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;}
+
+  /* ---- login ---- */
+  #loginScreen{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .login-card{background:var(--card);border-radius:20px;box-shadow:0 10px 30px rgba(15,23,42,.08);
+    padding:32px 24px;width:100%;max-width:360px;}
+  .login-card h1{font-size:20px;margin:0 0 4px;}
+  .login-card p{color:var(--sub);font-size:13px;margin:0 0 24px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:13px;font-weight:600;color:var(--sub);margin-bottom:6px;}
+  .field input,.field select{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;
+    font-size:16px;background:#f8fafc;}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--blue);background:#fff;}
+  .btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:700;
+    cursor:pointer;text-align:center;}
+  .btn-primary{background:var(--blue);color:#fff;}
+  .btn-primary:active{background:var(--blue-dark);}
+  .btn-primary:disabled{opacity:.6;}
+  .btn-ghost{background:#fff;color:var(--blue);border:1.5px solid var(--line);}
+  .err{background:#fef2f2;color:var(--red);border:1px solid #fecaca;border-radius:10px;padding:10px 12px;
+    font-size:13px;margin-bottom:16px;display:none;}
+  .err.on{display:block;}
+
+  /* ---- app shell ---- */
+  #topbar{background:var(--card);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;}
+  #topbar .who{font-size:14px;}
+  #topbar .who b{display:block;font-size:15px;}
+  #topbar .who span{color:var(--sub);font-size:12px;}
+  #topbar button{background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;padding:6px;}
+  #projSel{margin:12px 16px 0;}
+  #tabs{display:flex;gap:6px;padding:12px 16px;overflow-x:auto;}
+  .tab{flex:0 0 auto;padding:9px 14px;border-radius:999px;background:#fff;border:1.5px solid var(--line);
+    font-size:13px;font-weight:600;color:var(--sub);cursor:pointer;white-space:nowrap;}
+  .tab.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+  #content{flex:1;padding:0 16px 32px;}
+  .card{background:var(--card);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.05);}
+  .card h3{margin:0 0 14px;font-size:15px;}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);
+    font-size:14px;}
+  .row:last-child{border-bottom:none;}
+  .row .meta{color:var(--sub);font-size:12px;}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+  .badge.aman{background:#dcfce7;color:#166534;}
+  .badge.menipis,.badge.hampir{background:#fef3c7;color:#92400e;}
+  .badge.habis,.badge.melebihi{background:#fee2e2;color:#991b1b;}
+  .badge.neutral{background:#e2e8f0;color:#475569;}
+  .toast{position:fixed;left:16px;right:16px;bottom:20px;max-width:488px;margin:0 auto;background:#0f172a;
+    color:#fff;padding:13px 16px;border-radius:12px;font-size:13px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.2);}
+  .empty{text-align:center;color:var(--sub);font-size:13px;padding:32px 0;}
+  .hint{color:var(--sub);font-size:12px;margin-top:-8px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="loginScreen">
+    <div class="login-card">
+      <h1>Input Bahan Lapangan</h1>
+      <p>Prakasa Group — Material Masuk &amp; Pemakaian</p>
+      <div class="err" id="loginErr"></div>
+      <form id="loginForm">
+        <div class="field"><label>Email</label><input type="email" id="loginEmail" autocomplete="username" required></div>
+        <div class="field"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password" required></div>
+        <button class="btn btn-primary" id="loginSubmit" type="submit">Masuk</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="appRoot" style="display:none;">
+    <div id="topbar">
+      <div class="who"><b id="whoName">—</b><span id="whoRole">—</span></div>
+      <button id="btnLogout">Keluar</button>
+    </div>
+    <div id="projSel"></div>
+    <div id="tabs"></div>
+    <div id="content"></div>
+  </div>
+
+</div>
+<script src="backend-config.js"></script>
+<script>
+/* ============================================================
+   Mobile field-admin app. Same PHP+MySQL session/API as the main
+   dashboard (frontend/index.html) — different, much lighter UI
+   built for one-handed use on a phone in the field. No build step,
+   plain fetch, same apiFetch()/error-handling contract.
+   ============================================================ */
+var STATE = { user:null, projects:[], materials:[], pekerjaan:[], projectId:null, tab:'masuk' };
+
+function apiFetch(path, opts){
+  opts = opts || {};
+  opts.credentials = 'include';
+  opts.headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  return fetch((window.API_BASE_URL||'') + path, opts).then(async function(res){
+    var data = {}; try{ data = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+    return data;
+  });
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fmtNum(n){ return Number(n||0).toLocaleString('id-ID', {maximumFractionDigits:2}); }
+function fmtMoney(n){ return 'Rp ' + Number(n||0).toLocaleString('id-ID'); }
+function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function toast(msg, danger){
+  var d=document.createElement('div'); d.className='toast'; d.textContent=msg;
+  if(danger) d.style.background='#991b1b';
+  document.body.appendChild(d);
+  setTimeout(function(){ d.remove(); }, 2800);
+}
+
+/* ---------------- auth ---------------- */
+document.getElementById('loginForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  var email = document.getElementById('loginEmail').value.trim();
+  var password = document.getElementById('loginPassword').value;
+  var btn = document.getElementById('loginSubmit');
+  var err = document.getElementById('loginErr');
+  err.classList.remove('on');
+  btn.disabled = true; btn.textContent = 'Memproses…';
+  apiFetch('/auth_login.php', {method:'POST', body:JSON.stringify({email:email, password:password})})
+    .then(function(res){ boot(res.user); })
+    .catch(function(e){ err.textContent = e.message || 'Login gagal.'; err.classList.add('on'); })
+    .finally(function(){ btn.disabled = false; btn.textContent = 'Masuk'; });
+});
+document.getElementById('btnLogout').onclick = function(){
+  apiFetch('/auth_logout.php', {method:'POST'}).catch(function(){}).finally(function(){
+    STATE.user = null;
+    document.getElementById('appRoot').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  });
+};
+
+apiFetch('/auth_me.php').then(function(res){
+  if(res.user) boot(res.user);
+}).catch(function(){});
+
+function boot(user){
+  STATE.user = user;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  document.getElementById('whoName').textContent = user.nama;
+  var roleLabel = {admin:'Admin Pusat', owner:'Owner', lapangan:'Admin Lapangan'}[user.role] || user.role;
+  document.getElementById('whoRole').textContent = roleLabel;
+
+  Promise.all([
+    apiFetch('/projects.php'),
+    apiFetch('/materials.php'),
+    apiFetch('/pekerjaan.php'),
+  ]).then(function(r){
+    var allProjects = r[0], allPekerjaan = r[2];
+    STATE.materials = r[1];
+    if(user.role === 'lapangan' && Array.isArray(user.projectIds)){
+      var scope = user.projectIds;
+      STATE.projects = allProjects.filter(function(p){ return scope.indexOf(p.id) > -1; });
+    } else {
+      STATE.projects = allProjects; // admin/owner: full list for spot-checking/testing
+    }
+    STATE.pekerjaanAll = allPekerjaan;
+    if(!STATE.projects.length){
+      document.getElementById('projSel').innerHTML =
+        '<div class="card"><div class="empty">Belum ada proyek yang ditugaskan ke akun Anda.<br>Hubungi Admin Pusat.</div></div>';
+      return;
+    }
+    STATE.projectId = STATE.projects[0].id;
+    renderProjSel();
+    renderTabs();
+    renderTab();
+  }).catch(function(e){ toast('Gagal memuat data: ' + e.message, true); });
+}
+
+function renderProjSel(){
+  var el = document.getElementById('projSel');
+  if(STATE.projects.length <= 1){ el.innerHTML=''; return; }
+  el.innerHTML = '<select id="projPick" class="field-select" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:15px;font-weight:600;background:#fff;">' +
+    STATE.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===STATE.projectId?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('') +
+    '</select>';
+  document.getElementById('projPick').onchange = function(e){ STATE.projectId = e.target.value; renderTab(); };
+}
+
+function pekerjaanForProject(){
+  return (STATE.pekerjaanAll||[]).filter(function(pk){ return pk.project_id === STATE.projectId; });
+}
+
+/* ---------------- tabs ---------------- */
+var TABS = [
+  {id:'masuk', label:'Bahan Masuk'},
+  {id:'pakai', label:'Pemakaian'},
+  {id:'stok', label:'Stok'},
+  {id:'riwayat', label:'Riwayat'},
+];
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = TABS.map(function(t){
+    return '<button class="tab'+(t.id===STATE.tab?' on':'')+'" data-tab="'+t.id+'">'+esc(t.label)+'</button>';
+  }).join('');
+  document.querySelectorAll('.tab').forEach(function(b){
+    b.onclick = function(){ STATE.tab = b.getAttribute('data-tab'); renderTabs(); renderTab(); };
+  });
+}
+
+function renderTab(){
+  var c = document.getElementById('content');
+  if(STATE.tab === 'masuk') return renderInputForm(c, 'masuk');
+  if(STATE.tab === 'pakai') return renderInputForm(c, 'pakai');
+  if(STATE.tab === 'stok') return renderStok(c);
+  if(STATE.tab === 'riwayat') return renderRiwayat(c);
+}
+
+/* ---------------- input forms ---------------- */
+function materialOptions(selected){
+  return STATE.materials.map(function(m){
+    return '<option value="'+esc(m.id)+'"'+(m.id===selected?' selected':'')+'>'+esc(m.nama)+' ('+esc(m.satuan)+')</option>';
+  }).join('');
+}
+function pekerjaanOptions(selected){
+  var list = pekerjaanForProject();
+  if(!list.length) return '<option value="">— Tidak ada pekerjaan terdaftar —</option>';
+  return '<option value="">— Pilih pekerjaan (opsional) —</option>' + list.map(function(pk){
+    return '<option value="'+esc(pk.id)+'"'+(pk.id===selected?' selected':'')+'>'+esc(pk.nama)+'</option>';
+  }).join('');
+}
+
+function renderInputForm(c, mode){
+  var isMasuk = mode === 'masuk';
+  c.innerHTML = '<div class="card">' +
+    '<h3>'+(isMasuk?'Catat Bahan Masuk':'Catat Pemakaian Bahan')+'</h3>' +
+    '<div class="field"><label>Tanggal</label><input type="date" id="f_tgl" value="'+today()+'"></div>' +
+    '<div class="field"><label>Material</label><select id="f_material">'+materialOptions()+'</select></div>' +
+    (isMasuk ? '' : '<div class="field"><label>Pekerjaan (untuk analisis RAP)</label><select id="f_pekerjaan">'+pekerjaanOptions()+'</select></div>') +
+    '<div class="field"><label>Jumlah (Qty)</label><input type="number" id="f_qty" inputmode="decimal" min="0" step="any" placeholder="0"></div>' +
+    (isMasuk ? '<div class="field"><label>No. Surat Jalan / Nota</label><input type="text" id="f_ref" placeholder="Opsional"></div>' : '') +
+    (isMasuk ? '<div class="field"><label>Harga Satuan (opsional)</label><input type="number" id="f_harga" inputmode="decimal" min="0" step="any" placeholder="0"></div>' : '') +
+    '<div class="field"><label>Keterangan</label><input type="text" id="f_ket" placeholder="Opsional"></div>' +
+    '<button class="btn btn-primary" id="f_save">'+(isMasuk?'Simpan Bahan Masuk':'Simpan Pemakaian')+'</button>' +
+    '</div>';
+  if(!STATE.materials.length){
+    c.innerHTML = '<div class="card"><div class="empty">Belum ada Master Material.<br>Hubungi Admin Pusat untuk menambahkan.</div></div>';
+    return;
+  }
+  document.getElementById('f_save').onclick = function(){ submitInput(mode); };
+}
+
+function submitInput(mode){
+  var qty = parseFloat(document.getElementById('f_qty').value);
+  var materialId = document.getElementById('f_material').value;
+  if(!materialId){ toast('Pilih material.', true); return; }
+  if(!qty || qty <= 0){ toast('Isi jumlah (qty) yang valid.', true); return; }
+
+  var btn = document.getElementById('f_save');
+  btn.disabled = true; btn.textContent = 'Menyimpan…';
+
+  var payload, endpoint;
+  if(mode === 'masuk'){
+    payload = {
+      id: uid('mr_'), project_id: STATE.projectId, material_id: materialId,
+      tgl: document.getElementById('f_tgl').value || today(),
+      qty: qty, harga_satuan: parseFloat(document.getElementById('f_harga').value) || 0,
+      no_referensi: document.getElementById('f_ref').value || '',
+      ket: document.getElementById('f_ket').value || '',
+    };
+    endpoint = '/material_receipts.php';
+  } else {
+    payload = {
+      id: uid('mu_'), project_id: STATE.projectId, material_id: materialId,
+      pekerjaan_id: document.getElementById('f_pekerjaan').value || null,
+      tgl: document.getElementById('f_tgl').value || today(),
+      qty: qty, ket: document.getElementById('f_ket').value || '',
+    };
+    endpoint = '/material_usage.php';
+  }
+
+  apiFetch(endpoint, {method:'POST', body:JSON.stringify(payload)})
+    .then(function(){
+      toast('Tersimpan.');
+      renderTab();
+    })
+    .catch(function(e){ toast('Gagal menyimpan: ' + e.message, true); })
+    .finally(function(){ if(btn){ btn.disabled=false; btn.textContent = mode==='masuk'?'Simpan Bahan Masuk':'Simpan Pemakaian'; } });
+}
+
+/* ---------------- stok ---------------- */
+function statusBadge(status){
+  var map = {
+    AMAN:['aman','Aman'], HIJAU:['aman','Aman'],
+    MENIPIS:['menipis','Perlu Dikirim'], KUNING:['hampir','Hampir Habis'],
+    HABIS:['habis','Stok Habis'], MELEBIHI:['melebihi','Melebihi RAP'],
+    HAMPIR_HABIS:['hampir','Hampir Habis RAP'], DATA_TIDAK_LENGKAP:['neutral','Data Tidak Lengkap'],
+  };
+  var m = map[status] || ['neutral', status];
+  return '<span class="badge '+m[0]+'">'+esc(m[1])+'</span>';
+}
+
+function renderStok(c){
+  c.innerHTML = '<div class="card"><div class="empty">Memuat stok…</div></div>';
+  apiFetch('/material_stock.php').then(function(rows){
+    var mine = rows.filter(function(r){ return r.project_id === STATE.projectId; });
+    if(!mine.length){ c.innerHTML = '<div class="card"><div class="empty">Belum ada data bahan masuk/pemakaian untuk proyek ini.</div></div>'; return; }
+    c.innerHTML = '<div class="card"><h3>Stok Saat Ini</h3>' +
+      mine.map(function(r){
+        return '<div class="row"><div><b>'+esc(r.material_nama)+'</b><div class="meta">Masuk '+fmtNum(r.total_masuk)+' · Keluar '+fmtNum(r.total_keluar)+' '+esc(r.satuan)+'</div></div>' +
+          '<div style="text-align:right;"><div>'+fmtNum(r.stok)+' '+esc(r.satuan)+'</div>'+statusBadge(r.status)+'</div></div>';
+      }).join('') + '</div>';
+  }).catch(function(e){ c.innerHTML = '<div class="card"><div class="empty">Gagal memuat: '+esc(e.message)+'</div></div>'; });
+}
+
+/* ---------------- riwayat ---------------- */
+function renderRiwayat(c){
+  c.innerHTML = '<div class="card"><div class="empty">Memuat riwayat…</div></div>';
+  Promise.all([apiFetch('/material_receipts.php'), apiFetch('/material_usage.php')]).then(function(r){
+    var masuk = r[0].filter(function(x){ return x.project_id === STATE.projectId; }).slice(0, 20);
+    var pakai = r[1].filter(function(x){ return x.project_id === STATE.projectId; }).slice(0, 20);
+    var matName = function(id){ var m = STATE.materials.find(function(x){ return x.id===id; }); return m ? m.nama : id; };
+    c.innerHTML =
+      '<div class="card"><h3>Bahan Masuk Terakhir</h3>' +
+      (masuk.length ? masuk.map(function(x){
+        return '<div class="row"><div><b>'+esc(matName(x.material_id))+'</b><div class="meta">'+esc(x.tgl)+(x.no_referensi?' · '+esc(x.no_referensi):'')+'</div></div>' +
+          '<div style="display:flex;align-items:center;gap:10px;"><span>+'+fmtNum(x.qty)+'</span>' +
+          '<button data-del="masuk" data-id="'+esc(x.id)+'" style="border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;">Hapus</button></div></div>';
+      }).join('') : '<div class="empty">Belum ada data.</div>') + '</div>' +
+      '<div class="card"><h3>Pemakaian Terakhir</h3>' +
+      (pakai.length ? pakai.map(function(x){
+        return '<div class="row"><div><b>'+esc(matName(x.material_id))+'</b><div class="meta">'+esc(x.tgl)+'</div></div>' +
+          '<div style="display:flex;align-items:center;gap:10px;"><span>−'+fmtNum(x.qty)+'</span>' +
+          '<button data-del="pakai" data-id="'+esc(x.id)+'" style="border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;">Hapus</button></div></div>';
+      }).join('') : '<div class="empty">Belum ada data.</div>') + '</div>';
+    c.querySelectorAll('[data-del]').forEach(function(b){
+      b.onclick = function(){
+        if(!confirm('Hapus data ini?')) return;
+        var endpoint = b.getAttribute('data-del') === 'masuk' ? '/material_receipts.php' : '/material_usage.php';
+        apiFetch(endpoint + '?id=' + encodeURIComponent(b.getAttribute('data-id')), {method:'DELETE'})
+          .then(function(){ toast('Data dihapus.'); renderRiwayat(c); })
+          .catch(function(e){ toast('Gagal menghapus: ' + e.message, true); });
+      };
+    });
+  }).catch(function(e){ c.innerHTML = '<div class="card"><div class="empty">Gagal memuat: '+esc(e.message)+'</div></div>'; });
+}
+</script>
+</body>
+</html>

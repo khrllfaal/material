@@ -1,0 +1,7 @@
+# local tooling
+node_modules/
+.env
+
+# real credentials — copy backend/api/config.sample.php to config.php
+backend/api/config.php
+backend/backups/*.sql.gz

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Material & Stok — Admin</title>
+<style>
+  :root{
+    --blue:#2563eb; --blue-dark:#1d4ed8; --green:#16a34a; --red:#dc2626; --amber:#d97706;
+    --bg:#f1f5f9; --card:#ffffff; --ink:#0f172a; --sub:#64748b; --line:#e2e8f0; --sidebar:#0f172a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);}
+  a{color:inherit;}
+
+  /* ---- login ---- */
+  #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .login-card{background:var(--card);border-radius:20px;box-shadow:0 10px 30px rgba(15,23,42,.08);padding:36px 30px;width:100%;max-width:380px;}
+  .login-card h1{font-size:20px;margin:0 0 4px;}
+  .login-card p{color:var(--sub);font-size:13px;margin:0 0 24px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:13px;font-weight:600;color:var(--sub);margin-bottom:6px;}
+  .field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;background:#f8fafc;}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--blue);background:#fff;}
+  .btn{display:inline-block;padding:10px 16px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;text-align:center;}
+  .btn-primary{background:var(--blue);color:#fff;} .btn-primary:hover{background:var(--blue-dark);}
+  .btn-primary:disabled{opacity:.6;cursor:default;}
+  .btn-danger{background:#fee2e2;color:#991b1b;} .btn-ghost{background:#fff;border:1.5px solid var(--line);}
+  .btn-block{display:block;width:100%;}
+  .err{background:#fef2f2;color:var(--red);border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:16px;display:none;}
+  .err.on{display:block;}
+
+  /* ---- shell ---- */
+  #shell{display:none;min-height:100vh;}
+  #sidebar{width:220px;background:var(--sidebar);color:#cbd5e1;flex-shrink:0;padding:18px 0;position:fixed;top:0;bottom:0;overflow-y:auto;}
+  #sidebar .brand{color:#fff;font-weight:800;font-size:15px;padding:0 18px 18px;border-bottom:1px solid #1e293b;margin-bottom:10px;}
+  #sidebar .who{padding:0 18px 14px;font-size:12px;color:#94a3b8;}
+  .nav-link{display:block;padding:10px 18px;font-size:13.5px;color:#cbd5e1;text-decoration:none;cursor:pointer;border-left:3px solid transparent;}
+  .nav-link:hover{background:#1e293b;}
+  .nav-link.on{background:#1e293b;color:#fff;border-left-color:var(--blue);font-weight:700;}
+  #main{margin-left:220px;padding:24px 28px;max-width:1200px;}
+  .page-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
+  .page-head h1{font-size:20px;margin:0 0 4px;}
+  .page-head .sub{color:var(--sub);font-size:13px;}
+  .panel{background:var(--card);border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.05);padding:18px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+  .toolbar input[type=text]{padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;min-width:220px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);}
+  th{color:var(--sub);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.02em;}
+  tr:hover td{background:#f8fafc;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block;}
+  .badge.aman{background:#dcfce7;color:#166534;}
+  .badge.warn{background:#fef3c7;color:#92400e;}
+  .badge.danger{background:#fee2e2;color:#991b1b;}
+  .badge.neutral{background:#e2e8f0;color:#475569;}
+  .muted{color:var(--sub);font-style:italic;}
+  .empty{text-align:center;color:var(--sub);font-size:13px;padding:32px 0;}
+
+  /* ---- modal ---- */
+  #modalBack{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:30;align-items:center;justify-content:center;padding:20px;}
+  #modalBack.on{display:flex;}
+  .modal{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;}
+  .modal h2{margin:0 0 18px;font-size:17px;}
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
+  .form-grid{display:grid;gap:14px;}
+  .toast{position:fixed;right:20px;bottom:20px;background:#0f172a;color:#fff;padding:13px 18px;border-radius:12px;font-size:13px;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.2);}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>Material & Stok</h1>
+    <p>Admin Pusat / Owner — dashboard proyek, bahan, RAP &amp; stok</p>
+    <div class="err" id="loginErr"></div>
+    <form id="loginForm">
+      <div class="field"><label>Email</label><input type="email" id="loginEmail" required></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPassword" required></div>
+      <button class="btn btn-primary btn-block" id="loginSubmit" type="submit">Masuk</button>
+    </form>
+  </div>
+</div>
+
+<div id="shell">
+  <div id="sidebar">
+    <div class="brand">Material & Stok</div>
+    <div class="who" id="whoInfo">—</div>
+    <div id="navList"></div>
+    <a class="nav-link" id="btnLogout" style="margin-top:10px;">↩ Keluar</a>
+  </div>
+  <div id="main"><div id="content"></div></div>
+</div>
+
+<div id="modalBack"><div class="modal" id="modalBody"></div></div>
+<div id="toastWrap"></div>
+
+<script src="backend-config.js"></script>
+<script>
+/* ============================================================
+   Standalone Material & Stok admin dashboard. Same PHP+MySQL
+   session/API contract as frontend/lapangan.html — plain fetch,
+   no build step, no framework.
+   ============================================================ */
+var STATE = { user:null, page:'proyek', cache:{} };
+
+function apiFetch(path, opts){
+  opts = opts || {};
+  opts.credentials = 'include';
+  opts.headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  return fetch((window.API_BASE_URL||'') + path, opts).then(async function(res){
+    var data = {}; try{ data = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+    return data;
+  });
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function num0(n){ if(n==null||Number.isNaN(n)) return '0'; return Math.round(Number(n)).toLocaleString('id-ID'); }
+function numSigned(n){ n=Number(n)||0; return (n<0?'-':'')+Math.round(Math.abs(n)).toLocaleString('id-ID'); }
+function pct(n){ if(n==null||Number.isNaN(n)) return '–'; return (n*100).toFixed(1)+'%'; }
+function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function toast(msg, danger){
+  var d=document.createElement('div'); d.className='toast'; d.textContent=msg;
+  if(danger) d.style.background='#991b1b';
+  document.getElementById('toastWrap').appendChild(d);
+  setTimeout(function(){ d.remove(); }, 2800);
+}
+function isOwner(){ return !!(STATE.user && STATE.user.role==='owner'); }
+function fv(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; }
+
+function openModal(title, html, onSave){
+  document.getElementById('modalBody').innerHTML =
+    '<h2>'+esc(title)+'</h2>'+html+
+    '<div class="actions"><button class="btn btn-ghost" id="mCancel">Batal</button>'+
+    (onSave?'<button class="btn btn-primary" id="mSave">Simpan</button>':'')+'</div>';
+  document.getElementById('modalBack').classList.add('on');
+  document.getElementById('mCancel').onclick = closeModal;
+  if(onSave) document.getElementById('mSave').onclick = onSave;
+}
+function closeModal(){ document.getElementById('modalBack').classList.remove('on'); }
+function confirmModal(title, msg, onYes){
+  openModal(title, '<p style="font-size:14px;">'+msg+'</p>', function(){ closeModal(); onYes(); });
+}
+
+/* ---------------- auth ---------------- */
+document.getElementById('loginForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  var email=fv('loginEmail'), password=document.getElementById('loginPassword').value;
+  var btn=document.getElementById('loginSubmit'), err=document.getElementById('loginErr');
+  err.classList.remove('on'); btn.disabled=true; btn.textContent='Memproses…';
+  apiFetch('/auth_login.php', {method:'POST', body:JSON.stringify({email:email,password:password})})
+    .then(function(res){ boot(res.user); })
+    .catch(function(e){ err.textContent=e.message||'Login gagal.'; err.classList.add('on'); })
+    .finally(function(){ btn.disabled=false; btn.textContent='Masuk'; });
+});
+document.getElementById('btnLogout').onclick=function(){
+  apiFetch('/auth_logout.php', {method:'POST'}).catch(function(){}).finally(function(){
+    location.reload();
+  });
+};
+apiFetch('/auth_me.php').then(function(res){ if(res.user) boot(res.user); }).catch(function(){});
+
+function boot(user){
+  if(user.role==='lapangan'){ location.href='lapangan.html'; return; }
+  STATE.user = user;
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('shell').style.display='flex';
+  document.getElementById('whoInfo').textContent = user.nama+' · '+({admin:'Admin Pusat',owner:'Owner'}[user.role]||user.role);
+  renderNav();
+  go('proyek');
+}
+
+var NAV=[
+  {id:'proyek', label:'Master Proyek'},
+  {id:'bahan', label:'Master Bahan'},
+  {id:'pekerjaan', label:'Master Pekerjaan'},
+  {id:'rap', label:'Konfigurasi RAP'},
+  {id:'stock', label:'Monitor Stok'},
+  {id:'rap_report', label:'Analisis RAP Bahan'},
+  {id:'users', label:'Kelola User'},
+];
+function renderNav(){
+  document.getElementById('navList').innerHTML = NAV.map(function(n){
+    return '<a class="nav-link" data-page="'+n.id+'">'+esc(n.label)+'</a>';
+  }).join('');
+  document.querySelectorAll('.nav-link[data-page]').forEach(function(a){
+    a.onclick=function(){ go(a.getAttribute('data-page')); };
+  });
+}
+function go(page){
+  STATE.page=page;
+  document.querySelectorAll('.nav-link[data-page]').forEach(function(a){
+    a.classList.toggle('on', a.getAttribute('data-page')===page);
+  });
+  var c=document.getElementById('content');
+  c.innerHTML='';
+  (PAGES[page]||function(c){ c.innerHTML='<div class="empty">Halaman tidak ditemukan.</div>'; })(c);
+}
+function pageHead(title, sub, actionsHTML){
+  return '<div class="page-head"><div><h1>'+esc(title)+'</h1>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'')+'</div>'+
+    (actionsHTML?'<div>'+actionsHTML+'</div>':'')+'</div>';
+}
+
+/* ---------------- generic master-data CRUD page ---------------- */
+/* cfg: {title, sub, endpoint, addLabel, fields:[{key,label,type,required,optionsFn}], columns:[{key,label,render}] } */
+function masterPage(cfg){
+  return function(c){
+    c.innerHTML = pageHead(cfg.title, cfg.sub, isOwner()?'':'<button class="btn btn-primary" id="btnAdd">+ '+esc(cfg.addLabel||'Tambah')+'</button>') +
+      '<div class="panel"><div class="toolbar"><input type="text" id="q" placeholder="Cari…"><span class="muted" id="cnt"></span></div>'+
+      '<div style="overflow-x:auto;"><table id="tbl"></table></div></div>';
+
+    var rows=[];
+    function draw(){
+      var q=fv('q').toLowerCase();
+      var list = q ? rows.filter(function(r){ return (cfg.searchFn?cfg.searchFn(r):r.nama).toLowerCase().indexOf(q)>-1; }) : rows;
+      document.getElementById('cnt').textContent = list.length+' data';
+      var cols = cfg.columns.concat(isOwner()?[]:[{key:'_act',label:'Aksi',render:function(r){
+        return '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" data-edit="'+esc(r.id)+'">Edit</button> '+
+          '<button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" data-del="'+esc(r.id)+'">Hapus</button>';
+      }}]);
+      var tbl=document.getElementById('tbl');
+      tbl.innerHTML = '<thead><tr>'+cols.map(function(cl){ return '<th>'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+        '<tbody>'+(list.length?list.map(function(r){
+          return '<tr>'+cols.map(function(cl){ return '<td>'+cl.render(r)+'</td>'; }).join('')+'</tr>';
+        }).join(''):'<tr><td colspan="'+cols.length+'" class="empty">Belum ada data.</td></tr>')+'</tbody>';
+      tbl.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ form(b.getAttribute('data-edit')); }; });
+      tbl.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ del(b.getAttribute('data-del')); }; });
+    }
+    function refresh(){
+      apiFetch(cfg.endpoint).then(function(data){ rows=data; draw(); })
+        .catch(function(e){ document.getElementById('tbl').innerHTML=''; toast('Gagal memuat: '+e.message, true); });
+    }
+    function del(id){
+      confirmModal('Hapus Data','Yakin mau menghapus data ini? Tindakan ini tidak bisa dibatalkan.', function(){
+        apiFetch(cfg.endpoint+'?id='+encodeURIComponent(id), {method:'DELETE'})
+          .then(function(){ toast('Data dihapus.'); refresh(); })
+          .catch(function(e){ toast('Gagal menghapus: '+e.message, true); });
+      });
+    }
+    function form(id){
+      var rec = id ? rows.find(function(x){ return x.id===id; }) : null;
+      var html = '<div class="form-grid">'+cfg.fields.map(function(f){
+        var val = rec ? (rec[f.key]!==undefined?rec[f.key]:'') : (f.default!==undefined?f.default:'');
+        if(f.type==='select-dyn'){
+          var opts=f.optionsFn();
+          return '<div class="field"><label>'+esc(f.label)+(f.required?' *':'')+'</label><select id="f_'+f.key+'">'+
+            (f.placeholder?'<option value="">'+esc(f.placeholder)+'</option>':'')+
+            opts.map(function(o){ return '<option value="'+esc(o.value)+'"'+(String(val)===String(o.value)?' selected':'')+'>'+esc(o.label)+'</option>'; }).join('')+
+            '</select></div>';
+        }
+        return '<div class="field"><label>'+esc(f.label)+(f.required?' *':'')+'</label>'+
+          '<input id="f_'+f.key+'" type="'+(f.type||'text')+'" value="'+esc(val)+'"></div>';
+      }).join('')+'</div>';
+      openModal((id?'Edit ':'Tambah ')+cfg.title.replace(/^Master\s+/i,''), html, function(){
+        var obj = id ? Object.assign({}, rec) : {id: uid(cfg.idPrefix||'x')};
+        for(var i=0;i<cfg.fields.length;i++){
+          var f=cfg.fields[i], v=fv('f_'+f.key);
+          if(f.required && !v){ toast('Kolom "'+f.label+'" wajib diisi.', true); return; }
+          obj[f.key] = (f.type==='number') ? (parseFloat(v)||0) : v;
+        }
+        apiFetch(cfg.endpoint, {method:'POST', body:JSON.stringify(obj)})
+          .then(function(){ closeModal(); toast(id?'Data diperbarui.':'Data ditambahkan.'); refresh(); })
+          .catch(function(e){ toast('Gagal menyimpan: '+e.message, true); });
+      });
+    }
+    refresh();
+    document.getElementById('q').addEventListener('input', draw);
+    var btnAdd=document.getElementById('btnAdd');
+    if(btnAdd) btnAdd.onclick=function(){ form(null); };
+  };
+}
+
+var PAGES={};
+
+PAGES.proyek = masterPage({
+  title:'Master Proyek', sub:'Daftar proyek — dasar semua data bahan & RAP', endpoint:'/projects.php', addLabel:'Proyek', idPrefix:'proj_',
+  fields:[{key:'nama', label:'Nama Proyek', required:true}],
+  searchFn:function(r){ return r.nama; },
+  columns:[{key:'nama', label:'Nama Proyek', render:function(r){ return '<b>'+esc(r.nama)+'</b>'; }}],
+});
+
+PAGES.bahan = masterPage({
+  title:'Master Bahan', sub:'Katalog material — dipakai di semua proyek', endpoint:'/materials.php', addLabel:'Bahan', idPrefix:'mat_',
+  fields:[
+    {key:'kode', label:'Kode Bahan', required:true},
+    {key:'nama', label:'Nama Bahan', required:true},
+    {key:'satuan', label:'Satuan', required:true},
+    {key:'kategori', label:'Kategori'},
+    {key:'stok_minimum', label:'Stok Minimum (Reorder Point)', type:'number', default:0},
+  ],
+  searchFn:function(r){ return r.kode+' '+r.nama+' '+r.kategori; },
+  columns:[
+    {key:'kode', label:'Kode', render:function(r){ return esc(r.kode); }},
+    {key:'nama', label:'Nama Bahan', render:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
+    {key:'satuan', label:'Satuan', render:function(r){ return esc(r.satuan); }},
+    {key:'kategori', label:'Kategori', render:function(r){ return r.kategori?esc(r.kategori):'<span class="muted">–</span>'; }},
+    {key:'stok_minimum', label:'Stok Min.', render:function(r){ return num0(r.stok_minimum); }},
+  ],
+});
+
+PAGES.pekerjaan = function(c){
+  apiFetch('/projects.php').then(function(projects){
+    STATE.cache.projects = projects;
+    masterPage({
+      title:'Master Pekerjaan', sub:'Item pekerjaan (BOQ) per proyek — dasar RAP bahan', endpoint:'/pekerjaan.php', addLabel:'Pekerjaan', idPrefix:'pk_',
+      fields:[
+        {key:'project_id', label:'Proyek', type:'select-dyn', required:true, placeholder:'— Pilih proyek —',
+         optionsFn:function(){ return projects.map(function(p){ return {value:p.id, label:p.nama}; }); }},
+        {key:'nama', label:'Nama Pekerjaan', required:true},
+        {key:'satuan', label:'Satuan', required:true},
+        {key:'volume_kontrak', label:'Volume Kontrak (BQ)', type:'number', default:0},
+      ],
+      searchFn:function(r){ var p=projects.find(function(x){ return x.id===r.project_id; }); return r.nama+' '+(p?p.nama:''); },
+      columns:[
+        {key:'project_id', label:'Proyek', render:function(r){ var p=projects.find(function(x){ return x.id===r.project_id; }); return p?esc(p.nama):'<span class="muted">–</span>'; }},
+        {key:'nama', label:'Nama Pekerjaan', render:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
+        {key:'satuan', label:'Satuan', render:function(r){ return esc(r.satuan); }},
+        {key:'volume_kontrak', label:'Volume Kontrak', render:function(r){ return num0(r.volume_kontrak); }},
+      ],
+    })(c);
+  }).catch(function(e){ c.innerHTML=pageHead('Master Pekerjaan','')+'<div class="panel empty">Gagal memuat proyek: '+esc(e.message)+'</div>'; });
+};
+
+PAGES.rap = function(c){
+  Promise.all([apiFetch('/pekerjaan.php'), apiFetch('/materials.php'), apiFetch('/projects.php')]).then(function(r){
+    var pekerjaanList=r[0], materials=r[1], projects=r[2];
+    masterPage({
+      title:'Konfigurasi RAP Bahan', sub:'Koefisien bahan ideal per satuan volume pekerjaan', endpoint:'/rap_material.php', addLabel:'Koefisien', idPrefix:'rap_',
+      fields:[
+        {key:'pekerjaan_id', label:'Pekerjaan', type:'select-dyn', required:true, placeholder:'— Pilih pekerjaan —',
+         optionsFn:function(){ return pekerjaanList.map(function(pk){
+           var p=projects.find(function(x){ return x.id===pk.project_id; });
+           return {value:pk.id, label:(p?p.nama+' — ':'')+pk.nama};
+         }); }},
+        {key:'material_id', label:'Bahan', type:'select-dyn', required:true, placeholder:'— Pilih bahan —',
+         optionsFn:function(){ return materials.map(function(m){ return {value:m.id, label:m.nama+' ('+m.satuan+')'}; }); }},
+        {key:'koefisien', label:'Koefisien (qty bahan / 1 satuan volume)', type:'number', required:true},
+      ],
+      searchFn:function(r){
+        var pk=pekerjaanList.find(function(x){ return x.id===r.pekerjaan_id; });
+        var m=materials.find(function(x){ return x.id===r.material_id; });
+        return (pk?pk.nama:'')+' '+(m?m.nama:'');
+      },
+      columns:[
+        {key:'pekerjaan_id', label:'Pekerjaan', render:function(r){ var pk=pekerjaanList.find(function(x){ return x.id===r.pekerjaan_id; }); return pk?esc(pk.nama):'<span class="muted">–</span>'; }},
+        {key:'material_id', label:'Bahan', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return m?esc(m.nama):'<span class="muted">–</span>'; }},
+        {key:'koefisien', label:'Koefisien', render:function(r){ return Number(r.koefisien||0).toLocaleString('id-ID',{maximumFractionDigits:6}); }},
+      ],
+    })(c);
+  }).catch(function(e){ c.innerHTML=pageHead('Konfigurasi RAP Bahan','')+'<div class="panel empty">Gagal memuat: '+esc(e.message)+'</div>'; });
+};
+
+/* ---------------- read-only cross-project reports ---------------- */
+PAGES.stock = function(c){
+  c.innerHTML = pageHead('Monitor Stok Bahan (Semua Proyek)',
+    'Stok berjalan (bahan masuk − pemakaian) per proyek, seperti stok minimarket.') +
+    '<div class="panel"><div class="toolbar"><input type="text" id="q" placeholder="Cari proyek / bahan…"><span class="muted" id="cnt"></span></div>'+
+    '<div style="overflow-x:auto;"><table id="tbl"></table></div></div>';
+  var rows=[];
+  var cols=[
+    {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
+    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
+    {label:'Total Masuk', get:function(r){ return num0(r.total_masuk)+' '+esc(r.satuan); }},
+    {label:'Total Pemakaian', get:function(r){ return num0(r.total_keluar)+' '+esc(r.satuan); }},
+    {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+' '+esc(r.satuan)+'</b>'; }},
+    {label:'Stok Minimum', get:function(r){ return num0(r.stok_minimum); }},
+    {label:'Status', get:function(r){
+      var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis']};
+      var m=map[r.status]||['neutral',r.status];
+      return '<span class="badge '+m[0]+'">'+esc(m[1])+'</span>';
+    }},
+  ];
+  function draw(){
+    var q=fv('q').toLowerCase();
+    var list=q?rows.filter(function(r){ return (r.project_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
+    document.getElementById('cnt').textContent=list.length+' data';
+    document.getElementById('tbl').innerHTML='<thead><tr>'+cols.map(function(cl){ return '<th>'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+      '<tbody>'+(list.length?list.map(function(r){ return '<tr>'+cols.map(function(cl){ return '<td>'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+      '<tr><td colspan="'+cols.length+'" class="empty">Belum ada data bahan masuk/pemakaian.</td></tr>')+'</tbody>';
+  }
+  apiFetch('/material_stock.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
+    .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+};
+
+PAGES.rap_report = function(c){
+  c.innerHTML = pageHead('Analisis RAP Bahan (Semua Proyek)',
+    'Pemakaian aktual vs target ideal (koefisien RAP × progress volume pekerjaan) — mendeteksi pemborosan.') +
+    '<div class="panel"><div class="toolbar"><input type="text" id="q" placeholder="Cari proyek / pekerjaan / bahan…"><span class="muted" id="cnt"></span></div>'+
+    '<div style="overflow-x:auto;"><table id="tbl"></table></div></div>';
+  var rows=[];
+  var cols=[
+    {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
+    {label:'Pekerjaan', get:function(r){ return esc(r.pekerjaan_nama); }},
+    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
+    {label:'Progress Volume', get:function(r){ return num0(r.volume_aktual)+' '+esc(r.pekerjaan_satuan); }},
+    {label:'Target Ideal', get:function(r){ return num0(r.target_material_ideal)+' '+esc(r.material_satuan); }},
+    {label:'Aktual Pemakaian', get:function(r){ return num0(r.aktual_material)+' '+esc(r.material_satuan); }},
+    {label:'Deviasi', get:function(r){ return '<b style="color:'+(r.deviasi>0?'#dc2626':'#16a34a')+';">'+numSigned(r.deviasi)+'</b>'; }},
+    {label:'%', get:function(r){ return r.persentase==null?'–':pct(r.persentase); }},
+    {label:'Status', get:function(r){
+      var map={AMAN:['aman','Aman'],HAMPIR_HABIS:['warn','Hampir Habis RAP'],MELEBIHI:['danger','Melebihi RAP'],DATA_TIDAK_LENGKAP:['neutral','Data Tidak Lengkap']};
+      var m=map[r.status]||['neutral',r.status];
+      return '<span class="badge '+m[0]+'">'+esc(m[1])+'</span>';
+    }},
+  ];
+  function draw(){
+    var q=fv('q').toLowerCase();
+    var list=q?rows.filter(function(r){ return (r.project_nama+' '+r.pekerjaan_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
+    document.getElementById('cnt').textContent=list.length+' data';
+    document.getElementById('tbl').innerHTML='<thead><tr>'+cols.map(function(cl){ return '<th>'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+      '<tbody>'+(list.length?list.map(function(r){ return '<tr>'+cols.map(function(cl){ return '<td>'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+      '<tr><td colspan="'+cols.length+'" class="empty">Belum ada konfigurasi RAP / progress pekerjaan.</td></tr>')+'</tbody>';
+  }
+  apiFetch('/material_rap_report.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
+    .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+};
+
+/* ---------------- user management (admin only) ---------------- */
+PAGES.users = function(c){
+  if(!STATE.user || STATE.user.role!=='admin'){
+    c.innerHTML = pageHead('Kelola User','') + '<div class="panel">Hanya Admin Pusat yang bisa mengelola user.</div>';
+    return;
+  }
+  c.innerHTML = pageHead('Kelola User', 'Admin Lapangan hanya bisa input Bahan Masuk & Pemakaian, dibatasi ke proyek yang ditugaskan.',
+    '<button class="btn btn-primary" id="btnAdd">+ User</button>') +
+    '<div class="panel"><div style="overflow-x:auto;"><table id="tbl"></table></div></div>';
+
+  var rows=[], projects=[];
+  var cols=[
+    {label:'Nama', get:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
+    {label:'Email', get:function(r){ return esc(r.email); }},
+    {label:'Role', get:function(r){ return {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan'}[r.role]||esc(r.role); }},
+    {label:'Proyek Ditugaskan', get:function(r){
+      if(r.role!=='lapangan') return '<span class="muted">Semua (akses penuh)</span>';
+      var names=(r.projectIds||[]).map(function(id){ var p=projects.find(function(x){ return x.id===id; }); return p?p.nama:id; });
+      return names.length?esc(names.join(', ')):'<span class="muted">Belum ada proyek</span>';
+    }},
+    {label:'Aksi', get:function(r){
+      return '<button class="btn btn-ghost" style="padding:5px 10px;font-size:12px;" data-edit="'+esc(r.id)+'">Edit</button> '+
+        '<button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" data-del="'+esc(r.id)+'">Hapus</button>';
+    }},
+  ];
+  function draw(){
+    document.getElementById('tbl').innerHTML='<thead><tr>'+cols.map(function(cl){ return '<th>'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+      '<tbody>'+(rows.length?rows.map(function(r){ return '<tr>'+cols.map(function(cl){ return '<td>'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+      '<tr><td colspan="'+cols.length+'" class="empty">Belum ada user.</td></tr>')+'</tbody>';
+    document.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ form(b.getAttribute('data-edit')); }; });
+    document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ del(b.getAttribute('data-del')); }; });
+  }
+  function refresh(){
+    Promise.all([apiFetch('/users.php'), apiFetch('/projects.php')]).then(function(r){ rows=r[0]; projects=r[1]; draw(); })
+      .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+  }
+  function del(id){
+    confirmModal('Hapus User', 'Yakin mau menghapus user ini?', function(){
+      apiFetch('/users.php?id='+encodeURIComponent(id), {method:'DELETE'})
+        .then(function(){ toast('User dihapus.'); refresh(); }).catch(function(e){ toast('Gagal menghapus: '+e.message, true); });
+    });
+  }
+  function form(id){
+    var rec = id ? rows.find(function(x){ return x.id===id; }) : null;
+    var html =
+      '<div class="form-grid">'+
+      '<div class="field"><label>Nama *</label><input id="f_nama" value="'+esc(rec?rec.nama:'')+'"></div>'+
+      '<div class="field"><label>Email *</label><input id="f_email" type="email" value="'+esc(rec?rec.email:'')+'"></div>'+
+      '<div class="field"><label>Role *</label><select id="f_role">'+
+        ['lapangan','admin','owner'].map(function(r){ return '<option value="'+r+'"'+(rec&&rec.role===r?' selected':'')+'>'+
+          {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan'}[r]+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="field"><label>Password '+(id?'(kosongkan jika tidak diubah)':'*')+'</label><input id="f_password" type="password" placeholder="Min. 10 karakter"></div>'+
+      '<div class="field"><label>Proyek yang Ditugaskan (khusus Admin Lapangan)</label>'+
+        '<select id="f_projectIds" multiple size="8">'+
+          projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+((rec&&rec.projectIds||[]).indexOf(p.id)>-1?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('')+
+        '</select><div class="muted" style="font-size:11px;margin-top:4px;">Ctrl/Cmd+klik untuk pilih lebih dari satu.</div></div>'+
+      '</div>';
+    openModal((id?'Edit ':'Tambah ')+'User', html, function(){
+      var nama=fv('f_nama'), email=fv('f_email'), role=fv('f_role'), password=fv('f_password');
+      if(!nama||!email){ toast('Nama dan email wajib diisi.', true); return; }
+      if(!id && password.length<10){ toast('Password minimal 10 karakter.', true); return; }
+      var projectIds=Array.from(document.getElementById('f_projectIds').selectedOptions).map(function(o){ return o.value; });
+      apiFetch('/users.php', {method:'POST', body:JSON.stringify({id:id||'', nama:nama, email:email, role:role, password:password, projectIds:projectIds})})
+        .then(function(){ closeModal(); toast(id?'User diperbarui.':'User ditambahkan.'); refresh(); })
+        .catch(function(e){ toast('Gagal menyimpan: '+e.message, true); });
+    });
+  }
+  refresh();
+  document.getElementById('btnAdd').onclick=function(){ form(null); };
+};
+</script>
+</body>
+</html>

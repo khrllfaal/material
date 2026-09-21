@@ -1,0 +1,25 @@
+# Block direct access to anything that isn't a PHP entry point.
+<FilesMatch "\.(sql|md|sample)$">
+    Require all denied
+</FilesMatch>
+<Files "config.php">
+    Require all denied
+</Files>
+
+# Never let Apache list this directory's contents.
+Options -Indexes
+
+# These are API endpoints only — no HTML is ever served from here, so
+# there's no reason a browser should try to render a response as
+# anything but plain data.
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+</IfModule>
+
+# JSON compresses very well (often 80%+ smaller) — this API's biggest
+# response is the full transaction list fetched once at login, so
+# compressing it is a real, noticeable speed win, especially on mobile.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
