@@ -6,8 +6,13 @@ stok (seperti inventory minimarket) dan pemborosan bahan (RAP vs
 aktual) lintas puluhan proyek sekaligus.
 
 Backend **PHP + MySQL** (cocok langsung di hosting shared seperti
-Hostinger, database dikelola lewat phpMyAdmin) — tanpa build step di
-frontend.
+Hostinger, database dikelola lewat phpMyAdmin). Frontend pakai
+Tailwind CSS + ikon Lucide, tapi **di-build jadi file statis** dan
+disimpan di repo (`frontend/vendor/`) — bukan dimuat dari CDN saat
+halaman dibuka. Ini sengaja: admin lapangan sering kerja dengan sinyal
+HP pas-pasan di lokasi proyek, jadi halaman harus tetap cepat & tetap
+tampil rapi walau internet lambat/putus-putus, bukan bergantung ke
+CDN pihak ketiga setiap kali dibuka.
 
 ## Struktur repo
 
@@ -18,11 +23,20 @@ frontend/
   lapangan.html aplikasi ringan untuk HP — Admin Lapangan input Bahan
                 Masuk & Pemakaian per proyek, lihat stok & riwayat
   backend-config.js   API_BASE_URL (arahkan ke folder backend/api/)
+  vendor/
+    tailwind.css  CSS terkompilasi (hasil build, lihat scripts/build-tailwind.sh)
+    icons.js      subset ikon Lucide, di-inline lokal (bukan CDN)
 
 backend/mysql/
   schema.sql    skema tabel MySQL/MariaDB — aman dijalankan ulang
 
 backend/api/    REST API PHP 8 di atas MySQL (sesi cookie, audit log)
+
+scripts/
+  build-tailwind.sh   build ulang frontend/vendor/tailwind.css setelah
+                      mengubah class Tailwind di frontend/*.html
+                      (butuh Node.js sekali saat development — tidak
+                      dibutuhkan sama sekali saat aplikasi jalan/di-hosting)
 ```
 
 ## Setup cepat

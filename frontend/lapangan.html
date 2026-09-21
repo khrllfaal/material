@@ -3,104 +3,72 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Input Bahan — Prakasa Group</title>
+<title>Input Bahan — Material & Stok</title>
+<link rel="stylesheet" href="vendor/tailwind.css">
+<script src="vendor/icons.js"></script>
 <style>
-  :root{
-    --blue:#2563eb; --blue-dark:#1d4ed8; --green:#16a34a; --red:#dc2626; --amber:#d97706;
-    --bg:#f1f5f9; --card:#ffffff; --ink:#0f172a; --sub:#64748b; --line:#e2e8f0;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    background:var(--bg);color:var(--ink);}
-  #app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;}
-
-  /* ---- login ---- */
-  #loginScreen{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
-  .login-card{background:var(--card);border-radius:20px;box-shadow:0 10px 30px rgba(15,23,42,.08);
-    padding:32px 24px;width:100%;max-width:360px;}
-  .login-card h1{font-size:20px;margin:0 0 4px;}
-  .login-card p{color:var(--sub);font-size:13px;margin:0 0 24px;}
-  .field{margin-bottom:16px;}
-  .field label{display:block;font-size:13px;font-weight:600;color:var(--sub);margin-bottom:6px;}
-  .field input,.field select{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;
-    font-size:16px;background:#f8fafc;}
-  .field input:focus,.field select:focus{outline:none;border-color:var(--blue);background:#fff;}
-  .btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:700;
-    cursor:pointer;text-align:center;}
-  .btn-primary{background:var(--blue);color:#fff;}
-  .btn-primary:active{background:var(--blue-dark);}
-  .btn-primary:disabled{opacity:.6;}
-  .btn-ghost{background:#fff;color:var(--blue);border:1.5px solid var(--line);}
-  .err{background:#fef2f2;color:var(--red);border:1px solid #fecaca;border-radius:10px;padding:10px 12px;
-    font-size:13px;margin-bottom:16px;display:none;}
-  .err.on{display:block;}
-
-  /* ---- app shell ---- */
-  #topbar{background:var(--card);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;
-    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;}
-  #topbar .who{font-size:14px;}
-  #topbar .who b{display:block;font-size:15px;}
-  #topbar .who span{color:var(--sub);font-size:12px;}
-  #topbar button{background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;padding:6px;}
-  #projSel{margin:12px 16px 0;}
-  #tabs{display:flex;gap:6px;padding:12px 16px;overflow-x:auto;}
-  .tab{flex:0 0 auto;padding:9px 14px;border-radius:999px;background:#fff;border:1.5px solid var(--line);
-    font-size:13px;font-weight:600;color:var(--sub);cursor:pointer;white-space:nowrap;}
-  .tab.on{background:var(--blue);color:#fff;border-color:var(--blue);}
-  #content{flex:1;padding:0 16px 32px;}
-  .card{background:var(--card);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.05);}
-  .card h3{margin:0 0 14px;font-size:15px;}
-  .row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);
-    font-size:14px;}
-  .row:last-child{border-bottom:none;}
-  .row .meta{color:var(--sub);font-size:12px;}
-  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;}
-  .badge.aman{background:#dcfce7;color:#166534;}
-  .badge.menipis,.badge.hampir{background:#fef3c7;color:#92400e;}
-  .badge.habis,.badge.melebihi{background:#fee2e2;color:#991b1b;}
-  .badge.neutral{background:#e2e8f0;color:#475569;}
-  .toast{position:fixed;left:16px;right:16px;bottom:20px;max-width:488px;margin:0 auto;background:#0f172a;
-    color:#fff;padding:13px 16px;border-radius:12px;font-size:13px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.2);}
-  .empty{text-align:center;color:var(--sub);font-size:13px;padding:32px 0;}
-  .hint{color:var(--sub);font-size:12px;margin-top:-8px;margin-bottom:14px;}
+  body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;}
+  #app{max-width:520px;margin:0 auto;}
+  ::-webkit-scrollbar{display:none;}
+  .tab-scroll::-webkit-scrollbar{display:none;}
 </style>
 </head>
-<body>
-<div id="app">
+<body class="bg-slate-100 text-slate-800">
+<div id="app" class="min-h-screen bg-slate-100 flex flex-col">
 
-  <div id="loginScreen">
-    <div class="login-card">
-      <h1>Input Bahan Lapangan</h1>
-      <p>Prakasa Group — Material Masuk &amp; Pemakaian</p>
-      <div class="err" id="loginErr"></div>
-      <form id="loginForm">
-        <div class="field"><label>Email</label><input type="email" id="loginEmail" autocomplete="username" required></div>
-        <div class="field"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password" required></div>
-        <button class="btn btn-primary" id="loginSubmit" type="submit">Masuk</button>
+  <div id="loginScreen" class="flex-1 flex items-center justify-center p-6">
+    <div class="bg-white rounded-3xl shadow-lg shadow-slate-200 p-8 w-full max-w-sm">
+      <div class="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center mb-5">
+        <i data-lucide="smartphone" class="w-6 h-6"></i>
+      </div>
+      <h1 class="text-xl font-extrabold text-slate-800">Input Bahan Lapangan</h1>
+      <p class="text-slate-500 text-sm mt-1 mb-6">Material Masuk &amp; Pemakaian per proyek</p>
+      <div id="loginErr" class="hidden bg-red-50 text-red-700 border border-red-200 rounded-xl px-3.5 py-2.5 text-sm mb-4"></div>
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">Email</label>
+          <input type="email" id="loginEmail" autocomplete="username" required
+            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">Password</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" required
+            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500">
+        </div>
+        <button class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[.98] transition text-white font-bold py-3.5 rounded-xl text-[15px] disabled:opacity-60" id="loginSubmit" type="submit">Masuk</button>
       </form>
     </div>
   </div>
 
-  <div id="appRoot" style="display:none;">
-    <div id="topbar">
-      <div class="who"><b id="whoName">—</b><span id="whoRole">—</span></div>
-      <button id="btnLogout">Keluar</button>
+  <div id="appRoot" class="hidden flex-1 flex flex-col">
+    <div class="bg-white border-b border-slate-200 px-5 py-4 flex items-center justify-between sticky top-0 z-10">
+      <div>
+        <div class="font-bold text-[15px] leading-tight" id="whoName">—</div>
+        <div class="text-xs text-slate-400" id="whoRole">—</div>
+      </div>
+      <button id="btnLogout" class="text-slate-400 hover:text-red-600 transition flex items-center gap-1 text-xs font-semibold">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
+      </button>
     </div>
-    <div id="projSel"></div>
-    <div id="tabs"></div>
-    <div id="content"></div>
+
+    <div id="projSel" class="px-5 pt-4"></div>
+
+    <div id="tabs" class="flex gap-2 px-5 pt-4 pb-1 overflow-x-auto tab-scroll"></div>
+
+    <div id="content" class="flex-1 px-5 pb-10 pt-2"></div>
   </div>
 
 </div>
+<div id="toastWrap"></div>
 <script src="backend-config.js"></script>
 <script>
 /* ============================================================
-   Mobile field-admin app. Same PHP+MySQL session/API as the main
-   dashboard (frontend/index.html) — different, much lighter UI
-   built for one-handed use on a phone in the field. No build step,
-   plain fetch, same apiFetch()/error-handling contract.
+   Mobile field-admin app. Same PHP+MySQL session/API as
+   frontend/admin.html — different, much lighter UI built for
+   one-handed use on a phone in the field.
    ============================================================ */
 var STATE = { user:null, projects:[], materials:[], pekerjaan:[], projectId:null, tab:'masuk' };
+var TAB_ICONS = {masuk:'truck', pakai:'hammer', stok:'layers', riwayat:'history'};
 
 function apiFetch(path, opts){
   opts = opts || {};
@@ -115,13 +83,14 @@ function apiFetch(path, opts){
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function fmtNum(n){ return Number(n||0).toLocaleString('id-ID', {maximumFractionDigits:2}); }
-function fmtMoney(n){ return 'Rp ' + Number(n||0).toLocaleString('id-ID'); }
 function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function today(){ return new Date().toISOString().slice(0,10); }
+function icons(){ if(window.lucide) lucide.createIcons(); }
 function toast(msg, danger){
-  var d=document.createElement('div'); d.className='toast'; d.textContent=msg;
-  if(danger) d.style.background='#991b1b';
-  document.body.appendChild(d);
+  var d=document.createElement('div');
+  d.className='fixed left-4 right-4 bottom-5 max-w-[488px] mx-auto text-white text-sm px-4 py-3.5 rounded-2xl shadow-lg z-50 '+(danger?'bg-red-600':'bg-slate-900');
+  d.textContent = msg;
+  document.getElementById('toastWrap').appendChild(d);
   setTimeout(function(){ d.remove(); }, 2800);
 }
 
@@ -132,18 +101,18 @@ document.getElementById('loginForm').addEventListener('submit', function(e){
   var password = document.getElementById('loginPassword').value;
   var btn = document.getElementById('loginSubmit');
   var err = document.getElementById('loginErr');
-  err.classList.remove('on');
+  err.classList.add('hidden');
   btn.disabled = true; btn.textContent = 'Memproses…';
   apiFetch('/auth_login.php', {method:'POST', body:JSON.stringify({email:email, password:password})})
     .then(function(res){ boot(res.user); })
-    .catch(function(e){ err.textContent = e.message || 'Login gagal.'; err.classList.add('on'); })
+    .catch(function(e){ err.textContent = e.message || 'Login gagal.'; err.classList.remove('hidden'); })
     .finally(function(){ btn.disabled = false; btn.textContent = 'Masuk'; });
 });
 document.getElementById('btnLogout').onclick = function(){
   apiFetch('/auth_logout.php', {method:'POST'}).catch(function(){}).finally(function(){
     STATE.user = null;
-    document.getElementById('appRoot').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appRoot').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
   });
 };
 
@@ -153,8 +122,8 @@ apiFetch('/auth_me.php').then(function(res){
 
 function boot(user){
   STATE.user = user;
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('appRoot').style.display = 'block';
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appRoot').classList.remove('hidden');
   document.getElementById('whoName').textContent = user.nama;
   var roleLabel = {admin:'Admin Pusat', owner:'Owner', lapangan:'Admin Lapangan'}[user.role] || user.role;
   document.getElementById('whoRole').textContent = roleLabel;
@@ -170,12 +139,12 @@ function boot(user){
       var scope = user.projectIds;
       STATE.projects = allProjects.filter(function(p){ return scope.indexOf(p.id) > -1; });
     } else {
-      STATE.projects = allProjects; // admin/owner: full list for spot-checking/testing
+      STATE.projects = allProjects;
     }
     STATE.pekerjaanAll = allPekerjaan;
     if(!STATE.projects.length){
       document.getElementById('projSel').innerHTML =
-        '<div class="card"><div class="empty">Belum ada proyek yang ditugaskan ke akun Anda.<br>Hubungi Admin Pusat.</div></div>';
+        '<div class="bg-white rounded-2xl p-6 text-center text-sm text-slate-400 shadow-sm border border-slate-200">Belum ada proyek yang ditugaskan ke akun Anda.<br>Hubungi Admin Pusat.</div>';
       return;
     }
     STATE.projectId = STATE.projects[0].id;
@@ -187,11 +156,23 @@ function boot(user){
 
 function renderProjSel(){
   var el = document.getElementById('projSel');
-  if(STATE.projects.length <= 1){ el.innerHTML=''; return; }
-  el.innerHTML = '<select id="projPick" class="field-select" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:15px;font-weight:600;background:#fff;">' +
+  if(STATE.projects.length <= 1){
+    el.innerHTML = STATE.projects.length ?
+      '<div class="bg-white rounded-2xl px-4 py-3 shadow-sm border border-slate-200 flex items-center gap-2.5">'+
+      '<i data-lucide="building-2" class="w-4 h-4 text-emerald-600"></i>'+
+      '<span class="font-bold text-[15px]">'+esc(STATE.projects[0].nama)+'</span></div>' : '';
+    icons();
+    return;
+  }
+  el.innerHTML =
+    '<div class="relative">'+
+    '<select id="projPick" class="w-full appearance-none bg-white border border-slate-200 rounded-2xl px-4 py-3.5 pr-10 font-bold text-[15px] shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-100">'+
     STATE.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===STATE.projectId?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('') +
-    '</select>';
+    '</select>'+
+    '<i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>'+
+    '</div>';
   document.getElementById('projPick').onchange = function(e){ STATE.projectId = e.target.value; renderTab(); };
+  icons();
 }
 
 function pekerjaanForProject(){
@@ -207,11 +188,15 @@ var TABS = [
 ];
 function renderTabs(){
   document.getElementById('tabs').innerHTML = TABS.map(function(t){
-    return '<button class="tab'+(t.id===STATE.tab?' on':'')+'" data-tab="'+t.id+'">'+esc(t.label)+'</button>';
+    var on = t.id===STATE.tab;
+    return '<button data-tab="'+t.id+'" class="flex-none flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors '+
+      (on ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-200' : 'bg-white text-slate-500 border border-slate-200') + '">'+
+      '<i data-lucide="'+TAB_ICONS[t.id]+'" class="w-3.5 h-3.5"></i>'+esc(t.label)+'</button>';
   }).join('');
-  document.querySelectorAll('.tab').forEach(function(b){
+  document.querySelectorAll('[data-tab]').forEach(function(b){
     b.onclick = function(){ STATE.tab = b.getAttribute('data-tab'); renderTabs(); renderTab(); };
   });
+  icons();
 }
 
 function renderTab(){
@@ -221,6 +206,13 @@ function renderTab(){
   if(STATE.tab === 'stok') return renderStok(c);
   if(STATE.tab === 'riwayat') return renderRiwayat(c);
 }
+
+/* ---------------- shared card/field helpers ---------------- */
+function card(inner, extraCls){ return '<div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 mb-3.5 '+(extraCls||'')+'">'+inner+'</div>'; }
+function fieldWrap(label, inputHtml){
+  return '<div class="mb-4"><label class="block text-xs font-bold text-slate-500 mb-1.5">'+esc(label)+'</label>'+inputHtml+'</div>';
+}
+var inputCls = "w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500";
 
 /* ---------------- input forms ---------------- */
 function materialOptions(selected){
@@ -238,21 +230,27 @@ function pekerjaanOptions(selected){
 
 function renderInputForm(c, mode){
   var isMasuk = mode === 'masuk';
-  c.innerHTML = '<div class="card">' +
-    '<h3>'+(isMasuk?'Catat Bahan Masuk':'Catat Pemakaian Bahan')+'</h3>' +
-    '<div class="field"><label>Tanggal</label><input type="date" id="f_tgl" value="'+today()+'"></div>' +
-    '<div class="field"><label>Material</label><select id="f_material">'+materialOptions()+'</select></div>' +
-    (isMasuk ? '' : '<div class="field"><label>Pekerjaan (untuk analisis RAP)</label><select id="f_pekerjaan">'+pekerjaanOptions()+'</select></div>') +
-    '<div class="field"><label>Jumlah (Qty)</label><input type="number" id="f_qty" inputmode="decimal" min="0" step="any" placeholder="0"></div>' +
-    (isMasuk ? '<div class="field"><label>No. Surat Jalan / Nota</label><input type="text" id="f_ref" placeholder="Opsional"></div>' : '') +
-    (isMasuk ? '<div class="field"><label>Harga Satuan (opsional)</label><input type="number" id="f_harga" inputmode="decimal" min="0" step="any" placeholder="0"></div>' : '') +
-    '<div class="field"><label>Keterangan</label><input type="text" id="f_ket" placeholder="Opsional"></div>' +
-    '<button class="btn btn-primary" id="f_save">'+(isMasuk?'Simpan Bahan Masuk':'Simpan Pemakaian')+'</button>' +
-    '</div>';
+  var accent = isMasuk ? 'emerald' : 'amber';
   if(!STATE.materials.length){
-    c.innerHTML = '<div class="card"><div class="empty">Belum ada Master Material.<br>Hubungi Admin Pusat untuk menambahkan.</div></div>';
+    c.innerHTML = card('<div class="text-center text-sm text-slate-400 py-4">Belum ada Master Material.<br>Hubungi Admin Pusat untuk menambahkan.</div>');
     return;
   }
+  c.innerHTML = card(
+    '<div class="flex items-center gap-2.5 mb-5">'+
+      '<div class="w-9 h-9 rounded-xl bg-'+accent+'-50 text-'+accent+'-600 flex items-center justify-center"><i data-lucide="'+(isMasuk?'truck':'hammer')+'" class="w-4.5 h-4.5"></i></div>'+
+      '<h3 class="font-bold text-[15px]">'+(isMasuk?'Catat Bahan Masuk':'Catat Pemakaian Bahan')+'</h3>'+
+    '</div>'+
+    fieldWrap('Tanggal', '<input type="date" id="f_tgl" value="'+today()+'" class="'+inputCls+'">')+
+    fieldWrap('Material', '<select id="f_material" class="'+inputCls+'">'+materialOptions()+'</select>')+
+    (isMasuk ? '' : fieldWrap('Pekerjaan (untuk analisis RAP)', '<select id="f_pekerjaan" class="'+inputCls+'">'+pekerjaanOptions()+'</select>'))+
+    fieldWrap('Jumlah (Qty)', '<input type="number" id="f_qty" inputmode="decimal" min="0" step="any" placeholder="0" class="'+inputCls+'">')+
+    (isMasuk ? fieldWrap('No. Surat Jalan / Nota', '<input type="text" id="f_ref" placeholder="Opsional" class="'+inputCls+'">') : '')+
+    (isMasuk ? fieldWrap('Harga Satuan (opsional)', '<input type="number" id="f_harga" inputmode="decimal" min="0" step="any" placeholder="0" class="'+inputCls+'">') : '')+
+    fieldWrap('Keterangan', '<input type="text" id="f_ket" placeholder="Opsional" class="'+inputCls+'">')+
+    '<button id="f_save" class="w-full bg-'+accent+'-600 hover:bg-'+accent+'-700 active:scale-[.98] transition text-white font-bold py-3.5 rounded-xl text-[15px] mt-1">'+
+      (isMasuk?'Simpan Bahan Masuk':'Simpan Pemakaian')+'</button>'
+  );
+  icons();
   document.getElementById('f_save').onclick = function(){ submitInput(mode); };
 }
 
@@ -297,48 +295,57 @@ function submitInput(mode){
 /* ---------------- stok ---------------- */
 function statusBadge(status){
   var map = {
-    AMAN:['aman','Aman'], HIJAU:['aman','Aman'],
-    MENIPIS:['menipis','Perlu Dikirim'], KUNING:['hampir','Hampir Habis'],
-    HABIS:['habis','Stok Habis'], MELEBIHI:['melebihi','Melebihi RAP'],
-    HAMPIR_HABIS:['hampir','Hampir Habis RAP'], DATA_TIDAK_LENGKAP:['neutral','Data Tidak Lengkap'],
+    AMAN:['bg-emerald-50 text-emerald-700','Aman'],
+    MENIPIS:['bg-amber-50 text-amber-700','Perlu Dikirim'],
+    HABIS:['bg-red-50 text-red-700','Stok Habis'],
+    MELEBIHI:['bg-red-50 text-red-700','Melebihi RAP'],
+    HAMPIR_HABIS:['bg-amber-50 text-amber-700','Hampir Habis RAP'],
+    DATA_TIDAK_LENGKAP:['bg-slate-100 text-slate-500','Data Tidak Lengkap'],
   };
-  var m = map[status] || ['neutral', status];
-  return '<span class="badge '+m[0]+'">'+esc(m[1])+'</span>';
+  var m = map[status] || ['bg-slate-100 text-slate-500', status];
+  return '<span class="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap '+m[0]+'">'+esc(m[1])+'</span>';
 }
 
 function renderStok(c){
-  c.innerHTML = '<div class="card"><div class="empty">Memuat stok…</div></div>';
+  c.innerHTML = card('<div class="text-center text-sm text-slate-400 py-4">Memuat stok…</div>');
   apiFetch('/material_stock.php').then(function(rows){
     var mine = rows.filter(function(r){ return r.project_id === STATE.projectId; });
-    if(!mine.length){ c.innerHTML = '<div class="card"><div class="empty">Belum ada data bahan masuk/pemakaian untuk proyek ini.</div></div>'; return; }
-    c.innerHTML = '<div class="card"><h3>Stok Saat Ini</h3>' +
-      mine.map(function(r){
-        return '<div class="row"><div><b>'+esc(r.material_nama)+'</b><div class="meta">Masuk '+fmtNum(r.total_masuk)+' · Keluar '+fmtNum(r.total_keluar)+' '+esc(r.satuan)+'</div></div>' +
-          '<div style="text-align:right;"><div>'+fmtNum(r.stok)+' '+esc(r.satuan)+'</div>'+statusBadge(r.status)+'</div></div>';
-      }).join('') + '</div>';
-  }).catch(function(e){ c.innerHTML = '<div class="card"><div class="empty">Gagal memuat: '+esc(e.message)+'</div></div>'; });
+    if(!mine.length){ c.innerHTML = card('<div class="text-center text-sm text-slate-400 py-4">Belum ada data bahan masuk/pemakaian untuk proyek ini.</div>'); return; }
+    c.innerHTML = mine.map(function(r){
+      return card(
+        '<div class="flex items-start justify-between gap-3">'+
+          '<div><div class="font-bold text-[15px]">'+esc(r.material_nama)+'</div>'+
+          '<div class="text-xs text-slate-400 mt-0.5">Masuk '+fmtNum(r.total_masuk)+' · Keluar '+fmtNum(r.total_keluar)+' '+esc(r.satuan)+'</div></div>'+
+          statusBadge(r.status)+
+        '</div>'+
+        '<div class="text-2xl font-extrabold mt-3">'+fmtNum(r.stok)+' <span class="text-sm font-medium text-slate-400">'+esc(r.satuan)+'</span></div>'
+      );
+    }).join('');
+  }).catch(function(e){ c.innerHTML = card('<div class="text-center text-sm text-red-500 py-4">Gagal memuat: '+esc(e.message)+'</div>'); });
 }
 
 /* ---------------- riwayat ---------------- */
 function renderRiwayat(c){
-  c.innerHTML = '<div class="card"><div class="empty">Memuat riwayat…</div></div>';
+  c.innerHTML = card('<div class="text-center text-sm text-slate-400 py-4">Memuat riwayat…</div>');
   Promise.all([apiFetch('/material_receipts.php'), apiFetch('/material_usage.php')]).then(function(r){
     var masuk = r[0].filter(function(x){ return x.project_id === STATE.projectId; }).slice(0, 20);
     var pakai = r[1].filter(function(x){ return x.project_id === STATE.projectId; }).slice(0, 20);
     var matName = function(id){ var m = STATE.materials.find(function(x){ return x.id===id; }); return m ? m.nama : id; };
+    function rowHtml(x, sign, kind){
+      return '<div class="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">'+
+        '<div><div class="font-semibold text-[14px]">'+esc(matName(x.material_id))+'</div>'+
+        '<div class="text-xs text-slate-400">'+esc(x.tgl)+(x.no_referensi?' · '+esc(x.no_referensi):'')+'</div></div>'+
+        '<div class="flex items-center gap-3">'+
+          '<span class="font-bold '+(sign>0?'text-emerald-600':'text-amber-600')+'">'+(sign>0?'+':'−')+fmtNum(x.qty)+'</span>'+
+          '<button data-del="'+kind+'" data-id="'+esc(x.id)+'" class="text-slate-300 hover:text-red-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>'+
+        '</div></div>';
+    }
     c.innerHTML =
-      '<div class="card"><h3>Bahan Masuk Terakhir</h3>' +
-      (masuk.length ? masuk.map(function(x){
-        return '<div class="row"><div><b>'+esc(matName(x.material_id))+'</b><div class="meta">'+esc(x.tgl)+(x.no_referensi?' · '+esc(x.no_referensi):'')+'</div></div>' +
-          '<div style="display:flex;align-items:center;gap:10px;"><span>+'+fmtNum(x.qty)+'</span>' +
-          '<button data-del="masuk" data-id="'+esc(x.id)+'" style="border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;">Hapus</button></div></div>';
-      }).join('') : '<div class="empty">Belum ada data.</div>') + '</div>' +
-      '<div class="card"><h3>Pemakaian Terakhir</h3>' +
-      (pakai.length ? pakai.map(function(x){
-        return '<div class="row"><div><b>'+esc(matName(x.material_id))+'</b><div class="meta">'+esc(x.tgl)+'</div></div>' +
-          '<div style="display:flex;align-items:center;gap:10px;"><span>−'+fmtNum(x.qty)+'</span>' +
-          '<button data-del="pakai" data-id="'+esc(x.id)+'" style="border:none;background:none;color:var(--red);font-size:12px;cursor:pointer;">Hapus</button></div></div>';
-      }).join('') : '<div class="empty">Belum ada data.</div>') + '</div>';
+      card('<h3 class="font-bold text-[15px] mb-1 flex items-center gap-2"><i data-lucide="truck" class="w-4 h-4 text-emerald-600"></i>Bahan Masuk Terakhir</h3>'+
+        (masuk.length ? masuk.map(function(x){ return rowHtml(x, 1, 'masuk'); }).join('') : '<div class="text-center text-sm text-slate-400 py-4">Belum ada data.</div>'))+
+      card('<h3 class="font-bold text-[15px] mb-1 flex items-center gap-2"><i data-lucide="hammer" class="w-4 h-4 text-amber-600"></i>Pemakaian Terakhir</h3>'+
+        (pakai.length ? pakai.map(function(x){ return rowHtml(x, -1, 'pakai'); }).join('') : '<div class="text-center text-sm text-slate-400 py-4">Belum ada data.</div>'));
+    icons();
     c.querySelectorAll('[data-del]').forEach(function(b){
       b.onclick = function(){
         if(!confirm('Hapus data ini?')) return;
@@ -348,7 +355,7 @@ function renderRiwayat(c){
           .catch(function(e){ toast('Gagal menghapus: ' + e.message, true); });
       };
     });
-  }).catch(function(e){ c.innerHTML = '<div class="card"><div class="empty">Gagal memuat: '+esc(e.message)+'</div></div>'; });
+  }).catch(function(e){ c.innerHTML = card('<div class="text-center text-sm text-red-500 py-4">Gagal memuat: '+esc(e.message)+'</div>'); });
 }
 </script>
 </body>

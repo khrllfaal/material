@@ -4,23 +4,44 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Material & Stok</title>
-<style>
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#0f172a;
-    min-height:100vh;display:flex;align-items:center;justify-content:center;}
-  .card{background:#fff;border-radius:20px;box-shadow:0 10px 30px rgba(15,23,42,.08);padding:36px;max-width:380px;width:100%;text-align:center;}
-  h1{font-size:20px;margin:0 0 6px;}
-  p{color:#64748b;font-size:13px;margin:0 0 24px;}
-  a.btn{display:block;padding:14px;border-radius:12px;font-weight:700;text-decoration:none;margin-bottom:12px;font-size:15px;}
-  a.admin{background:#2563eb;color:#fff;}
-  a.lapangan{background:#fff;color:#2563eb;border:1.5px solid #e2e8f0;}
-</style>
+<link rel="stylesheet" href="vendor/tailwind.css">
+<script src="vendor/icons.js"></script>
+<style>body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;}</style>
 </head>
-<body>
-  <div class="card">
-    <h1>Material & Stok</h1>
-    <p>Pilih halaman sesuai peran Anda</p>
-    <a class="btn admin" href="admin.html">Admin Pusat / Owner</a>
-    <a class="btn lapangan" href="lapangan.html">Admin Lapangan (HP)</a>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
+  <div class="w-full max-w-4xl">
+    <div class="text-center mb-10">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200 mb-4">
+        <i data-lucide="boxes" class="w-7 h-7"></i>
+      </div>
+      <h1 class="text-2xl font-extrabold text-slate-800 tracking-tight">Material & Stok</h1>
+      <p class="text-slate-500 text-sm mt-1">Input bahan masuk &amp; pemakaian, pantau stok dan RAP lintas proyek</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-6">
+      <a href="admin.html" class="group bg-white rounded-3xl shadow-sm border border-slate-200 p-8 hover:shadow-xl hover:-translate-y-1 hover:border-blue-300 transition-all">
+        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-5 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+          <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+        </div>
+        <h2 class="text-lg font-bold text-slate-800">Admin Pusat / Owner</h2>
+        <p class="text-sm text-slate-500 mt-1.5 leading-relaxed">Kelola Master Proyek, Bahan, Pekerjaan &amp; RAP, pantau Stok dan Analisis RAP lintas semua proyek.</p>
+        <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 mt-5">
+          Masuk ke Dashboard <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+        </span>
+      </a>
+
+      <a href="lapangan.html" class="group bg-white rounded-3xl shadow-sm border border-slate-200 p-8 hover:shadow-xl hover:-translate-y-1 hover:border-emerald-300 transition-all">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-5 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+          <i data-lucide="smartphone" class="w-6 h-6"></i>
+        </div>
+        <h2 class="text-lg font-bold text-slate-800">Admin Lapangan</h2>
+        <p class="text-sm text-slate-500 mt-1.5 leading-relaxed">Input Bahan Masuk &amp; Pemakaian langsung dari HP, cek stok proyek Anda kapan saja.</p>
+        <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 mt-5">
+          Buka Aplikasi HP <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+        </span>
+      </a>
+    </div>
   </div>
+<script>lucide.createIcons();</script>
 </body>
 </html>

@@ -1,7 +1,6 @@
-/* PHP + MySQL backend connection (primary backend for this app).
-   Point this at wherever backend/api/ is deployed:
-     - Same domain as this frontend (typical Hostinger setup): '/api'
-     - A different domain/subdomain: 'https://api.yourdomain.com'
-   Leave empty ('') to keep the app in local/offline mode — see
-   docs/DEPLOY_HOSTINGER.md for the full setup. */
-window.API_BASE_URL = '';
+/* PHP + MySQL backend connection. Default assumes this repo is
+   deployed as-is (frontend/ and backend/ as siblings under the same
+   domain), so '../backend/api' resolves correctly from any page in
+   frontend/ without extra web server config. Override if you deploy
+   the API elsewhere, e.g. 'https://api.yourdomain.com'. */
+window.API_BASE_URL = '../backend/api';
