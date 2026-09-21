@@ -22,7 +22,7 @@ if (extension_loaded('zlib') && !ini_get('zlib.output_compression')) {
     ob_start('ob_gzhandler');
 }
 set_exception_handler(function (Throwable $e): void {
-    error_log('[accv2] Unhandled ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    error_log('[material] Unhandled ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     if (!headers_sent()) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
@@ -50,7 +50,7 @@ function start_session(): void {
         // the cookie still gets marked secure on a real HTTPS deploy.
         'secure' => !empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'),
     ]);
-    session_name('accv2_session');
+    session_name('material_session');
     session_start();
 }
 
