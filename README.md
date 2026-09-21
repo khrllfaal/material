@@ -16,12 +16,18 @@ CDN pihak ketiga setiap kali dibuka.
 
 ## Struktur repo
 
+Frontend sengaja **satu file HTML saja** (`index.html`) untuk Admin
+Pusat, Owner, maupun Admin Lapangan — supaya revisi ke depan (ganti
+warna, tambah menu, perbaiki bug) cukup edit satu file, bukan tiga.
+Setelah login, halaman otomatis menampilkan tampilan sidebar desktop
+(Admin Pusat/Owner) atau tampilan tab HP (Admin Lapangan) sesuai role
+akun — bukan berdasarkan halaman mana yang dibuka.
+
 ```
 frontend/
-  index.html    halaman pilih peran (Admin Pusat/Owner vs Admin Lapangan)
-  admin.html    dashboard Admin Pusat & Owner — master data + laporan
-  lapangan.html aplikasi ringan untuk HP — Admin Lapangan input Bahan
-                Masuk & Pemakaian per proyek, lihat stok & riwayat
+  index.html    SATU halaman untuk semua role — tampilan menyesuaikan
+                otomatis setelah login (sidebar desktop untuk Admin
+                Pusat/Owner, tab HP untuk Admin Lapangan)
   backend-config.js   API_BASE_URL (arahkan ke folder backend/api/)
   vendor/
     tailwind.css  CSS terkompilasi (hasil build, lihat scripts/build-tailwind.sh)
@@ -51,23 +57,23 @@ scripts/
      komputer lokal untuk mendapatkan password hash, lalu `INSERT` baris
      ke tabel `users` lewat phpMyAdmin.
 4. Isi `frontend/backend-config.js` — `window.API_BASE_URL` diarahkan
-   ke folder `backend/api` (mis. `/api` kalau frontend & backend satu
-   domain).
+   ke folder `backend/api` (default `../backend/api`, sudah pas kalau
+   `frontend/` dan `backend/` diupload sejajar di domain yang sama).
 5. Upload semua isi `frontend/` dan `backend/` ke hosting, buka
-   `frontend/index.html`.
+   `frontend/index.html`. Semua role login di halaman yang sama.
 
 ## Role (ditegakkan di backend, bukan cuma disembunyikan di UI)
 
 - **Admin Lapangan** (`lapangan`) — hanya boleh input Bahan Masuk &
-  Pemakaian, dibatasi ke proyek yang ditugaskan (menu "Kelola User" di
-  `admin.html`). Tidak bisa mengakses data proyek lain sama sekali.
-  Login lewat `lapangan.html`.
+  Pemakaian, dibatasi ke proyek yang ditugaskan (menu "Kelola User").
+  Tidak bisa mengakses data proyek lain sama sekali. Setelah login
+  otomatis melihat tampilan tab HP, bukan sidebar desktop.
 - **Admin Pusat** (`admin`) — akses penuh: kelola Master Proyek,
   Master Bahan, Master Pekerjaan, Konfigurasi RAP, lihat semua
   laporan, dan kelola user.
-- **Owner** (`owner`) — bisa melihat semua menu di `admin.html`, tapi
-  setiap endpoint menolak permintaan tulis (POST/DELETE) dari role
-  ini dengan HTTP 403; tombol Tambah/Edit/Hapus juga disembunyikan.
+- **Owner** (`owner`) — bisa melihat semua menu, tapi setiap endpoint
+  menolak permintaan tulis (POST/DELETE) dari role ini dengan HTTP
+  403; tombol Tambah/Edit/Hapus juga disembunyikan di UI.
 
 ## Alur kerja
 
