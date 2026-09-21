@@ -47,6 +47,13 @@ $stmt->execute($params);
 $out = array_map(function ($r) {
     $stok = (float)$r['stok'];
     $min = (float)$r['stok_minimum'];
+    // PDO returns DECIMAL columns as strings — cast back to real JSON
+    // numbers so the frontend's typeof-based number formatting
+    // (exports especially) doesn't treat them as pre-formatted text.
+    $r['stok'] = $stok;
+    $r['stok_minimum'] = $min;
+    $r['total_masuk'] = (float)$r['total_masuk'];
+    $r['total_keluar'] = (float)$r['total_keluar'];
     if ($stok <= 0) $status = 'HABIS';
     elseif ($stok <= $min) $status = 'MENIPIS';
     else $status = 'AMAN';

@@ -84,6 +84,22 @@ CREATE TABLE IF NOT EXISTS rap_material (
   FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Simple RAP: one total budget qty per project+material, no BOQ/
+-- pekerjaan breakdown needed. This is the one pusat should fill in for
+-- every project (fast, always fillable); rap_material above stays
+-- available for a deeper per-pekerjaan breakdown on projects worth the
+-- extra setup effort.
+CREATE TABLE IF NOT EXISTS rap_bahan_proyek (
+  id            VARCHAR(40) PRIMARY KEY,
+  project_id    VARCHAR(40) NOT NULL,
+  material_id   VARCHAR(40) NOT NULL,
+  rap_qty       DECIMAL(18,3) NOT NULL DEFAULT 0,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_rap_project_material (project_id, material_id),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Latest cumulative % progress per pekerjaan, reported from the field.
 CREATE TABLE IF NOT EXISTS progress_pekerjaan (
   id             VARCHAR(40) PRIMARY KEY,

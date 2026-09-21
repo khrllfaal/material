@@ -55,6 +55,13 @@ $out = array_map(function ($r) {
     $volumeAktual = (float)$r['volume_aktual'];
     $koefisien = (float)$r['koefisien'];
     $aktualMaterial = (float)$r['aktual_material'];
+    // PDO returns DECIMAL columns as strings — cast back to real JSON
+    // numbers so the frontend's typeof-based number formatting
+    // (exports especially) doesn't treat them as pre-formatted text.
+    $r['volume_aktual'] = $volumeAktual;
+    $r['koefisien'] = $koefisien;
+    $r['aktual_material'] = $aktualMaterial;
+    $r['volume_kontrak'] = (float)$r['volume_kontrak'];
     $targetIdeal = $koefisien * $volumeAktual;
     $r['target_material_ideal'] = $targetIdeal;
     $r['deviasi'] = $aktualMaterial - $targetIdeal;

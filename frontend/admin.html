@@ -38,10 +38,12 @@
 </div>
 
 <div id="shell" class="hidden">
-  <div id="sidebar" class="w-60 bg-slate-900 text-slate-300 fixed top-0 bottom-0 left-0 overflow-y-auto flex flex-col">
+  <div id="sidebarBackdrop" class="hidden fixed inset-0 bg-slate-900/50 z-30 lg:hidden"></div>
+  <div id="sidebar" class="w-64 bg-slate-900 text-slate-300 fixed top-0 bottom-0 left-0 overflow-y-auto flex flex-col z-40 transform -translate-x-full transition-transform duration-200 lg:translate-x-0 lg:w-60">
     <div class="px-5 py-5 flex items-center gap-2.5 border-b border-white/10">
       <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0"><i data-lucide="boxes" class="w-4.5 h-4.5"></i></div>
       <span class="font-extrabold text-white text-[15px] tracking-tight">Material & Stok</span>
+      <button id="btnCloseSidebar" class="ml-auto text-slate-400 hover:text-white lg:hidden"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
     <div class="px-5 py-3.5 text-xs text-slate-400 border-b border-white/10" id="whoInfo">—</div>
     <div id="navList" class="py-2 flex-1"></div>
@@ -49,7 +51,11 @@
       <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
     </a>
   </div>
-  <div class="ml-60 p-8 max-w-6xl"><div id="content"></div></div>
+  <div id="topbarMobile" class="lg:hidden sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-3.5 flex items-center gap-3">
+    <button id="btnOpenSidebar" class="text-slate-600"><i data-lucide="menu" class="w-6 h-6"></i></button>
+    <span class="font-extrabold text-slate-800 text-[15px]">Material & Stok</span>
+  </div>
+  <div class="lg:ml-60 p-5 lg:p-8 max-w-6xl"><div id="content"></div></div>
 </div>
 
 <div id="modalBack" class="hidden fixed inset-0 bg-slate-900/50 z-30 items-center justify-center p-5">
@@ -125,6 +131,9 @@ document.getElementById('loginForm').addEventListener('submit', function(e){
 document.getElementById('btnLogout').onclick=function(){
   apiFetch('/auth_logout.php', {method:'POST'}).catch(function(){}).finally(function(){ location.reload(); });
 };
+document.getElementById('btnOpenSidebar').onclick=function(){ openSidebar(); };
+document.getElementById('btnCloseSidebar').onclick=function(){ closeSidebar(); };
+document.getElementById('sidebarBackdrop').onclick=function(){ closeSidebar(); };
 apiFetch('/auth_me.php').then(function(res){ if(res.user) boot(res.user); }).catch(function(){});
 
 function boot(user){
@@ -144,10 +153,13 @@ var NAV=[
   {id:'dashboard', label:'Dashboard', icon:'layout-dashboard'},
   {id:'proyek', label:'Master Proyek', icon:'briefcase'},
   {id:'bahan', label:'Master Bahan', icon:'box'},
-  {id:'pekerjaan', label:'Master Pekerjaan', icon:'hammer'},
-  {id:'rap', label:'Konfigurasi RAP', icon:'file-spreadsheet'},
+  {id:'pekerjaan', label:'Master Pekerjaan (opsional)', icon:'hammer'},
+  {id:'rap_proyek', label:'RAP per Proyek', icon:'file-spreadsheet'},
+  {id:'rap', label:'RAP per Pekerjaan (detail)', icon:'file-spreadsheet'},
+  {id:'riwayat', label:'Riwayat Transaksi', icon:'history'},
   {id:'stock', label:'Monitor Stok', icon:'layers'},
-  {id:'rap_report', label:'Analisis RAP Bahan', icon:'trending-up'},
+  {id:'rap_proyek_report', label:'Analisis RAP per Proyek', icon:'trending-up'},
+  {id:'rap_report', label:'Analisis RAP per Pekerjaan (detail)', icon:'trending-up'},
   {id:'users', label:'Kelola User', icon:'users'},
 ];
 function renderNav(){
@@ -156,8 +168,16 @@ function renderNav(){
       '<i data-lucide="'+n.icon+'" class="w-4 h-4"></i>'+esc(n.label)+'</a>';
   }).join('');
   document.querySelectorAll('.nav-link').forEach(function(a){
-    a.onclick=function(){ go(a.getAttribute('data-page')); };
+    a.onclick=function(){ go(a.getAttribute('data-page')); closeSidebar(); };
   });
+}
+function openSidebar(){
+  document.getElementById('sidebar').classList.remove('-translate-x-full');
+  document.getElementById('sidebarBackdrop').classList.remove('hidden');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.add('-translate-x-full');
+  document.getElementById('sidebarBackdrop').classList.add('hidden');
 }
 function go(page){
   STATE.page=page;
@@ -187,11 +207,168 @@ function badge(kind, label){
   return '<span class="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap '+(map[kind]||map.neutral)+'">'+esc(label)+'</span>';
 }
 
+/* ============================================================
+   EXPORT — Excel (.xlsx) & PDF, with the same status colors used
+   on-screen (conditional formatting), so a report opened outside
+   the app still reads Aman/Perlu Dikirim/Habis (or Melebihi RAP)
+   at a glance — this is the format owners actually forward around.
+   ============================================================ */
+var STATUS_STYLE = {
+  AMAN:               {xlsxFill:'FFC6EFCE', xlsxFont:'FF006100', bg:'#C6EFCE', fg:'#006100', label:'Aman'},
+  MENIPIS:            {xlsxFill:'FFFFEB9C', xlsxFont:'FF9C6500', bg:'#FFEB9C', fg:'#9C6500', label:'Perlu Dikirim'},
+  HABIS:              {xlsxFill:'FFFFC7CE', xlsxFont:'FF9C0006', bg:'#FFC7CE', fg:'#9C0006', label:'Stok Habis'},
+  HAMPIR_HABIS:       {xlsxFill:'FFFFEB9C', xlsxFont:'FF9C6500', bg:'#FFEB9C', fg:'#9C6500', label:'Hampir Habis RAP'},
+  MELEBIHI:           {xlsxFill:'FFFFC7CE', xlsxFont:'FF9C0006', bg:'#FFC7CE', fg:'#9C0006', label:'Melebihi RAP'},
+  DATA_TIDAK_LENGKAP: {xlsxFill:'FFF2F2F2', xlsxFont:'FF7F7F7F', bg:'#F2F2F2', fg:'#7F7F7F', label:'Data Tidak Lengkap'},
+};
+
+var _exceljsLoading=null;
+function loadExcelJS(){
+  if(window.ExcelJS) return Promise.resolve();
+  if(_exceljsLoading) return _exceljsLoading;
+  _exceljsLoading=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    s.src='vendor/exceljs.min.js';
+    s.onload=function(){ resolve(); };
+    s.onerror=function(){ _exceljsLoading=null; reject(new Error('Gagal memuat modul Excel.')); };
+    document.head.appendChild(s);
+  });
+  return _exceljsLoading;
+}
+
+/* headers: string[]; rows: any[][] (numbers stay numbers so Excel can
+   sum/sort them); opts.statusCol: index of the column holding the RAW
+   status code (AMAN/MENIPIS/…) to color that cell — that column's
+   values are swapped for their human label after coloring. */
+async function exportExcel(filename, title, headers, rows, opts){
+  opts=opts||{};
+  try{ await loadExcelJS(); }
+  catch(e){ toast('Gagal memuat modul Excel — cek koneksi lalu coba lagi.', true); return; }
+
+  var wb=new ExcelJS.Workbook();
+  wb.creator='Material & Stok';
+  wb.created=new Date();
+  var ws=wb.addWorksheet((opts.sheetName||filename).slice(0,31).replace(/[\\/*?:\[\]]/g,' '));
+
+  var titleRow=ws.addRow([title]);
+  titleRow.font={bold:true, size:13, name:'Calibri', color:{argb:'FF1E3A8A'}};
+  ws.mergeCells(titleRow.number,1,titleRow.number,Math.max(headers.length,1));
+  var subRow=ws.addRow(['Diekspor '+new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})+' dari Material & Stok']);
+  subRow.font={italic:true, size:9.5, name:'Calibri', color:{argb:'FF888888'}};
+  ws.mergeCells(subRow.number,1,subRow.number,Math.max(headers.length,1));
+  ws.addRow([]);
+
+  var headerRow=ws.addRow(headers);
+  headerRow.eachCell(function(cell){
+    cell.font={bold:true, color:{argb:'FFFFFFFF'}, name:'Calibri', size:10.5};
+    cell.fill={type:'pattern', pattern:'solid', fgColor:{argb:'FF1E3A8A'}};
+    cell.alignment={vertical:'middle', horizontal:'center', wrapText:true};
+  });
+  headerRow.height=20;
+  ws.views=[{state:'frozen', ySplit:headerRow.number}];
+
+  var isNumCol=headers.map(function(_,ci){
+    return rows.length>0 && rows.every(function(r){ return r[ci]==null || typeof r[ci]==='number'; });
+  });
+
+  rows.forEach(function(r, ri){
+    var displayRow = r.slice();
+    var style = (opts.statusCol!=null) ? STATUS_STYLE[r[opts.statusCol]] : null;
+    if(opts.statusCol!=null) displayRow[opts.statusCol] = style ? style.label : r[opts.statusCol];
+    var row=ws.addRow(displayRow);
+    row.eachCell({includeEmpty:true}, function(cell, ci){
+      cell.font={name:'Calibri', size:10.5};
+      cell.border={bottom:{style:'hair', color:{argb:'FFE3E7EE'}}};
+      if(isNumCol[ci-1]){ cell.numFmt='#,##0.##'; cell.alignment={horizontal:'right'}; }
+      else cell.alignment={horizontal:'left'};
+      if(ri%2===1) cell.fill={type:'pattern', pattern:'solid', fgColor:{argb:'FFF7F9FC'}};
+      if(style && (ci-1)===opts.statusCol){
+        cell.fill={type:'pattern', pattern:'solid', fgColor:{argb:style.xlsxFill}};
+        cell.font={name:'Calibri', size:10.5, bold:true, color:{argb:style.xlsxFont}};
+        cell.alignment={horizontal:'center'};
+      }
+    });
+  });
+
+  headers.forEach(function(h, i){
+    var maxLen=String(h).length;
+    rows.forEach(function(r){
+      var v=(opts.statusCol===i && STATUS_STYLE[r[i]]) ? STATUS_STYLE[r[i]].label : r[i];
+      var len=(typeof v==='number')?num0(v).length:String(v==null?'':v).length;
+      if(len>maxLen) maxLen=len;
+    });
+    ws.getColumn(i+1).width=Math.min(Math.max(maxLen+2, 10), 48);
+  });
+
+  var buf=await wb.xlsx.writeBuffer();
+  var blob=new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename.replace(/\s+/g,'_')+'.xlsx';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+/* Same data, rendered as a standalone print-ready page in a new tab —
+   uses the browser's own "Save as PDF" (no extra library needed) and
+   keeps the status colors via print-color-adjust so they survive
+   printing/PDF export, not just on-screen viewing. */
+function exportPdf(title, sub, headers, rows, opts){
+  opts=opts||{};
+  var win=window.open('', '_blank');
+  if(!win){ toast('Popup diblokir browser — izinkan popup untuk mengekspor PDF.', true); return; }
+  var theadHtml='<tr>'+headers.map(function(h){ return '<th>'+esc(h)+'</th>'; }).join('')+'</tr>';
+  var tbodyHtml=rows.map(function(r){
+    return '<tr>'+r.map(function(v, ci){
+      var style=(opts.statusCol===ci && STATUS_STYLE[v]) ? STATUS_STYLE[v] : null;
+      var text = style ? style.label : (typeof v==='number' ? num0(v) : esc(v==null?'':v));
+      var cellStyle = style ? ' style="background:'+style.bg+';color:'+style.fg+';font-weight:700;text-align:center;border-radius:999px;"' : (typeof v==='number' ? ' style="text-align:right;"' : '');
+      return '<td'+cellStyle+'>'+(style?'<span class="pill">'+text+'</span>':text)+'</td>';
+    }).join('')+'</tr>';
+  }).join('');
+  win.document.write(
+    '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(title)+'</title><style>'+
+    'body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;margin:32px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'+
+    'h1{font-size:18px;margin:0 0 2px;color:#1e3a8a;}'+
+    '.sub{color:#64748b;font-size:12px;margin-bottom:18px;}'+
+    'table{width:100%;border-collapse:collapse;font-size:11.5px;}'+
+    'th{background:#1e3a8a;color:#fff;text-align:left;padding:8px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em;}'+
+    'td{padding:7px 10px;border-bottom:1px solid #e3e7ee;}'+
+    'tr:nth-child(even) td{background:#f7f9fc;}'+
+    '.pill{padding:3px 10px;border-radius:999px;font-size:10.5px;}'+
+    '.foot{margin-top:16px;color:#94a3b8;font-size:10px;}'+
+    '@media print{ body{margin:12mm;} }'+
+    '</style></head><body>'+
+    '<h1>'+esc(title)+'</h1>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'')+
+    '<table><thead>'+theadHtml+'</thead><tbody>'+tbodyHtml+'</tbody></table>'+
+    '<div class="foot">Diekspor '+new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})+' dari Material & Stok</div>'+
+    '</body></html>'
+  );
+  win.document.close();
+  win.onload = function(){ win.focus(); win.print(); };
+  setTimeout(function(){ win.focus(); win.print(); }, 300);
+}
+
+function exportBtnsHtml(){
+  return '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button> '+
+    '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="printer" class="w-3.5 h-3.5"></i>PDF</button>';
+}
+/* rowsFn()/rowsForPdfFn() return the CURRENT (filtered) rows as
+   arrays-of-cells matching `headers`; statusCol is optional. */
+function bindExportBtns(filename, title, sub, headers, rowsFn, statusCol){
+  var bx=document.getElementById('btnExportExcel'), bp=document.getElementById('btnExportPdf');
+  if(bx) bx.onclick=function(){ exportExcel(filename, title, headers, rowsFn(), {statusCol:statusCol}); };
+  if(bp) bp.onclick=function(){ exportPdf(title, sub, headers, rowsFn(), {statusCol:statusCol}); };
+}
+
 /* ---------------- generic master-data CRUD page ---------------- */
 /* cfg: {title, sub, endpoint, addLabel, fields:[{key,label,type,required,optionsFn}], columns:[{key,label,render}] } */
+function stripHtml(html){ var d=document.createElement('div'); d.innerHTML=html; return (d.textContent||'').replace(/\s+/g,' ').trim(); }
+
 function masterPage(cfg){
   return function(c){
-    c.innerHTML = pageHead(cfg.title, cfg.sub, isOwner()?'':'<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>'+esc(cfg.addLabel||'Tambah')+'</button>') +
+    c.innerHTML = pageHead(cfg.title, cfg.sub,
+      (isOwner()?'':'<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>'+esc(cfg.addLabel||'Tambah')+'</button> ')+exportBtnsHtml()) +
       panel(
         '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
           '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
@@ -200,11 +377,17 @@ function masterPage(cfg){
         '</div>'+
         '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
       );
+    // Pages whose data loads via an outer Promise before calling this
+    // (e.g. PAGES.pekerjaan, PAGES.rap) only get their innerHTML set
+    // here, *after* go()'s own icons() call already ran — so the
+    // plus/search icons in the markup above need their own pass.
+    icons();
 
-    var rows=[];
+    var rows=[], filteredList=[];
     function draw(){
       var q=fv('q').toLowerCase();
-      var list = q ? rows.filter(function(r){ return (cfg.searchFn?cfg.searchFn(r):r.nama).toLowerCase().indexOf(q)>-1; }) : rows;
+      filteredList = q ? rows.filter(function(r){ return (cfg.searchFn?cfg.searchFn(r):r.nama).toLowerCase().indexOf(q)>-1; }) : rows;
+      var list = filteredList;
       document.getElementById('cnt').textContent = list.length+' data';
       var cols = cfg.columns.concat(isOwner()?[]:[{key:'_act',label:'Aksi',render:function(r){
         return '<button class="'+btnGhostSm+'" data-edit="'+esc(r.id)+'">Edit</button> '+
@@ -216,6 +399,8 @@ function masterPage(cfg){
           return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.render(r)+'</td>'; }).join('')+'</tr>';
         }).join(''):'<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada data.</td></tr>')+'</tbody>';
       tbl.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ form(b.getAttribute('data-edit')); }; });
+      bindExportBtns(cfg.title, cfg.title, cfg.sub, cfg.columns.map(function(cl){ return cl.label; }),
+        function(){ return filteredList.map(function(r){ return cfg.columns.map(function(cl){ return stripHtml(cl.render(r)); }); }); });
       tbl.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ del(b.getAttribute('data-del')); }; });
     }
     function refresh(){
@@ -285,17 +470,20 @@ PAGES.dashboard = function(c){
 
   Promise.all([
     apiFetch('/projects.php'), apiFetch('/materials.php'),
-    apiFetch('/material_stock.php'), apiFetch('/material_rap_report.php'),
+    apiFetch('/material_stock.php'), apiFetch('/material_rap_proyek_report.php'),
   ]).then(function(r){
     var projects=r[0], materials=r[1], stock=r[2], rapReport=r[3];
     var critical = stock.filter(function(s){ return s.status==='MENIPIS'||s.status==='HABIS'; });
+    // RAP per Proyek (jatah total, sekali isi per proyek) is the primary
+    // over-budget signal — always available, unlike the per-pekerjaan
+    // detail report which only has data where pusat set up koefisien.
     var over = rapReport.filter(function(s){ return s.status==='MELEBIHI'; });
 
     document.getElementById('statGrid').innerHTML =
       statCard('briefcase','bg-blue-50 text-blue-600','Total Proyek', projects.length) +
       statCard('box','bg-indigo-50 text-indigo-600','Total Bahan Terdaftar', materials.length) +
       statCard('layers','bg-amber-50 text-amber-600','Bahan Perlu Restock', critical.length, critical.length?'di '+new Set(critical.map(function(x){return x.project_id;})).size+' proyek':null) +
-      statCard('trending-up','bg-red-50 text-red-600','Pekerjaan Melebihi RAP', over.length, over.length?'potensi pemborosan bahan':null);
+      statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null);
 
     var stockPrev=document.getElementById('stockPreview');
     stockPrev.innerHTML = critical.length ? panel(critical.slice(0,6).map(function(r){
@@ -307,9 +495,9 @@ PAGES.dashboard = function(c){
     var rapPrev=document.getElementById('rapPreview');
     rapPrev.innerHTML = over.length ? panel(over.slice(0,6).map(function(r){
       return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm">'+
-        '<div><b>'+esc(r.material_nama)+'</b><div class="text-xs text-slate-400">'+esc(r.pekerjaan_nama)+' · '+esc(r.project_nama)+'</div></div>'+
+        '<div><b>'+esc(r.material_nama)+'</b><div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div></div>'+
         '<span class="font-bold text-red-600">+'+num0(r.deviasi)+'</span></div>';
-    }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Tidak ada pemborosan bahan ✓</div>');
+    }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Belum ada bahan yang melebihi RAP ✓ (pastikan RAP per Proyek sudah diisi)</div>');
     icons();
   }).catch(function(e){ document.getElementById('statGrid').innerHTML='<div class="col-span-full text-center text-sm text-red-500 py-8">Gagal memuat: '+esc(e.message)+'</div>'; });
 };
@@ -392,10 +580,36 @@ PAGES.rap = function(c){
   }).catch(function(e){ c.innerHTML=pageHead('Konfigurasi RAP Bahan','')+panel('<div class="text-red-500 text-sm">Gagal memuat: '+esc(e.message)+'</div>'); });
 };
 
-/* ---------------- read-only cross-project reports ---------------- */
-PAGES.stock = function(c){
-  c.innerHTML = pageHead('Monitor Stok Bahan (Semua Proyek)',
-    'Stok berjalan (bahan masuk − pemakaian) per proyek, seperti stok minimarket.') +
+PAGES.rap_proyek = function(c){
+  Promise.all([apiFetch('/projects.php'), apiFetch('/materials.php')]).then(function(r){
+    var projects=r[0], materials=r[1];
+    masterPage({
+      title:'RAP per Proyek', sub:'Jatah total bahan per proyek — cukup satu angka, tanpa perlu setup pekerjaan. Isi ini untuk setiap proyek.',
+      endpoint:'/rap_bahan_proyek.php', addLabel:'Jatah Bahan', idPrefix:'rapp_',
+      fields:[
+        {key:'project_id', label:'Proyek', type:'select-dyn', required:true, placeholder:'— Pilih proyek —',
+         optionsFn:function(){ return projects.map(function(p){ return {value:p.id, label:p.nama}; }); }},
+        {key:'material_id', label:'Bahan', type:'select-dyn', required:true, placeholder:'— Pilih bahan —',
+         optionsFn:function(){ return materials.map(function(m){ return {value:m.id, label:m.nama+' ('+m.satuan+')'}; }); }},
+        {key:'rap_qty', label:'Jatah Total (RAP)', type:'number', required:true},
+      ],
+      searchFn:function(r){
+        var p=projects.find(function(x){ return x.id===r.project_id; });
+        var m=materials.find(function(x){ return x.id===r.material_id; });
+        return (p?p.nama:'')+' '+(m?m.nama:'');
+      },
+      columns:[
+        {key:'project_id', label:'Proyek', render:function(r){ var p=projects.find(function(x){ return x.id===r.project_id; }); return p?esc(p.nama):'<span class="text-slate-300 italic">–</span>'; }},
+        {key:'material_id', label:'Bahan', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return m?esc(m.nama):'<span class="text-slate-300 italic">–</span>'; }},
+        {key:'rap_qty', label:'Jatah Total', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return num0(r.rap_qty)+' '+(m?esc(m.satuan):''); }},
+      ],
+    })(c);
+  }).catch(function(e){ c.innerHTML=pageHead('RAP per Proyek','')+panel('<div class="text-red-500 text-sm">Gagal memuat: '+esc(e.message)+'</div>'); });
+};
+
+PAGES.rap_proyek_report = function(c){
+  c.innerHTML = pageHead('Analisis RAP per Proyek',
+    'Pemakaian aktual vs jatah total (RAP) per bahan per proyek — cara paling cepat untuk lihat proyek mana yang sudah lewat jatah.', exportBtnsHtml()) +
     panel(
       '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
         '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
@@ -404,7 +618,126 @@ PAGES.stock = function(c){
       '</div>'+
       '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
     );
-  var rows=[];
+  var rows=[], filteredList=[];
+  var cols=[
+    {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
+    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
+    {label:'Jatah (RAP)', get:function(r){ return num0(r.rap_qty)+' '+esc(r.satuan); }},
+    {label:'Aktual Pemakaian', get:function(r){ return num0(r.aktual_pemakaian)+' '+esc(r.satuan); }},
+    {label:'Deviasi', get:function(r){ return '<b class="'+(r.deviasi>0?'text-red-600':'text-emerald-600')+'">'+numSigned(r.deviasi)+'</b>'; }},
+    {label:'%', get:function(r){ return r.persentase==null?'–':pct(r.persentase); }},
+    {label:'Status', get:function(r){
+      var map={AMAN:['aman','Aman'],HAMPIR_HABIS:['warn','Hampir Habis'],MELEBIHI:['danger','Melebihi RAP'],DATA_TIDAK_LENGKAP:['neutral','Data Tidak Lengkap']};
+      var m=map[r.status]||['neutral',r.status];
+      return badge(m[0], m[1]);
+    }},
+  ];
+  var STATUS_COL = cols.length-1;
+  function exportRow(r){ return [r.project_nama, r.material_nama, r.rap_qty, r.aktual_pemakaian, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; }
+  function draw(){
+    var q=fv('q').toLowerCase();
+    filteredList=q?rows.filter(function(r){ return (r.project_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
+    var list=filteredList;
+    document.getElementById('cnt').textContent=list.length+' data';
+    document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+      '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+      '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada RAP per Proyek yang diisi.</td></tr>')+'</tbody>';
+    bindExportBtns('Analisis_RAP_per_Proyek', 'Analisis RAP per Proyek', 'Pemakaian aktual vs jatah total (RAP)', cols.map(function(cl){ return cl.label; }),
+      function(){ return filteredList.map(exportRow); }, STATUS_COL);
+  }
+  apiFetch('/material_rap_proyek_report.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
+    .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+};
+
+/* ---------------- read-only cross-project reports ---------------- */
+PAGES.riwayat = function(c){
+  c.innerHTML = pageHead('Riwayat Transaksi (Semua Proyek)',
+    'Semua Bahan Masuk & Pemakaian, urut terbaru — bisa disaring per rentang tanggal.', exportBtnsHtml()) +
+    panel(
+      '<div class="flex flex-wrap items-end gap-3 mb-4">'+
+        '<div class="relative flex-1 min-w-[220px]"><label class="block text-xs font-semibold text-slate-500 mb-1.5">Cari</label>'+
+        '<i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-[38px] -translate-y-1/2"></i>'+
+        '<input type="text" id="q" placeholder="Proyek / bahan / keterangan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis</label>'+
+        '<select id="fJenis" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+          '<option value="">Semua</option><option value="Masuk">Bahan Masuk</option><option value="Pemakaian">Pemakaian</option>'+
+        '</select></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Dari Tanggal</label>'+
+        '<input type="date" id="fFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Sampai Tanggal</label>'+
+        '<input type="date" id="fTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<button id="btnResetFilter" class="'+btnGhostSm+'">Reset</button>'+
+        '<span class="text-xs text-slate-400 ml-auto self-center" id="cnt"></span>'+
+      '</div>'+
+      '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
+    );
+
+  var rows=[], filteredList=[];
+  var cols=[
+    {label:'Tanggal', get:function(r){ return esc(r.tgl); }},
+    {label:'Jenis', get:function(r){ return r.jenis==='Masuk' ? badge('aman','Bahan Masuk') : badge('warn','Pemakaian'); }},
+    {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
+    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
+    {label:'Qty', get:function(r){ return (r.jenis==='Masuk'?'+':'−')+num0(r.qty)+' '+esc(r.satuan); }},
+    {label:'Pekerjaan / Referensi', get:function(r){ return r.ref?esc(r.ref):'<span class="text-slate-300 italic">–</span>'; }},
+    {label:'Keterangan', get:function(r){ return r.ket?esc(r.ket):'<span class="text-slate-300 italic">–</span>'; }},
+  ];
+  function exportRow(r){ return [r.tgl, r.jenis, r.project_nama, r.material_nama, (r.jenis==='Masuk'?r.qty:-r.qty), r.ref||'', r.ket||'']; }
+  function draw(){
+    var q=fv('q').toLowerCase(), jenis=fv('fJenis'), from=fv('fFrom'), to=fv('fTo');
+    filteredList = rows.filter(function(r){
+      if(jenis && r.jenis!==jenis) return false;
+      if(from && r.tgl<from) return false;
+      if(to && r.tgl>to) return false;
+      if(q && (r.project_nama+' '+r.material_nama+' '+(r.ket||'')).toLowerCase().indexOf(q)===-1) return false;
+      return true;
+    });
+    var list=filteredList;
+    document.getElementById('cnt').textContent=list.length+' data';
+    document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+      '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+      '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Tidak ada data pada rentang/filter ini.</td></tr>')+'</tbody>';
+    bindExportBtns('Riwayat_Transaksi', 'Riwayat Transaksi (Semua Proyek)',
+      (from||to) ? ('Periode '+(from||'awal')+' s/d '+(to||'sekarang')) : 'Seluruh riwayat',
+      cols.map(function(cl){ return cl.label; }), function(){ return filteredList.map(exportRow); });
+  }
+  Promise.all([
+    apiFetch('/material_receipts.php'), apiFetch('/material_usage.php'),
+    apiFetch('/projects.php'), apiFetch('/materials.php'), apiFetch('/pekerjaan.php'),
+  ]).then(function(r){
+    var receipts=r[0], usage=r[1], projects=r[2], materials=r[3], pekerjaanList=r[4];
+    var projName=function(id){ var p=projects.find(function(x){ return x.id===id; }); return p?p.nama:id; };
+    var matName=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.nama:id; };
+    var matSatuan=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.satuan:''; };
+    var pkName=function(id){ var pk=pekerjaanList.find(function(x){ return x.id===id; }); return pk?pk.nama:''; };
+    rows = receipts.map(function(x){ return {jenis:'Masuk', tgl:x.tgl, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.no_referensi||'', ket:x.ket||''}; })
+      .concat(usage.map(function(x){ return {jenis:'Pemakaian', tgl:x.tgl, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.pekerjaan_id?pkName(x.pekerjaan_id):'', ket:x.ket||''}; }));
+    rows.sort(function(a,b){ return a.tgl<b.tgl?1:(a.tgl>b.tgl?-1:0); });
+    draw();
+    document.getElementById('q').addEventListener('input', draw);
+    document.getElementById('fJenis').addEventListener('change', draw);
+    document.getElementById('fFrom').addEventListener('change', draw);
+    document.getElementById('fTo').addEventListener('change', draw);
+    document.getElementById('btnResetFilter').onclick=function(){
+      document.getElementById('q').value=''; document.getElementById('fJenis').value='';
+      document.getElementById('fFrom').value=''; document.getElementById('fTo').value='';
+      draw();
+    };
+  }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+};
+
+PAGES.stock = function(c){
+  c.innerHTML = pageHead('Monitor Stok Bahan (Semua Proyek)',
+    'Stok berjalan (bahan masuk − pemakaian) per proyek, seperti stok minimarket.', exportBtnsHtml()) +
+    panel(
+      '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
+        '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
+        '<input type="text" id="q" placeholder="Cari proyek / bahan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<span class="text-xs text-slate-400" id="cnt"></span>'+
+      '</div>'+
+      '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
+    );
+  var rows=[], filteredList=[];
   var cols=[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
@@ -418,13 +751,18 @@ PAGES.stock = function(c){
       return badge(m[0], m[1]);
     }},
   ];
+  var STATUS_COL = cols.length-1;
+  function exportRow(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.stok_minimum, r.status]; }
   function draw(){
     var q=fv('q').toLowerCase();
-    var list=q?rows.filter(function(r){ return (r.project_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
+    filteredList=q?rows.filter(function(r){ return (r.project_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
+    var list=filteredList;
     document.getElementById('cnt').textContent=list.length+' data';
     document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
       '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
       '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada data bahan masuk/pemakaian.</td></tr>')+'</tbody>';
+    bindExportBtns('Monitor_Stok_Bahan', 'Monitor Stok Bahan (Semua Proyek)', 'Stok berjalan per proyek', cols.map(function(cl){ return cl.label; }),
+      function(){ return filteredList.map(exportRow); }, STATUS_COL);
   }
   apiFetch('/material_stock.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
     .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
@@ -432,7 +770,7 @@ PAGES.stock = function(c){
 
 PAGES.rap_report = function(c){
   c.innerHTML = pageHead('Analisis RAP Bahan (Semua Proyek)',
-    'Pemakaian aktual vs target ideal (koefisien RAP × progress volume pekerjaan) — mendeteksi pemborosan.') +
+    'Pemakaian aktual vs target ideal (koefisien RAP × progress volume pekerjaan) — mendeteksi pemborosan.', exportBtnsHtml()) +
     panel(
       '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
         '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
@@ -441,7 +779,7 @@ PAGES.rap_report = function(c){
       '</div>'+
       '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
     );
-  var rows=[];
+  var rows=[], filteredList=[];
   var cols=[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Pekerjaan', get:function(r){ return esc(r.pekerjaan_nama); }},
@@ -457,13 +795,18 @@ PAGES.rap_report = function(c){
       return badge(m[0], m[1]);
     }},
   ];
+  var STATUS_COL = cols.length-1;
+  function exportRow(r){ return [r.project_nama, r.pekerjaan_nama, r.material_nama, r.volume_aktual, r.target_material_ideal, r.aktual_material, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; }
   function draw(){
     var q=fv('q').toLowerCase();
-    var list=q?rows.filter(function(r){ return (r.project_nama+' '+r.pekerjaan_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
+    filteredList=q?rows.filter(function(r){ return (r.project_nama+' '+r.pekerjaan_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
+    var list=filteredList;
     document.getElementById('cnt').textContent=list.length+' data';
     document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
       '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
       '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada konfigurasi RAP / progress pekerjaan.</td></tr>')+'</tbody>';
+    bindExportBtns('Analisis_RAP_Bahan', 'Analisis RAP Bahan (Semua Proyek)', 'Pemakaian aktual vs target ideal', cols.map(function(cl){ return cl.label; }),
+      function(){ return filteredList.map(exportRow); }, STATUS_COL);
   }
   apiFetch('/material_rap_report.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
     .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
@@ -477,7 +820,14 @@ PAGES.users = function(c){
   }
   c.innerHTML = pageHead('Kelola User', 'Admin Lapangan hanya bisa input Bahan Masuk & Pemakaian, dibatasi ke proyek yang ditugaskan.',
     '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>User</button>') +
-    panel('<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>');
+    panel(
+      '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
+        '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
+        '<input type="text" id="q" placeholder="Cari nama / email…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<span class="text-xs text-slate-400" id="cnt"></span>'+
+      '</div>'+
+      '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
+    );
 
   var rows=[], projects=[];
   var cols=[
@@ -495,8 +845,11 @@ PAGES.users = function(c){
     }},
   ];
   function draw(){
+    var q=fv('q').toLowerCase();
+    var list=q?rows.filter(function(r){ return (r.nama+' '+r.email).toLowerCase().indexOf(q)>-1; }):rows;
+    document.getElementById('cnt').textContent=list.length+' user';
     document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
-      '<tbody>'+(rows.length?rows.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+      '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
       '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada user.</td></tr>')+'</tbody>';
     document.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ form(b.getAttribute('data-edit')); }; });
     document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ del(b.getAttribute('data-del')); }; });
@@ -538,6 +891,7 @@ PAGES.users = function(c){
     });
   }
   refresh();
+  document.getElementById('q').addEventListener('input', draw);
   document.getElementById('btnAdd').onclick=function(){ form(null); };
 };
 </script>
