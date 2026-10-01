@@ -349,45 +349,93 @@ async function exportExcel(filename, title, headers, rows, opts){
    uses the browser's own "Save as PDF" (no extra library needed) and
    keeps the status colors via print-color-adjust so they survive
    printing/PDF export, not just on-screen viewing. */
-function exportPdf(title, sub, headers, rows, opts){
+var _jspdfLoading=null;
+function loadJsPdf(){
+  if(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) return Promise.resolve();
+  if(_jspdfLoading) return _jspdfLoading;
+  _jspdfLoading=new Promise(function(resolve,reject){
+    var s1=document.createElement('script');
+    s1.src='vendor/jspdf.umd.min.js';
+    s1.onload=function(){
+      var s2=document.createElement('script');
+      s2.src='vendor/jspdf.autotable.min.js';
+      s2.onload=function(){ resolve(); };
+      s2.onerror=function(){ _jspdfLoading=null; reject(new Error('Gagal memuat modul PDF.')); };
+      document.head.appendChild(s2);
+    };
+    s1.onerror=function(){ _jspdfLoading=null; reject(new Error('Gagal memuat modul PDF.')); };
+    document.head.appendChild(s1);
+  });
+  return _jspdfLoading;
+}
+function hexToRgb(hex){
+  hex = String(hex).replace('#','');
+  var n = parseInt(hex,16);
+  return [(n>>16)&255, (n>>8)&255, n&255];
+}
+function filenameFromTitle(title){
+  return String(title).replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'Laporan';
+}
+
+/* Real downloadable .pdf (jsPDF + autoTable, self-hosted — no CDN, no
+   browser print dialog) with the same status colors as the on-screen
+   table and the Excel export, carried through as real cell fills. */
+async function exportPdf(title, sub, headers, rows, opts){
   opts=opts||{};
-  var win=window.open('', '_blank');
-  if(!win){ toast('Popup diblokir browser — izinkan popup untuk mengekspor PDF.', true); return; }
-  var theadHtml='<tr>'+headers.map(function(h){ return '<th>'+esc(h)+'</th>'; }).join('')+'</tr>';
-  var tbodyHtml=rows.map(function(r){
-    return '<tr>'+r.map(function(v, ci){
+  try{ await loadJsPdf(); }
+  catch(e){ toast('Gagal memuat modul PDF — cek koneksi lalu coba lagi.', true); return; }
+
+  var jsPDF = window.jspdf.jsPDF;
+  var landscape = headers.length > 6;
+  var doc = new jsPDF({orientation: landscape ? 'landscape' : 'portrait', unit:'pt', format:'a4'});
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(30,58,138);
+  doc.text(title, 40, 36);
+  if(sub){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139); doc.text(sub, 40, 52); }
+
+  var body = rows.map(function(r){
+    return r.map(function(v, ci){
       var style=(opts.statusCol===ci && STATUS_STYLE[v]) ? STATUS_STYLE[v] : null;
-      var text = style ? style.label : (typeof v==='number' ? num0(v) : esc(v==null?'':v));
-      var cellStyle = style ? ' style="background:'+style.bg+';color:'+style.fg+';font-weight:700;text-align:center;border-radius:999px;"' : (typeof v==='number' ? ' style="text-align:right;"' : '');
-      return '<td'+cellStyle+'>'+(style?'<span class="pill">'+text+'</span>':text)+'</td>';
-    }).join('')+'</tr>';
-  }).join('');
-  win.document.write(
-    '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(title)+'</title><style>'+
-    'body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;margin:32px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'+
-    'h1{font-size:18px;margin:0 0 2px;color:#1e3a8a;}'+
-    '.sub{color:#64748b;font-size:12px;margin-bottom:18px;}'+
-    'table{width:100%;border-collapse:collapse;font-size:11.5px;}'+
-    'th{background:#1e3a8a;color:#fff;text-align:left;padding:8px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em;}'+
-    'td{padding:7px 10px;border-bottom:1px solid #e3e7ee;}'+
-    'tr:nth-child(even) td{background:#f7f9fc;}'+
-    '.pill{padding:3px 10px;border-radius:999px;font-size:10.5px;}'+
-    '.foot{margin-top:16px;color:#94a3b8;font-size:10px;}'+
-    '@media print{ body{margin:12mm;} }'+
-    '</style></head><body>'+
-    '<h1>'+esc(title)+'</h1>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'')+
-    '<table><thead>'+theadHtml+'</thead><tbody>'+tbodyHtml+'</tbody></table>'+
-    '<div class="foot">Diekspor '+new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})+' dari Material & Stok</div>'+
-    '</body></html>'
-  );
-  win.document.close();
-  win.onload = function(){ win.focus(); win.print(); };
-  setTimeout(function(){ win.focus(); win.print(); }, 300);
+      if(style) return style.label;
+      return typeof v==='number' ? num0(v) : (v==null?'':String(v));
+    });
+  });
+
+  doc.autoTable({
+    head: [headers],
+    body: body,
+    startY: sub ? 64 : 48,
+    margin: {left:40, right:40},
+    styles: {font:'helvetica', fontSize:8.5, cellPadding:5, textColor:[15,23,42], lineColor:[227,231,238], lineWidth:0.5, overflow:'linebreak'},
+    headStyles: {fillColor:[30,58,138], textColor:255, fontStyle:'bold', fontSize:8},
+    alternateRowStyles: {fillColor:[247,249,252]},
+    didParseCell: function(data){
+      if(opts.statusCol!=null && data.section==='body' && data.column.index===opts.statusCol){
+        var rawVal = rows[data.row.index][opts.statusCol];
+        var style = STATUS_STYLE[rawVal];
+        if(style){
+          data.cell.styles.fillColor = hexToRgb(style.bg);
+          data.cell.styles.textColor = hexToRgb(style.fg);
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.halign = 'center';
+        }
+      }
+    },
+    didDrawPage: function(data){
+      var pageSize = doc.internal.pageSize;
+      var h = pageSize.getHeight ? pageSize.getHeight() : pageSize.height;
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(148,163,184);
+      doc.text('Diekspor '+new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})+' dari Material & Stok',
+        40, h-20);
+    },
+  });
+
+  doc.save(filenameFromTitle(title) + '.pdf');
 }
 
 function exportBtnsHtml(){
   return '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button> '+
-    '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="printer" class="w-3.5 h-3.5"></i>PDF</button>';
+    '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button>';
 }
 function bindExportBtns(filename, title, sub, headers, rowsFn, statusCol){
   var bx=document.getElementById('btnExportExcel'), bp=document.getElementById('btnExportPdf');
@@ -541,15 +589,13 @@ PAGES.bahan = masterPage({
     {key:'kode', label:'Kode Bahan', required:true},
     {key:'nama', label:'Nama Bahan', required:true},
     {key:'satuan', label:'Satuan', required:true},
-    {key:'kategori', label:'Kategori'},
-    {key:'stok_minimum', label:'Stok Minimum (Reorder Point)', type:'number', default:0},
+    {key:'stok_minimum', label:'Stok Minimum (ambang batas "Perlu Dikirim")', type:'number', default:0},
   ],
-  searchFn:function(r){ return r.kode+' '+r.nama+' '+r.kategori; },
+  searchFn:function(r){ return r.kode+' '+r.nama; },
   columns:[
     {key:'kode', label:'Kode', render:function(r){ return '<span class="text-slate-500">'+esc(r.kode)+'</span>'; }},
     {key:'nama', label:'Nama Bahan', render:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
     {key:'satuan', label:'Satuan', render:function(r){ return esc(r.satuan); }},
-    {key:'kategori', label:'Kategori', render:function(r){ return r.kategori?esc(r.kategori):'<span class="text-slate-300 italic">–</span>'; }},
     {key:'stok_minimum', label:'Stok Min.', render:function(r){ return num0(r.stok_minimum); }},
   ],
 });
