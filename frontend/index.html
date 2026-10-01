@@ -242,6 +242,16 @@ function badge(kind, label){
   var map={aman:'bg-emerald-50 text-emerald-700', warn:'bg-amber-50 text-amber-700', danger:'bg-red-50 text-red-700', neutral:'bg-slate-100 text-slate-500'};
   return '<span class="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap '+(map[kind]||map.neutral)+'">'+esc(label)+'</span>';
 }
+/* Project filter ("slicer") dropdown, reused across every data menu so
+   pusat/owner can narrow any list/report to one proyek without losing
+   the free-text search — the two filters combine (AND), never replace
+   each other. */
+function projectFilterSelectHtml(projects){
+  return '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[180px]">'+
+    '<option value="">Semua Proyek</option>'+
+    projects.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('')+
+    '</select>';
+}
 
 /* ============================================================
    EXPORT — Excel (.xlsx) & PDF, with the same status colors used
@@ -452,8 +462,11 @@ function masterPage(cfg){
       (isOwner()?'':'<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>'+esc(cfg.addLabel||'Tambah')+'</button> ')+exportBtnsHtml()) +
       panel(
         '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
+          '<div class="flex items-center gap-3 flex-wrap flex-1">'+
           '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
           '<input type="text" id="q" placeholder="Cari…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+          (cfg.projectFilter ? projectFilterSelectHtml(cfg.projectFilter.projects) : '')+
+          '</div>'+
           '<span class="text-xs text-slate-400" id="cnt"></span>'+
         '</div>'+
         '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
@@ -463,7 +476,12 @@ function masterPage(cfg){
     var rows=[], filteredList=[];
     function draw(){
       var q=fv('q').toLowerCase();
-      filteredList = q ? rows.filter(function(r){ return (cfg.searchFn?cfg.searchFn(r):r.nama).toLowerCase().indexOf(q)>-1; }) : rows;
+      var projId = cfg.projectFilter ? fv('fProj') : '';
+      filteredList = rows.filter(function(r){
+        if(q && (cfg.searchFn?cfg.searchFn(r):r.nama).toLowerCase().indexOf(q)===-1) return false;
+        if(projId && cfg.projectFilter.getProjectId(r)!==projId) return false;
+        return true;
+      });
       var list = filteredList;
       document.getElementById('cnt').textContent = list.length+' data';
       var cols = cfg.columns.concat(isOwner()?[]:[{key:'_act',label:'Aksi',render:function(r){
@@ -519,6 +537,7 @@ function masterPage(cfg){
     }
     refresh();
     document.getElementById('q').addEventListener('input', draw);
+    if(cfg.projectFilter) document.getElementById('fProj').addEventListener('change', draw);
     var btnAdd=document.getElementById('btnAdd');
     if(btnAdd) btnAdd.onclick=function(){ form(null); };
   };
@@ -526,7 +545,7 @@ function masterPage(cfg){
 
 var PAGES={};
 
-/* ---------------- dashboard (summary) ---------------- */
+/* ---------------- dashboard (Power-BI style: KPI + charts + drilldown, filterable per proyek) ---------------- */
 function statCard(icon, colorCls, label, value, sub){
   return '<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-start gap-4">'+
     '<div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 '+colorCls+'"><i data-lucide="'+icon+'" class="w-5 h-5"></i></div>'+
@@ -534,45 +553,111 @@ function statCard(icon, colorCls, label, value, sub){
     '<div class="text-sm text-slate-500 mt-0.5">'+esc(label)+'</div>'+
     (sub?'<div class="text-xs text-slate-400 mt-1">'+sub+'</div>':'')+'</div></div>';
 }
+function panelTitle(icon, label, sub){
+  return '<h2 class="text-sm font-bold text-slate-600 mb-0.5 flex items-center gap-2"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+esc(label)+'</h2>'+
+    (sub?'<div class="text-xs text-slate-400 mb-3">'+esc(sub)+'</div>':'<div class="mb-3"></div>');
+}
+/* Status colors are fixed/reserved across the whole app (same as badge()) —
+   a chart segment's color always means the same status everywhere, and is
+   always paired with a text label/legend, never color alone. */
+var STATUS_BAR_COLOR = {AMAN:'#10b981', MENIPIS:'#f59e0b', HABIS:'#ef4444', HAMPIR_HABIS:'#f59e0b', MELEBIHI:'#ef4444', DATA_TIDAK_LENGKAP:'#cbd5e1'};
+var STATUS_BAR_LABEL = {AMAN:'Aman', MENIPIS:'Perlu Dikirim', HABIS:'Stok Habis', HAMPIR_HABIS:'Hampir Habis RAP', MELEBIHI:'Melebihi RAP', DATA_TIDAK_LENGKAP:'Data Tidak Lengkap'};
+/* Horizontal bar row: label left, filled track right, value as a direct
+   label (never color-only) so the number reads even in grayscale/print. */
+function hbarRow(label, sublabel, pctWidth, color, valueLabel){
+  var w = Math.max(3, Math.min(100, pctWidth));
+  return '<div class="py-2">'+
+    '<div class="flex justify-between items-baseline gap-2 mb-1">'+
+      '<div class="text-sm text-slate-700 truncate"><b>'+esc(label)+'</b>'+(sublabel?' <span class="text-xs text-slate-400">'+esc(sublabel)+'</span>':'')+'</div>'+
+      '<div class="text-xs font-bold shrink-0" style="color:'+color+'">'+esc(valueLabel)+'</div>'+
+    '</div>'+
+    '<div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full" style="width:'+w+'%;background:'+color+'"></div></div>'+
+  '</div>';
+}
+/* Stacked status bar + legend — a status breakdown is counted, never summed
+   across incompatible units, so this works the same whether scoped to one
+   proyek or all of them. */
+function statusStackChart(counts, order, total){
+  if(!total) return '<div class="text-center text-sm text-slate-400 py-8">Belum ada data.</div>';
+  var segs = order.filter(function(k){ return counts[k]>0; }).map(function(k){
+    var pct = counts[k]/total*100;
+    return '<div style="width:'+pct+'%;background:'+STATUS_BAR_COLOR[k]+'" title="'+esc(STATUS_BAR_LABEL[k])+': '+counts[k]+'"></div>';
+  }).join('');
+  var legend = order.filter(function(k){ return counts[k]>0; }).map(function(k){
+    return '<div class="flex items-center gap-1.5 text-xs text-slate-600"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:'+STATUS_BAR_COLOR[k]+'"></span>'+esc(STATUS_BAR_LABEL[k])+' <b>'+counts[k]+'</b></div>';
+  }).join('');
+  return '<div class="flex h-4 rounded-full overflow-hidden gap-[2px] bg-slate-100">'+segs+'</div>'+
+    '<div class="flex flex-wrap gap-x-4 gap-y-1.5 mt-3.5">'+legend+'</div>';
+}
+
 PAGES.dashboard = function(c){
-  c.innerHTML = pageHead('Dashboard', 'Ringkasan cepat lintas semua proyek') +
-    '<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8" id="statGrid">'+
+  c.innerHTML = pageHead('Dashboard', 'Ringkasan lintas proyek untuk pengambilan keputusan — pilih satu proyek untuk melihat detailnya.',
+      '<select id="dashProj" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[200px]"><option value="">Semua Proyek</option></select>') +
+    '<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="statGrid">'+
       '<div class="col-span-full text-center text-sm text-slate-400 py-8">Memuat ringkasan…</div>'+
+    '</div>'+
+    '<div class="grid lg:grid-cols-2 gap-5 mb-5">'+
+      '<div>'+panel(panelTitle('layers','Distribusi Status Stok','Jumlah bahan per status, seluruh proyek terpilih')+'<div id="stockChart"></div>')+'</div>'+
+      '<div>'+panel(panelTitle('trending-up','Pemakaian vs RAP','Bahan dengan persentase RAP terpakai tertinggi')+'<div id="rapChart"></div>')+'</div>'+
     '</div>'+
     '<div class="grid lg:grid-cols-2 gap-5">'+
       '<div>'+panelTitle('layers','Perlu Perhatian — Stok')+'<div id="stockPreview"></div></div>'+
       '<div>'+panelTitle('trending-up','Perlu Perhatian — RAP Bahan')+'<div id="rapPreview"></div></div>'+
     '</div>';
-  function panelTitle(icon, label){ return '<h2 class="text-sm font-bold text-slate-600 mb-3 flex items-center gap-2"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+esc(label)+'</h2>'; }
+  icons();
 
   Promise.all([
     apiFetch('/projects.php'), apiFetch('/materials.php'),
     apiFetch('/material_stock.php'), apiFetch('/material_rap_proyek_report.php'),
   ]).then(function(r){
-    var projects=r[0], materials=r[1], stock=r[2], rapReport=r[3];
-    var critical = stock.filter(function(s){ return s.status==='MENIPIS'||s.status==='HABIS'; });
-    var over = rapReport.filter(function(s){ return s.status==='MELEBIHI'; });
+    var projects=r[0], materials=r[1], stockAll=r[2], rapReportAll=r[3];
+    document.getElementById('dashProj').innerHTML = '<option value="">Semua Proyek</option>'+
+      projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
 
-    document.getElementById('statGrid').innerHTML =
-      statCard('briefcase','bg-blue-50 text-blue-600','Total Proyek', projects.length) +
-      statCard('box','bg-indigo-50 text-indigo-600','Total Bahan Terdaftar', materials.length) +
-      statCard('layers','bg-amber-50 text-amber-600','Bahan Perlu Restock', critical.length, critical.length?'di '+new Set(critical.map(function(x){return x.project_id;})).size+' proyek':null) +
-      statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null);
+    function render(){
+      var projId = fv('dashProj');
+      var stock = projId ? stockAll.filter(function(s){ return s.project_id===projId; }) : stockAll;
+      var rapReport = projId ? rapReportAll.filter(function(s){ return s.project_id===projId; }) : rapReportAll;
+      var critical = stock.filter(function(s){ return s.status==='MENIPIS'||s.status==='HABIS'; });
+      var over = rapReport.filter(function(s){ return s.status==='MELEBIHI'; });
+      var projectCount = projId ? 1 : projects.length;
+      var materialCount = projId ? new Set(stock.map(function(x){return x.material_id;})).size : materials.length;
 
-    var stockPrev=document.getElementById('stockPreview');
-    stockPrev.innerHTML = critical.length ? panel(critical.slice(0,6).map(function(r){
-      return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm">'+
-        '<div><b>'+esc(r.material_nama)+'</b><div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div></div>'+
-        badge(r.status==='HABIS'?'danger':'warn', r.status==='HABIS'?'Habis':'Perlu Dikirim')+'</div>';
-    }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Semua stok aman ✓</div>');
+      document.getElementById('statGrid').innerHTML =
+        statCard('briefcase','bg-blue-50 text-blue-600', projId?'Proyek Terpilih':'Total Proyek', projectCount) +
+        statCard('box','bg-indigo-50 text-indigo-600', projId?'Bahan Dipakai':'Total Bahan Terdaftar', materialCount) +
+        statCard('layers','bg-amber-50 text-amber-600','Bahan Perlu Restock', critical.length, critical.length&&!projId?'di '+new Set(critical.map(function(x){return x.project_id;})).size+' proyek':null) +
+        statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length&&!projId?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null);
 
-    var rapPrev=document.getElementById('rapPreview');
-    rapPrev.innerHTML = over.length ? panel(over.slice(0,6).map(function(r){
-      return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm">'+
-        '<div><b>'+esc(r.material_nama)+'</b><div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div></div>'+
-        '<span class="font-bold text-red-600">+'+num0(r.deviasi)+'</span></div>';
-    }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Belum ada bahan yang melebihi RAP ✓ (pastikan RAP per Proyek sudah diisi)</div>');
-    icons();
+      // Chart 1 — stock status distribution (count-based, safe to compare across units)
+      var stockCounts = {AMAN:0, MENIPIS:0, HABIS:0};
+      stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
+      document.getElementById('stockChart').innerHTML = statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS'], stock.length);
+
+      // Chart 2 — top materials by % RAP terpakai (ratio is unit-agnostic, so bars are comparable)
+      var ranked = rapReport.filter(function(r){ return r.persentase!=null; }).slice()
+        .sort(function(a,b){ return b.persentase-a.persentase; }).slice(0,8);
+      document.getElementById('rapChart').innerHTML = ranked.length ? ranked.map(function(r){
+        return hbarRow(r.material_nama, projId?null:r.project_nama, r.persentase*100, STATUS_BAR_COLOR[r.status]||'#94a3b8', pct(r.persentase));
+      }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Belum ada RAP per Proyek yang diisi'+(projId?' untuk proyek ini':'')+'.</div>';
+
+      var stockPrev=document.getElementById('stockPreview');
+      stockPrev.innerHTML = critical.length ? panel(critical.slice(0,6).map(function(r){
+        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm">'+
+          '<div><b>'+esc(r.material_nama)+'</b>'+(projId?'':'<div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div>')+'</div>'+
+          badge(r.status==='HABIS'?'danger':'warn', r.status==='HABIS'?'Habis':'Perlu Dikirim')+'</div>';
+      }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Semua stok aman ✓</div>');
+
+      var rapPrev=document.getElementById('rapPreview');
+      rapPrev.innerHTML = over.length ? panel(over.slice(0,6).map(function(r){
+        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm">'+
+          '<div><b>'+esc(r.material_nama)+'</b>'+(projId?'':'<div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div>')+'</div>'+
+          '<span class="font-bold text-red-600">+'+num0(r.deviasi)+'</span></div>';
+      }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Belum ada bahan yang melebihi RAP ✓ (pastikan RAP per Proyek sudah diisi)</div>');
+      icons();
+    }
+    render();
+    document.getElementById('dashProj').addEventListener('change', render);
   }).catch(function(e){ document.getElementById('statGrid').innerHTML='<div class="col-span-full text-center text-sm text-red-500 py-8">Gagal memuat: '+esc(e.message)+'</div>'; });
 };
 
@@ -613,6 +698,7 @@ PAGES.pekerjaan = function(c){
         {key:'volume_kontrak', label:'Volume Kontrak (BQ)', type:'number', default:0},
       ],
       searchFn:function(r){ var p=projects.find(function(x){ return x.id===r.project_id; }); return r.nama+' '+(p?p.nama:''); },
+      projectFilter:{ projects:projects, getProjectId:function(r){ return r.project_id; } },
       columns:[
         {key:'project_id', label:'Proyek', render:function(r){ var p=projects.find(function(x){ return x.id===r.project_id; }); return p?esc(p.nama):'<span class="text-slate-300 italic">–</span>'; }},
         {key:'nama', label:'Nama Pekerjaan', render:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
@@ -643,6 +729,9 @@ PAGES.rap = function(c){
         var m=materials.find(function(x){ return x.id===r.material_id; });
         return (pk?pk.nama:'')+' '+(m?m.nama:'');
       },
+      projectFilter:{ projects:projects, getProjectId:function(r){
+        var pk=pekerjaanList.find(function(x){ return x.id===r.pekerjaan_id; }); return pk?pk.project_id:null;
+      } },
       columns:[
         {key:'pekerjaan_id', label:'Pekerjaan', render:function(r){ var pk=pekerjaanList.find(function(x){ return x.id===r.pekerjaan_id; }); return pk?esc(pk.nama):'<span class="text-slate-300 italic">–</span>'; }},
         {key:'material_id', label:'Bahan', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return m?esc(m.nama):'<span class="text-slate-300 italic">–</span>'; }},
@@ -670,6 +759,7 @@ PAGES.rap_proyek = function(c){
         var m=materials.find(function(x){ return x.id===r.material_id; });
         return (p?p.nama:'')+' '+(m?m.nama:'');
       },
+      projectFilter:{ projects:projects, getProjectId:function(r){ return r.project_id; } },
       columns:[
         {key:'project_id', label:'Proyek', render:function(r){ var p=projects.find(function(x){ return x.id===r.project_id; }); return p?esc(p.nama):'<span class="text-slate-300 italic">–</span>'; }},
         {key:'material_id', label:'Bahan', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return m?esc(m.nama):'<span class="text-slate-300 italic">–</span>'; }},
@@ -679,19 +769,59 @@ PAGES.rap_proyek = function(c){
   }).catch(function(e){ c.innerHTML=pageHead('RAP per Proyek','')+panel('<div class="text-red-500 text-sm">Gagal memuat: '+esc(e.message)+'</div>'); });
 };
 
-PAGES.rap_proyek_report = function(c){
-  c.innerHTML = pageHead('Analisis RAP per Proyek',
-    'Pemakaian aktual vs jatah total (RAP) per bahan per proyek — cara paling cepat untuk lihat proyek mana yang sudah lewat jatah.', exportBtnsHtml()) +
-    panel(
-      '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
-        '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-        '<input type="text" id="q" placeholder="Cari proyek / bahan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
-        '<span class="text-xs text-slate-400" id="cnt"></span>'+
-      '</div>'+
-      '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
-    );
-  var rows=[], filteredList=[];
-  var cols=[
+/* ---------------- generic read-only report page (search + project filter + export) ---------------- */
+function reportPage(cfg){
+  return function(c){
+    c.innerHTML = pageHead(cfg.title, cfg.sub, exportBtnsHtml()) +
+      panel(
+        '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
+          '<div class="flex items-center gap-3 flex-wrap flex-1">'+
+          '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
+          '<input type="text" id="q" placeholder="'+esc(cfg.searchPlaceholder)+'" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+          '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[180px]"><option value="">Semua Proyek</option></select>'+
+          '</div>'+
+          '<span class="text-xs text-slate-400" id="cnt"></span>'+
+        '</div>'+
+        '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
+      );
+    icons();
+    var rows=[], filteredList=[];
+    var STATUS_COL = cfg.statusCol!=null ? cfg.statusCol : null;
+    function draw(){
+      var q=fv('q').toLowerCase(), projId=fv('fProj');
+      filteredList = rows.filter(function(r){
+        if(q && cfg.searchFn(r).toLowerCase().indexOf(q)===-1) return false;
+        if(projId && r.project_id!==projId) return false;
+        return true;
+      });
+      var list=filteredList;
+      document.getElementById('cnt').textContent=list.length+' data';
+      document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cfg.columns.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+        '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cfg.columns.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+        '<tr><td colspan="'+cfg.columns.length+'" class="text-center text-slate-400 text-sm py-10">'+esc(cfg.emptyMsg)+'</td></tr>')+'</tbody>';
+      bindExportBtns(cfg.filename, cfg.title, cfg.sub, cfg.columns.map(function(cl){ return cl.label; }),
+        function(){ return filteredList.map(cfg.exportRow); }, STATUS_COL);
+    }
+    apiFetch(cfg.endpoint).then(function(data){
+      rows=data;
+      var seen={}, opts=[];
+      rows.forEach(function(r){ if(r.project_id && !seen[r.project_id]){ seen[r.project_id]=1; opts.push({id:r.project_id, nama:r.project_nama}); } });
+      opts.sort(function(a,b){ return a.nama.localeCompare(b.nama); });
+      document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
+        opts.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+      draw();
+      document.getElementById('q').addEventListener('input',draw);
+      document.getElementById('fProj').addEventListener('change',draw);
+    }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+  };
+}
+
+PAGES.rap_proyek_report = reportPage({
+  title:'Analisis RAP per Proyek', sub:'Pemakaian aktual vs jatah total (RAP) per bahan per proyek — cara paling cepat untuk lihat proyek mana yang sudah lewat jatah.',
+  endpoint:'/material_rap_proyek_report.php', filename:'Analisis_RAP_per_Proyek', searchPlaceholder:'Cari proyek / bahan…',
+  searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
+  statusCol:6, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
+  columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
     {label:'Jatah (RAP)', get:function(r){ return num0(r.rap_qty)+' '+esc(r.satuan); }},
@@ -703,23 +833,9 @@ PAGES.rap_proyek_report = function(c){
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
-  ];
-  var STATUS_COL = cols.length-1;
-  function exportRow(r){ return [r.project_nama, r.material_nama, r.rap_qty, r.aktual_pemakaian, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; }
-  function draw(){
-    var q=fv('q').toLowerCase();
-    filteredList=q?rows.filter(function(r){ return (r.project_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
-    var list=filteredList;
-    document.getElementById('cnt').textContent=list.length+' data';
-    document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
-      '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
-      '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada RAP per Proyek yang diisi.</td></tr>')+'</tbody>';
-    bindExportBtns('Analisis_RAP_per_Proyek', 'Analisis RAP per Proyek', 'Pemakaian aktual vs jatah total (RAP)', cols.map(function(cl){ return cl.label; }),
-      function(){ return filteredList.map(exportRow); }, STATUS_COL);
-  }
-  apiFetch('/material_rap_proyek_report.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
-    .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
-};
+  ],
+  exportRow:function(r){ return [r.project_nama, r.material_nama, r.rap_qty, r.aktual_pemakaian, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; },
+});
 
 PAGES.riwayat = function(c){
   c.innerHTML = pageHead('Riwayat Transaksi (Semua Proyek)',
@@ -729,6 +845,8 @@ PAGES.riwayat = function(c){
         '<div class="relative flex-1 min-w-[220px]"><label class="block text-xs font-semibold text-slate-500 mb-1.5">Cari</label>'+
         '<i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-[38px] -translate-y-1/2"></i>'+
         '<input type="text" id="q" placeholder="Proyek / bahan / keterangan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek</label>'+
+        '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[160px]"><option value="">Semua Proyek</option></select></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis</label>'+
         '<select id="fJenis" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
           '<option value="">Semua</option><option value="Masuk">Bahan Masuk</option><option value="Pemakaian">Pemakaian</option>'+
@@ -755,9 +873,10 @@ PAGES.riwayat = function(c){
   ];
   function exportRow(r){ return [r.tgl, r.jenis, r.project_nama, r.material_nama, (r.jenis==='Masuk'?r.qty:-r.qty), r.ref||'', r.ket||'']; }
   function draw(){
-    var q=fv('q').toLowerCase(), jenis=fv('fJenis'), from=fv('fFrom'), to=fv('fTo');
+    var q=fv('q').toLowerCase(), jenis=fv('fJenis'), from=fv('fFrom'), to=fv('fTo'), projId=fv('fProj');
     filteredList = rows.filter(function(r){
       if(jenis && r.jenis!==jenis) return false;
+      if(projId && r.project_id!==projId) return false;
       if(from && r.tgl<from) return false;
       if(to && r.tgl>to) return false;
       if(q && (r.project_nama+' '+r.material_nama+' '+(r.ket||'')).toLowerCase().indexOf(q)===-1) return false;
@@ -781,35 +900,31 @@ PAGES.riwayat = function(c){
     var matName=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.nama:id; };
     var matSatuan=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.satuan:''; };
     var pkName=function(id){ var pk=pekerjaanList.find(function(x){ return x.id===id; }); return pk?pk.nama:''; };
-    rows = receipts.map(function(x){ return {jenis:'Masuk', tgl:x.tgl, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.no_referensi||'', ket:x.ket||''}; })
-      .concat(usage.map(function(x){ return {jenis:'Pemakaian', tgl:x.tgl, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.pekerjaan_id?pkName(x.pekerjaan_id):'', ket:x.ket||''}; }));
+    rows = receipts.map(function(x){ return {jenis:'Masuk', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.no_referensi||'', ket:x.ket||''}; })
+      .concat(usage.map(function(x){ return {jenis:'Pemakaian', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.pekerjaan_id?pkName(x.pekerjaan_id):'', ket:x.ket||''}; }));
     rows.sort(function(a,b){ return a.tgl<b.tgl?1:(a.tgl>b.tgl?-1:0); });
+    document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
+      projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
     draw();
     document.getElementById('q').addEventListener('input', draw);
+    document.getElementById('fProj').addEventListener('change', draw);
     document.getElementById('fJenis').addEventListener('change', draw);
     document.getElementById('fFrom').addEventListener('change', draw);
     document.getElementById('fTo').addEventListener('change', draw);
     document.getElementById('btnResetFilter').onclick=function(){
-      document.getElementById('q').value=''; document.getElementById('fJenis').value='';
+      document.getElementById('q').value=''; document.getElementById('fProj').value=''; document.getElementById('fJenis').value='';
       document.getElementById('fFrom').value=''; document.getElementById('fTo').value='';
       draw();
     };
   }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
 };
 
-PAGES.stock = function(c){
-  c.innerHTML = pageHead('Monitor Stok Bahan (Semua Proyek)',
-    'Stok berjalan (bahan masuk − pemakaian) per proyek, seperti stok minimarket.', exportBtnsHtml()) +
-    panel(
-      '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
-        '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-        '<input type="text" id="q" placeholder="Cari proyek / bahan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
-        '<span class="text-xs text-slate-400" id="cnt"></span>'+
-      '</div>'+
-      '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
-    );
-  var rows=[], filteredList=[];
-  var cols=[
+PAGES.stock = reportPage({
+  title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok berjalan (bahan masuk − pemakaian) per proyek, seperti stok minimarket.',
+  endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
+  searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
+  statusCol:6, emptyMsg:'Belum ada data bahan masuk/pemakaian.',
+  columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
     {label:'Total Masuk', get:function(r){ return num0(r.total_masuk)+' '+esc(r.satuan); }},
@@ -826,37 +941,16 @@ PAGES.stock = function(c){
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
-  ];
-  var STATUS_COL = cols.length-1;
-  function exportRow(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.threshold_basis==='rap'?r.sisa_kebutuhan:r.stok_minimum, r.status]; }
-  function draw(){
-    var q=fv('q').toLowerCase();
-    filteredList=q?rows.filter(function(r){ return (r.project_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
-    var list=filteredList;
-    document.getElementById('cnt').textContent=list.length+' data';
-    document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
-      '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
-      '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada data bahan masuk/pemakaian.</td></tr>')+'</tbody>';
-    bindExportBtns('Monitor_Stok_Bahan', 'Monitor Stok Bahan (Semua Proyek)', 'Stok berjalan per proyek', cols.map(function(cl){ return cl.label; }),
-      function(){ return filteredList.map(exportRow); }, STATUS_COL);
-  }
-  apiFetch('/material_stock.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
-    .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
-};
+  ],
+  exportRow:function(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.threshold_basis==='rap'?r.sisa_kebutuhan:r.stok_minimum, r.status]; },
+});
 
-PAGES.rap_report = function(c){
-  c.innerHTML = pageHead('Analisis RAP Bahan (Semua Proyek)',
-    'Pemakaian aktual vs target ideal (koefisien RAP × progress volume pekerjaan) — mendeteksi pemborosan.', exportBtnsHtml()) +
-    panel(
-      '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
-        '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-        '<input type="text" id="q" placeholder="Cari proyek / pekerjaan / bahan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
-        '<span class="text-xs text-slate-400" id="cnt"></span>'+
-      '</div>'+
-      '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
-    );
-  var rows=[], filteredList=[];
-  var cols=[
+PAGES.rap_report = reportPage({
+  title:'Analisis RAP Bahan (Semua Proyek)', sub:'Pemakaian aktual vs target ideal (koefisien RAP × progress volume pekerjaan) — mendeteksi pemborosan.',
+  endpoint:'/material_rap_report.php', filename:'Analisis_RAP_Bahan', searchPlaceholder:'Cari proyek / pekerjaan / bahan…',
+  searchFn:function(r){ return r.project_nama+' '+r.pekerjaan_nama+' '+r.material_nama; },
+  statusCol:7, emptyMsg:'Belum ada konfigurasi RAP / progress pekerjaan.',
+  columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Pekerjaan', get:function(r){ return esc(r.pekerjaan_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
@@ -870,23 +964,9 @@ PAGES.rap_report = function(c){
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
-  ];
-  var STATUS_COL = cols.length-1;
-  function exportRow(r){ return [r.project_nama, r.pekerjaan_nama, r.material_nama, r.volume_aktual, r.target_material_ideal, r.aktual_material, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; }
-  function draw(){
-    var q=fv('q').toLowerCase();
-    filteredList=q?rows.filter(function(r){ return (r.project_nama+' '+r.pekerjaan_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
-    var list=filteredList;
-    document.getElementById('cnt').textContent=list.length+' data';
-    document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
-      '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
-      '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada konfigurasi RAP / progress pekerjaan.</td></tr>')+'</tbody>';
-    bindExportBtns('Analisis_RAP_Bahan', 'Analisis RAP Bahan (Semua Proyek)', 'Pemakaian aktual vs target ideal', cols.map(function(cl){ return cl.label; }),
-      function(){ return filteredList.map(exportRow); }, STATUS_COL);
-  }
-  apiFetch('/material_rap_report.php').then(function(data){ rows=data; draw(); document.getElementById('q').addEventListener('input',draw); })
-    .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
-};
+  ],
+  exportRow:function(r){ return [r.project_nama, r.pekerjaan_nama, r.material_nama, r.volume_aktual, r.target_material_ideal, r.aktual_material, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; },
+});
 
 /* ---------------- user management (admin only) ---------------- */
 PAGES.users = function(c){
@@ -898,8 +978,11 @@ PAGES.users = function(c){
     '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>User</button>') +
     panel(
       '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
+        '<div class="flex items-center gap-3 flex-wrap flex-1">'+
         '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
         '<input type="text" id="q" placeholder="Cari nama / username…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[200px]"><option value="">Semua Proyek</option></select>'+
+        '</div>'+
         '<span class="text-xs text-slate-400" id="cnt"></span>'+
       '</div>'+
       '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
@@ -921,8 +1004,12 @@ PAGES.users = function(c){
     }},
   ];
   function draw(){
-    var q=fv('q').toLowerCase();
-    var list=q?rows.filter(function(r){ return (r.nama+' '+r.username).toLowerCase().indexOf(q)>-1; }):rows;
+    var q=fv('q').toLowerCase(), projId=fv('fProj');
+    var list=rows.filter(function(r){
+      if(q && (r.nama+' '+r.username).toLowerCase().indexOf(q)===-1) return false;
+      if(projId && (r.projectIds||[]).indexOf(projId)===-1) return false;
+      return true;
+    });
     document.getElementById('cnt').textContent=list.length+' user';
     document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
       '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
@@ -931,8 +1018,12 @@ PAGES.users = function(c){
     document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ del(b.getAttribute('data-del')); }; });
   }
   function refresh(){
-    Promise.all([apiFetch('/users.php'), apiFetch('/projects.php')]).then(function(r){ rows=r[0]; projects=r[1]; draw(); })
-      .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+    Promise.all([apiFetch('/users.php'), apiFetch('/projects.php')]).then(function(r){
+      rows=r[0]; projects=r[1];
+      document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
+        projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+      draw();
+    }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
   }
   function del(id){
     confirmModal('Hapus User', 'Yakin mau menghapus user ini?', function(){
@@ -968,6 +1059,7 @@ PAGES.users = function(c){
   }
   refresh();
   document.getElementById('q').addEventListener('input', draw);
+  document.getElementById('fProj').addEventListener('change', draw);
   document.getElementById('btnAdd').onclick=function(){ form(null); };
 };
 
