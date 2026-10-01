@@ -589,6 +589,54 @@ function statusStackChart(counts, order, total){
   return '<div class="flex h-4 rounded-full overflow-hidden gap-[2px] bg-slate-100">'+segs+'</div>'+
     '<div class="flex flex-wrap gap-x-4 gap-y-1.5 mt-3.5">'+legend+'</div>';
 }
+/* Groups "melebihi RAP" rows by an entity (proyek, or bahan) so the
+   dashboard can answer "which proyek/bahan is over" directly, instead
+   of a flat ranked list that mixes entities together. Each group is
+   sized by its single worst (highest %) row — count alone would make
+   a group with one badly-over item look smaller than a group with many
+   mildly-over ones, which is backwards for "where's the real risk". */
+function groupOverRows(rows, keyFn, nameFn){
+  var map = {};
+  rows.forEach(function(r){
+    var k = keyFn(r);
+    if(!map[k]) map[k] = {name:nameFn(r), items:[]};
+    map[k].items.push(r);
+  });
+  var arr = Object.keys(map).map(function(k){
+    var g = map[k];
+    var worst = g.items.slice().sort(function(a,b){ return b.persentase-a.persentase; })[0];
+    return {name:g.name, count:g.items.length, worst:worst};
+  });
+  arr.sort(function(a,b){ return b.worst.persentase-a.worst.persentase; });
+  return arr;
+}
+function overGroupChart(groups, emptyMsg, sublabelFn, limit){
+  if(!groups.length) return '<div class="text-center text-sm text-slate-400 py-8">'+esc(emptyMsg)+'</div>';
+  return groups.slice(0,limit||8).map(function(g){
+    return hbarRow(g.name, sublabelFn(g), g.worst.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(g.worst.persentase));
+  }).join('');
+}
+/* Full drilldown table for "melebihi RAP" — every row, not a capped
+   preview, so pusat/owner can see the whole picture without leaving
+   the dashboard (the capped 6-item list this replaces was the main
+   complaint: it hid how many proyek/bahan were actually over). */
+function overDetailTable(rows){
+  if(!rows.length) return '<div class="text-center text-sm text-slate-400 py-8">Belum ada bahan yang melebihi RAP ✓ (pastikan RAP per Proyek sudah diisi)</div>';
+  var sorted = rows.slice().sort(function(a,b){ return b.persentase-a.persentase; });
+  var head = ['Proyek','Bahan','Jatah (RAP)','Aktual Pemakaian','Deviasi','%'];
+  return '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm">'+
+    '<thead><tr class="border-b border-slate-200">'+head.map(function(h){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(h)+'</th>'; }).join('')+'</tr></thead>'+
+    '<tbody>'+sorted.map(function(r){
+      return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+
+        '<td class="py-2.5 pr-4">'+esc(r.project_nama)+'</td>'+
+        '<td class="py-2.5 pr-4"><b>'+esc(r.material_nama)+'</b></td>'+
+        '<td class="py-2.5 pr-4">'+num0(r.rap_qty)+' '+esc(r.satuan)+'</td>'+
+        '<td class="py-2.5 pr-4">'+num0(r.aktual_pemakaian)+' '+esc(r.satuan)+'</td>'+
+        '<td class="py-2.5 pr-4"><b class="text-red-600">+'+num0(r.deviasi)+'</b></td>'+
+        '<td class="py-2.5 pr-4"><b class="text-red-600">'+pct(r.persentase)+'</b></td>'+
+      '</tr>';
+    }).join('')+'</tbody></table></div>';
+}
 
 PAGES.dashboard = function(c){
   c.innerHTML = pageHead('Dashboard', 'Ringkasan lintas proyek untuk pengambilan keputusan — pilih satu proyek untuk melihat detailnya.',
@@ -598,13 +646,19 @@ PAGES.dashboard = function(c){
     '</div>'+
     '<div class="grid lg:grid-cols-2 gap-5 mb-5">'+
       '<div>'+panel(panelTitle('layers','Distribusi Status Stok','Jumlah bahan per status, seluruh proyek terpilih')+'<div id="stockChart"></div>')+'</div>'+
-      '<div>'+panel(panelTitle('trending-up','Pemakaian vs RAP','Bahan dengan persentase RAP terpakai tertinggi')+'<div id="rapChart"></div>')+'</div>'+
+      '<div>'+panel('<div id="chartA_title"></div><div id="chartA"></div>')+'</div>'+
     '</div>'+
-    '<div class="grid lg:grid-cols-2 gap-5">'+
+    '<div class="grid lg:grid-cols-2 gap-5 mb-5">'+
       '<div>'+panelTitle('layers','Perlu Perhatian — Stok')+'<div id="stockPreview"></div></div>'+
-      '<div>'+panelTitle('trending-up','Perlu Perhatian — RAP Bahan')+'<div id="rapPreview"></div></div>'+
+      '<div>'+panel('<div id="chartB_title"></div><div id="chartB"></div>')+'</div>'+
+    '</div>'+
+    '<div>'+panel(
+      '<div class="flex justify-between items-center mb-1">'+panelTitle('trending-up','Bahan Melebihi RAP — Detail Lengkap','Semua bahan yang pemakaiannya sudah melewati jatah RAP, urut dari paling parah')+
+      '<button class="'+btnGhostSm+' shrink-0 -mt-4" id="btnGoRapReport">Buka Analisis Lengkap</button></div>'+
+      '<div id="overTable"></div>')+
     '</div>';
   icons();
+  document.getElementById('btnGoRapReport').onclick=function(){ go('rap_proyek_report'); };
 
   Promise.all([
     apiFetch('/projects.php'), apiFetch('/materials.php'),
@@ -629,17 +683,36 @@ PAGES.dashboard = function(c){
         statCard('layers','bg-amber-50 text-amber-600','Bahan Perlu Restock', critical.length, critical.length&&!projId?'di '+new Set(critical.map(function(x){return x.project_id;})).size+' proyek':null) +
         statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length&&!projId?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null);
 
-      // Chart 1 — stock status distribution (count-based, safe to compare across units)
+      // Stock status distribution (count-based, safe to compare across units)
       var stockCounts = {AMAN:0, MENIPIS:0, HABIS:0};
       stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
       document.getElementById('stockChart').innerHTML = statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS'], stock.length);
 
-      // Chart 2 — top materials by % RAP terpakai (ratio is unit-agnostic, so bars are comparable)
-      var ranked = rapReport.filter(function(r){ return r.persentase!=null; }).slice()
-        .sort(function(a,b){ return b.persentase-a.persentase; }).slice(0,8);
-      document.getElementById('rapChart').innerHTML = ranked.length ? ranked.map(function(r){
-        return hbarRow(r.material_nama, projId?null:r.project_nama, r.persentase*100, STATUS_BAR_COLOR[r.status]||'#94a3b8', pct(r.persentase));
-      }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Belum ada RAP per Proyek yang diisi'+(projId?' untuk proyek ini':'')+'.</div>';
+      // Chart A / B — directly answer "which proyek is over" and "which
+      // bahan is over" as two separate, clearly-labeled groupings, instead
+      // of one flat ranked list that mixed entities and statuses together.
+      if(!projId){
+        document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Proyek Melebihi RAP','Proyek dengan bahan yang sudah melewati jatah, urut dari paling parah');
+        var byProject = groupOverRows(over, function(r){return r.project_id;}, function(r){return r.project_nama;});
+        document.getElementById('chartA').innerHTML = overGroupChart(byProject, 'Semua proyek masih dalam jatah RAP ✓', function(g){
+          return g.count+' bahan melebihi — terparah: '+g.worst.material_nama;
+        });
+        document.getElementById('chartB_title').innerHTML = panelTitle('box','Bahan Sering Melebihi','Bahan yang paling sering melewati jatah lintas proyek');
+        var byMaterial = groupOverRows(over, function(r){return r.material_id;}, function(r){return r.material_nama;});
+        document.getElementById('chartB').innerHTML = overGroupChart(byMaterial, 'Belum ada bahan yang melebihi RAP ✓', function(g){
+          return 'melebihi di '+g.count+' proyek — terparah: '+g.worst.project_nama;
+        });
+      } else {
+        document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Bahan Melebihi RAP di Proyek Ini','Urut dari persentase pemakaian tertinggi');
+        document.getElementById('chartA').innerHTML = over.length ? over.slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8).map(function(r){
+          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(r.persentase));
+        }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Proyek ini masih dalam jatah RAP ✓</div>';
+        document.getElementById('chartB_title').innerHTML = panelTitle('box','Pemakaian vs RAP — Semua Bahan','Seluruh bahan di proyek ini, urut dari persentase tertinggi');
+        var allRanked = rapReport.filter(function(r){ return r.persentase!=null; }).slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8);
+        document.getElementById('chartB').innerHTML = allRanked.length ? allRanked.map(function(r){
+          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR[r.status]||'#94a3b8', pct(r.persentase));
+        }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Belum ada RAP yang diisi untuk proyek ini.</div>';
+      }
 
       var stockPrev=document.getElementById('stockPreview');
       stockPrev.innerHTML = critical.length ? panel(critical.slice(0,6).map(function(r){
@@ -648,12 +721,7 @@ PAGES.dashboard = function(c){
           badge(r.status==='HABIS'?'danger':'warn', r.status==='HABIS'?'Habis':'Perlu Dikirim')+'</div>';
       }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Semua stok aman ✓</div>');
 
-      var rapPrev=document.getElementById('rapPreview');
-      rapPrev.innerHTML = over.length ? panel(over.slice(0,6).map(function(r){
-        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm">'+
-          '<div><b>'+esc(r.material_nama)+'</b>'+(projId?'':'<div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div>')+'</div>'+
-          '<span class="font-bold text-red-600">+'+num0(r.deviasi)+'</span></div>';
-      }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Belum ada bahan yang melebihi RAP ✓ (pastikan RAP per Proyek sudah diisi)</div>');
+      document.getElementById('overTable').innerHTML = overDetailTable(over);
       icons();
     }
     render();
