@@ -18,14 +18,23 @@ function handle_project_scoped_resource(string $table, array $columns, string $p
     $scope = user_project_ids($user); // null = unrestricted (admin/owner)
 
     if ($method === 'GET') {
+        // Optional ?tgl_from=YYYY-MM-DD&tgl_to=YYYY-MM-DD so a growing
+        // history doesn't mean every page load pulls every row ever
+        // recorded — the frontend can ask for just the window it needs.
+        // Omitting both keeps today's "everything" behaviour.
+        $conds = [];
+        $params = [];
         if ($scope !== null) {
             if (!$scope) { json_response([]); return; }
             $placeholders = implode(',', array_fill(0, count($scope), '?'));
-            $stmt = db()->prepare("SELECT * FROM `$table` WHERE `$projectColumn` IN ($placeholders) ORDER BY tgl DESC, id DESC");
-            $stmt->execute($scope);
-        } else {
-            $stmt = db()->query("SELECT * FROM `$table` ORDER BY tgl DESC, id DESC");
+            $conds[] = "`$projectColumn` IN ($placeholders)";
+            $params = array_merge($params, $scope);
         }
+        if (!empty($_GET['tgl_from'])) { $conds[] = 'tgl >= ?'; $params[] = $_GET['tgl_from']; }
+        if (!empty($_GET['tgl_to']))   { $conds[] = 'tgl <= ?'; $params[] = $_GET['tgl_to']; }
+        $where = $conds ? ('WHERE ' . implode(' AND ', $conds)) : '';
+        $stmt = db()->prepare("SELECT * FROM `$table` $where ORDER BY tgl DESC, id DESC");
+        $stmt->execute($params);
         json_response($stmt->fetchAll());
         return;
     }
