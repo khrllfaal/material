@@ -6,8 +6,8 @@ declare(strict_types=1);
  * the server.
  *
  * Usage (CLI only — refuses to run over HTTP):
- *   php create_user.php owner@example.com "S3curePassword!" "Nama Pemilik" owner
- *   php create_user.php admin@example.com "S3curePassword!" "Nama Admin" admin
+ *   php create_user.php owner "S3curePassword!" "Nama Pemilik" owner
+ *   php create_user.php admin "S3curePassword!" "Nama Admin" admin
  *
  * On Hostinger without SSH access: use hPanel's phpMyAdmin instead —
  * run this script locally to print the password hash, then INSERT the
@@ -20,9 +20,9 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../db.php';
 
-[$script, $email, $password, $nama, $role] = array_pad($argv, 5, null);
-if (!$email || !$password || !$nama || !in_array($role, ['admin', 'owner', 'lapangan'], true)) {
-    fwrite(STDERR, "Usage: php create_user.php <email> <password> <nama> <admin|owner|lapangan>\n");
+[$script, $username, $password, $nama, $role] = array_pad($argv, 5, null);
+if (!$username || !$password || !$nama || !in_array($role, ['admin', 'owner', 'lapangan'], true)) {
+    fwrite(STDERR, "Usage: php create_user.php <username> <password> <nama> <admin|owner|lapangan>\n");
     fwrite(STDERR, "For 'lapangan' (field admin), assign project access afterwards via the Kelola User Lapangan screen or the users.php API.\n");
     exit(1);
 }
@@ -30,15 +30,20 @@ if (strlen($password) < 10) {
     fwrite(STDERR, "Password terlalu pendek — minimal 10 karakter.\n");
     exit(1);
 }
+$username = strtolower(trim($username));
+if (!preg_match('/^[a-z0-9._-]{3,40}$/', $username)) {
+    fwrite(STDERR, "Username 3-40 karakter, hanya huruf kecil/angka/titik/garis bawah/strip, tanpa spasi.\n");
+    exit(1);
+}
 
 $hash = password_hash($password, PASSWORD_BCRYPT);
 $id = 'u' . bin2hex(random_bytes(6));
 
 $stmt = db()->prepare(
-    'INSERT INTO users (id, email, password_hash, nama, role) VALUES (?,?,?,?,?)
+    'INSERT INTO users (id, username, password_hash, nama, role) VALUES (?,?,?,?,?)
      ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), nama = VALUES(nama), role = VALUES(role),
        failed_attempts = 0, locked_until = NULL'
 );
-$stmt->execute([$id, strtolower(trim($email)), $hash, $nama, $role]);
+$stmt->execute([$id, $username, $hash, $nama, $role]);
 
-echo "OK — user '$email' ($role) is ready to log in.\n";
+echo "OK — user '$username' ($role) is ready to log in.\n";

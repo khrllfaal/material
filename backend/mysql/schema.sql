@@ -20,7 +20,7 @@ SET NAMES utf8mb4;
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
   id              VARCHAR(40) PRIMARY KEY,
-  email           VARCHAR(190) NOT NULL UNIQUE,
+  username        VARCHAR(60) NOT NULL UNIQUE,
   password_hash   VARCHAR(255) NOT NULL,
   nama            VARCHAR(190) NOT NULL,
   role            ENUM('admin','owner','lapangan') NOT NULL,
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS material_usage (
 CREATE TABLE IF NOT EXISTS audit_log (
   id          BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id     VARCHAR(40) NULL,
-  user_email  VARCHAR(190) NULL,
+  user_username VARCHAR(60) NULL,
   action      ENUM('create','update','delete') NOT NULL,
   entity      VARCHAR(40) NOT NULL,
   entity_id   VARCHAR(40) NOT NULL,

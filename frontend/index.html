@@ -28,8 +28,8 @@
     <div id="loginErr" class="hidden bg-red-50 text-red-700 border border-red-200 rounded-xl px-3.5 py-2.5 text-sm mb-4"></div>
     <form id="loginForm" class="space-y-4">
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Email</label>
-        <input type="email" id="loginEmail" autocomplete="username" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500">
+        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Username</label>
+        <input type="text" id="loginEmail" autocomplete="username" autocapitalize="none" autocorrect="off" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500">
       </div>
       <div>
         <label class="block text-xs font-semibold text-slate-500 mb-1.5">Password</label>
@@ -144,10 +144,10 @@ var fieldCls = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded
 /* ---------------- auth ---------------- */
 document.getElementById('loginForm').addEventListener('submit', function(e){
   e.preventDefault();
-  var email=fv('loginEmail'), password=document.getElementById('loginPassword').value;
+  var username=fv('loginEmail'), password=document.getElementById('loginPassword').value;
   var btn=document.getElementById('loginSubmit'), err=document.getElementById('loginErr');
   err.classList.add('hidden'); btn.disabled=true; btn.textContent='Memproses…';
-  apiFetch('/auth_login.php', {method:'POST', body:JSON.stringify({email:email,password:password})})
+  apiFetch('/auth_login.php', {method:'POST', body:JSON.stringify({username:username,password:password})})
     .then(function(res){ boot(res.user); })
     .catch(function(e){ err.textContent=e.message||'Login gagal.'; err.classList.remove('hidden'); })
     .finally(function(){ btn.disabled=false; btn.textContent='Masuk'; });
@@ -894,7 +894,7 @@ PAGES.users = function(c){
     panel(
       '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
         '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-        '<input type="text" id="q" placeholder="Cari nama / email…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<input type="text" id="q" placeholder="Cari nama / username…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
         '<span class="text-xs text-slate-400" id="cnt"></span>'+
       '</div>'+
       '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
@@ -903,7 +903,7 @@ PAGES.users = function(c){
   var rows=[], projects=[];
   var cols=[
     {label:'Nama', get:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
-    {label:'Email', get:function(r){ return esc(r.email); }},
+    {label:'Username', get:function(r){ return esc(r.username); }},
     {label:'Role', get:function(r){ return {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan'}[r.role]||esc(r.role); }},
     {label:'Proyek Ditugaskan', get:function(r){
       if(r.role!=='lapangan') return '<span class="text-slate-300 italic">Semua (akses penuh)</span>';
@@ -917,7 +917,7 @@ PAGES.users = function(c){
   ];
   function draw(){
     var q=fv('q').toLowerCase();
-    var list=q?rows.filter(function(r){ return (r.nama+' '+r.email).toLowerCase().indexOf(q)>-1; }):rows;
+    var list=q?rows.filter(function(r){ return (r.nama+' '+r.username).toLowerCase().indexOf(q)>-1; }):rows;
     document.getElementById('cnt').textContent=list.length+' user';
     document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cols.map(function(cl){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
       '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cols.map(function(cl){ return '<td class="py-2.5 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
@@ -940,7 +940,7 @@ PAGES.users = function(c){
     var html =
       '<div class="space-y-4">'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama *</label><input id="f_nama" value="'+esc(rec?rec.nama:'')+'" class="'+fieldCls+'"></div>'+
-      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Email *</label><input id="f_email" type="email" value="'+esc(rec?rec.email:'')+'" class="'+fieldCls+'"></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Username *</label><input id="f_username" type="text" autocapitalize="none" autocorrect="off" value="'+esc(rec?rec.username:'')+'" class="'+fieldCls+'" placeholder="huruf kecil, angka, . _ -"></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Role *</label><select id="f_role" class="'+fieldCls+'">'+
         ['lapangan','admin','owner'].map(function(r){ return '<option value="'+r+'"'+(rec&&rec.role===r?' selected':'')+'>'+
           {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan'}[r]+'</option>'; }).join('')+
@@ -952,11 +952,11 @@ PAGES.users = function(c){
         '</select><div class="text-xs text-slate-400 mt-1">Ctrl/Cmd+klik untuk pilih lebih dari satu.</div></div>'+
       '</div>';
     openModal((id?'Edit ':'Tambah ')+'User', html, function(){
-      var nama=fv('f_nama'), email=fv('f_email'), role=fv('f_role'), password=fv('f_password');
-      if(!nama||!email){ toast('Nama dan email wajib diisi.', true); return; }
+      var nama=fv('f_nama'), username=fv('f_username'), role=fv('f_role'), password=fv('f_password');
+      if(!nama||!username){ toast('Nama dan username wajib diisi.', true); return; }
       if(!id && password.length<10){ toast('Password minimal 10 karakter.', true); return; }
       var projectIds=Array.from(document.getElementById('f_projectIds').selectedOptions).map(function(o){ return o.value; });
-      apiFetch('/users.php', {method:'POST', body:JSON.stringify({id:id||'', nama:nama, email:email, role:role, password:password, projectIds:projectIds})})
+      apiFetch('/users.php', {method:'POST', body:JSON.stringify({id:id||'', nama:nama, username:username, role:role, password:password, projectIds:projectIds})})
         .then(function(){ closeModal(); toast(id?'User diperbarui.':'User ditambahkan.'); refresh(); })
         .catch(function(e){ toast('Gagal menyimpan: '+e.message, true); });
     });

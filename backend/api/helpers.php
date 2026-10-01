@@ -135,10 +135,10 @@ function require_project_access(array $user, string $projectId): void {
 function audit(string $action, string $entity, string $entityId, string $detail = ''): void {
     $u = current_user();
     $stmt = db()->prepare(
-        'INSERT INTO audit_log (user_id, user_email, action, entity, entity_id, detail, ip_address, user_agent) VALUES (?,?,?,?,?,?,?,?)'
+        'INSERT INTO audit_log (user_id, user_username, action, entity, entity_id, detail, ip_address, user_agent) VALUES (?,?,?,?,?,?,?,?)'
     );
     $stmt->execute([
-        $u['id'] ?? null, $u['email'] ?? null, $action, $entity, $entityId, $detail,
+        $u['id'] ?? null, $u['username'] ?? null, $action, $entity, $entityId, $detail,
         $_SERVER['REMOTE_ADDR'] ?? null,
         substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255) ?: null,
     ]);

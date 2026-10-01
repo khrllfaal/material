@@ -6,18 +6,18 @@ send_cors_headers();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Method not allowed', 405);
 
 $body = read_json_body();
-$email = trim(strtolower((string)($body['email'] ?? '')));
+$username = trim(strtolower((string)($body['username'] ?? '')));
 $password = (string)($body['password'] ?? '');
-if ($email === '' || $password === '') json_error('Email dan password wajib diisi.', 422);
+if ($username === '' || $password === '') json_error('Username dan password wajib diisi.', 422);
 
-$stmt = db()->prepare('SELECT * FROM users WHERE email = ?');
-$stmt->execute([$email]);
+$stmt = db()->prepare('SELECT * FROM users WHERE username = ?');
+$stmt->execute([$username]);
 $user = $stmt->fetch();
 
-$generic_error = 'Email atau password salah.';
+$generic_error = 'Username atau password salah.';
 
 if (!$user) {
-    // Don't reveal whether the email exists at all.
+    // Don't reveal whether the username exists at all.
     json_error($generic_error, 401);
 }
 
@@ -37,7 +37,7 @@ if (!password_verify($password, $user['password_hash'])) {
 db()->prepare('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?')->execute([$user['id']]);
 start_session();
 session_regenerate_id(true);
-$_SESSION['user'] = ['id' => $user['id'], 'email' => $user['email'], 'nama' => $user['nama'], 'role' => $user['role']];
+$_SESSION['user'] = ['id' => $user['id'], 'username' => $user['username'], 'nama' => $user['nama'], 'role' => $user['role']];
 
 $out = $_SESSION['user'];
 if ($user['role'] === 'lapangan') $out['projectIds'] = user_project_ids($_SESSION['user']);
