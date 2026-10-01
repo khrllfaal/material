@@ -815,7 +815,12 @@ PAGES.stock = function(c){
     {label:'Total Masuk', get:function(r){ return num0(r.total_masuk)+' '+esc(r.satuan); }},
     {label:'Total Pemakaian', get:function(r){ return num0(r.total_keluar)+' '+esc(r.satuan); }},
     {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+' '+esc(r.satuan)+'</b>'; }},
-    {label:'Stok Minimum', get:function(r){ return num0(r.stok_minimum); }},
+    {label:'Ambang Batas', get:function(r){
+      var isRap = r.threshold_basis==='rap';
+      var val = isRap ? num0(r.sisa_kebutuhan) : num0(r.stok_minimum);
+      var tip = isRap ? 'Dari sisa kebutuhan RAP Bahan ('+num0(r.rap_qty)+' − '+num0(r.total_keluar)+' terpakai)' : 'Dari Stok Minimum manual (belum ada RAP Bahan untuk proyek ini)';
+      return val+' <span class="text-[10px] px-1.5 py-0.5 rounded '+(isRap?'bg-blue-50 text-blue-600':'bg-slate-100 text-slate-400')+'" title="'+esc(tip)+'">'+(isRap?'RAP':'manual')+'</span>';
+    }},
     {label:'Status', get:function(r){
       var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis']};
       var m=map[r.status]||['neutral',r.status];
@@ -823,7 +828,7 @@ PAGES.stock = function(c){
     }},
   ];
   var STATUS_COL = cols.length-1;
-  function exportRow(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.stok_minimum, r.status]; }
+  function exportRow(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.threshold_basis==='rap'?r.sisa_kebutuhan:r.stok_minimum, r.status]; }
   function draw(){
     var q=fv('q').toLowerCase();
     filteredList=q?rows.filter(function(r){ return (r.project_nama+' '+r.material_nama).toLowerCase().indexOf(q)>-1; }):rows;
