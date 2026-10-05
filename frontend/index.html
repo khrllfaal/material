@@ -801,7 +801,7 @@ function overGroupChart(groups, emptyMsg, sublabelFn, limit){
 function overDetailTable(rows){
   if(!rows.length) return '<div class="text-center text-sm text-slate-400 py-8">Belum ada bahan yang melebihi RAP ✓ (pastikan RAP per Proyek sudah diisi)</div>';
   var sorted = rows.slice().sort(function(a,b){ return b.persentase-a.persentase; });
-  var head = ['Proyek','Bahan','Jatah (RAP)','Aktual Pemakaian','Deviasi','%'];
+  var head = ['Proyek','Bahan','Pagu (RAP)','Aktual Pemakaian','Deviasi','%'];
   return '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm">'+
     '<thead><tr class="border-b border-slate-200">'+head.map(function(h){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(h)+'</th>'; }).join('')+'</tr></thead>'+
     '<tbody>'+sorted.map(function(r){
@@ -838,7 +838,7 @@ PAGES.dashboard = function(c){
       '<div>'+panel('<div id="chartB_title"></div><div id="chartB"></div>')+'</div>'+
     '</div>'+
     '<div class="mb-5">'+panel(
-      '<div class="flex justify-between items-center mb-1">'+panelTitle('trending-up','Bahan Melebihi RAP — Detail Lengkap','Semua bahan yang pemakaiannya sudah melewati jatah RAP, urut dari paling parah')+
+      '<div class="flex justify-between items-center mb-1">'+panelTitle('trending-up','Bahan Melebihi RAP — Detail Lengkap','Semua bahan yang pemakaiannya sudah melewati pagu RAP, urut dari paling parah')+
       '<button class="'+btnGhostSm+' shrink-0 -mt-4" id="btnGoRapReport">Buka Analisis Lengkap</button></div>'+
       '<div id="overTable"></div>')+
     '</div>'+
@@ -895,12 +895,12 @@ PAGES.dashboard = function(c){
       // bahan is over" as two separate, clearly-labeled groupings, instead
       // of one flat ranked list that mixed entities and statuses together.
       if(!projId){
-        document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Proyek Melebihi RAP','Proyek dengan bahan yang sudah melewati jatah, urut dari paling parah');
+        document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Proyek Melebihi RAP','Proyek dengan bahan yang sudah melewati pagu, urut dari paling parah');
         var byProject = groupOverRows(over, function(r){return r.project_id;}, function(r){return r.project_nama;});
-        document.getElementById('chartA').innerHTML = overGroupChart(byProject, 'Semua proyek masih dalam jatah RAP ✓', function(g){
+        document.getElementById('chartA').innerHTML = overGroupChart(byProject, 'Semua proyek masih dalam pagu RAP ✓', function(g){
           return g.count+' bahan melebihi — terparah: '+g.worst.material_nama;
         });
-        document.getElementById('chartB_title').innerHTML = panelTitle('box','Bahan Sering Melebihi','Bahan yang paling sering melewati jatah lintas proyek');
+        document.getElementById('chartB_title').innerHTML = panelTitle('box','Bahan Sering Melebihi','Bahan yang paling sering melewati pagu lintas proyek');
         var byMaterial = groupOverRows(over, function(r){return r.material_id;}, function(r){return r.material_nama;});
         document.getElementById('chartB').innerHTML = overGroupChart(byMaterial, 'Belum ada bahan yang melebihi RAP ✓', function(g){
           return 'melebihi di '+g.count+' proyek — terparah: '+g.worst.project_nama;
@@ -909,7 +909,7 @@ PAGES.dashboard = function(c){
         document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Bahan Melebihi RAP di Proyek Ini','Urut dari persentase pemakaian tertinggi');
         document.getElementById('chartA').innerHTML = over.length ? over.slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8).map(function(r){
           return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(r.persentase));
-        }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Proyek ini masih dalam jatah RAP ✓</div>';
+        }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Proyek ini masih dalam pagu RAP ✓</div>';
         document.getElementById('chartB_title').innerHTML = panelTitle('box','Pemakaian vs RAP — Semua Bahan','Seluruh bahan di proyek ini, urut dari persentase tertinggi');
         var allRanked = rapReport.filter(function(r){ return r.persentase!=null; }).slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8);
         document.getElementById('chartB').innerHTML = allRanked.length ? allRanked.map(function(r){
@@ -1039,14 +1039,14 @@ PAGES.rap_proyek = function(c){
   Promise.all([apiFetch('/projects.php'), apiFetch('/materials.php')]).then(function(r){
     var projects=r[0], materials=r[1];
     masterPage({
-      title:'RAP per Proyek', sub:'Jatah total bahan per proyek — cukup satu angka, tanpa perlu setup pekerjaan. Isi ini untuk setiap proyek.',
-      endpoint:'/rap_bahan_proyek.php', addLabel:'Jatah Bahan', idPrefix:'rapp_',
+      title:'RAP per Proyek', sub:'Pagu total bahan per proyek — cukup satu angka, tanpa perlu setup pekerjaan. Isi ini untuk setiap proyek.',
+      endpoint:'/rap_bahan_proyek.php', addLabel:'Pagu Bahan', idPrefix:'rapp_',
       fields:[
         {key:'project_id', label:'Proyek', type:'select-dyn', required:true, placeholder:'— Pilih proyek —',
          optionsFn:function(){ return projects.map(function(p){ return {value:p.id, label:p.nama}; }); }},
         {key:'material_id', label:'Bahan', type:'select-dyn', required:true, placeholder:'— Pilih bahan —',
          optionsFn:function(){ return materials.map(function(m){ return {value:m.id, label:m.nama+' ('+m.satuan+')'}; }); }},
-        {key:'rap_qty', label:'Jatah Total (RAP)', type:'number', required:true},
+        {key:'rap_qty', label:'Pagu Total (RAP)', type:'number', required:true},
       ],
       searchFn:function(r){
         var p=projects.find(function(x){ return x.id===r.project_id; });
@@ -1057,7 +1057,7 @@ PAGES.rap_proyek = function(c){
       columns:[
         {key:'project_id', label:'Proyek', render:function(r){ var p=projects.find(function(x){ return x.id===r.project_id; }); return p?esc(p.nama):'<span class="text-slate-300 italic">–</span>'; }},
         {key:'material_id', label:'Bahan', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return m?esc(m.nama):'<span class="text-slate-300 italic">–</span>'; }},
-        {key:'rap_qty', label:'Jatah Total', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return num0(r.rap_qty)+' '+(m?esc(m.satuan):''); }},
+        {key:'rap_qty', label:'Pagu Total', render:function(r){ var m=materials.find(function(x){ return x.id===r.material_id; }); return num0(r.rap_qty)+' '+(m?esc(m.satuan):''); }},
       ],
     })(c);
   }).catch(function(e){ c.innerHTML=pageHead('RAP per Proyek','')+panel('<div class="text-red-500 text-sm">Gagal memuat: '+esc(e.message)+'</div>'); });
@@ -1144,17 +1144,29 @@ function reportPage(cfg){
 }
 
 PAGES.rap_proyek_report = reportPage({
-  title:'Analisis RAP per Proyek', sub:'Pemakaian aktual vs jatah total (RAP) per bahan per proyek — cara paling cepat untuk lihat proyek mana yang sudah lewat jatah.',
+  title:'Analisis RAP per Proyek', sub:'Pemakaian aktual vs pagu total (RAP) per bahan per proyek — cara paling cepat untuk lihat proyek mana yang sudah lewat pagu.',
   endpoint:'/material_rap_proyek_report.php', filename:'Analisis_RAP_per_Proyek', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:7, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
-  dateFilter:{hint:'Rentang tanggal hanya menyaring Pemakaian yang dihitung (mis. "pemakaian bulan ini vs jatah total") — Jatah (RAP) selalu angka penuh, tidak ikut terpotong oleh tanggal.'},
+  statusCol:10, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
+  dateFilter:{hint:'Rentang tanggal hanya menyaring Pemakaian yang dihitung (mis. "pemakaian bulan ini vs pagu total") — Pagu (RAP), Total Masuk, dan % Pagu Didatangkan selalu angka penuh, tidak ikut terpotong oleh tanggal.'},
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
     {label:'Satuan', get:function(r){ return esc(r.satuan); }},
-    {label:'Jatah (RAP)', get:function(r){ return num0(r.rap_qty); }},
+    {label:'Pagu (RAP)', get:function(r){ return num0(r.rap_qty); }},
+    {label:'Total Masuk', get:function(r){ return num0(r.total_masuk); }},
+    {label:'% Pagu Didatangkan', get:function(r){
+      // Receiving control — independent of Pemakaian entirely, so it
+      // still works even when a proyek's admin lapangan never logs
+      // usage. Over 100% here flags over-procurement at the gate.
+      if(r.pct_didatangkan==null) return '<span class="text-slate-300 italic">—</span>';
+      return '<b class="'+(r.pct_didatangkan>1?'text-red-600':'text-slate-700')+'">'+pct(r.pct_didatangkan)+'</b>';
+    }},
     {label:'Aktual Pemakaian', get:function(r){ return num0(r.aktual_pemakaian); }},
+    {label:'Ambang Batas (Sisa Kebutuhan)', get:function(r){
+      if(r.rap_qty==null) return '<span class="text-slate-300 italic">—</span>';
+      return num0(r.sisa_kebutuhan)+' <span class="text-xs text-slate-400">(sisa dari pagu '+num0(r.rap_qty)+')</span>';
+    }},
     {label:'Deviasi', get:function(r){ return '<b class="'+(r.deviasi>0?'text-red-600':'text-emerald-600')+'">'+numSigned(r.deviasi)+'</b>'; }},
     {label:'%', get:function(r){ return r.persentase==null?'–':pct(r.persentase); }},
     {label:'Status', get:function(r){
@@ -1163,7 +1175,11 @@ PAGES.rap_proyek_report = reportPage({
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){ return [r.project_nama, r.material_nama, r.satuan, r.rap_qty, r.aktual_pemakaian, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; },
+  exportRow:function(r){
+    return [r.project_nama, r.material_nama, r.satuan, r.rap_qty, r.total_masuk,
+      r.pct_didatangkan==null?'—':pct(r.pct_didatangkan), r.aktual_pemakaian, r.sisa_kebutuhan,
+      r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status];
+  },
 });
 
 PAGES.riwayat = function(c){
@@ -1251,10 +1267,10 @@ PAGES.riwayat = function(c){
 };
 
 PAGES.stock = reportPage({
-  title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan, kontrol pengadaan vs RAP, dan perkiraan kapan perlu kirim lagi.',
+  title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan dan perkiraan kapan perlu kirim lagi — metrik RAP (pagu/ambang batas) ada di Analisis RAP per Proyek.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:9,
+  statusCol:7,
   // Single "as of" date only — not a [from,to] range. "Sisa Stok" is a
   // running balance; a range would drop whatever carried over from
   // before it and misreport physical stock. One date keeps the filter
@@ -1267,25 +1283,11 @@ PAGES.stock = reportPage({
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
     {label:'Satuan', get:function(r){ return esc(r.satuan); }},
     {label:'Total Masuk', get:function(r){ return num0(r.total_masuk); }},
-    {label:'% Jatah Didatangkan', get:function(r){
-      // Receiving control, independent of Pemakaian entirely — catches
-      // over-procurement (menerima lebih dari jatah RAP) the moment it
-      // happens at the gate, regardless of whether usage ever gets
-      // logged afterward. This is the "kedatangan" half of the picture;
-      // Analisis RAP per Proyek covers the "pemakaian" half.
-      if(r.rap_qty==null) return '<span class="text-slate-300 italic">—</span>';
-      var p = r.rap_qty>0 ? r.total_masuk/r.rap_qty : 0;
-      return '<b class="'+(p>1?'text-red-600':'text-slate-700')+'">'+pct(p)+'</b>';
-    }},
     {label:'Total Pemakaian', get:function(r){
       return num0(r.total_keluar)+
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
     {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':''); }},
-    {label:'Ambang Batas (RAP)', get:function(r){
-      if(r.sisa_kebutuhan==null) return '<span class="text-slate-300 italic" title="Isi RAP per Proyek untuk bahan ini agar status stok bisa dihitung">— RAP belum diisi</span>';
-      return num0(r.sisa_kebutuhan)+' <span class="text-xs text-slate-400">(sisa dari jatah '+num0(r.rap_qty)+')</span>';
-    }},
     {label:'Perkiraan Habis', get:function(r){
       // Simple run-rate forecast (days-of-supply): avg daily usage
       // observed so far, projected against current stock. Only shown
@@ -1302,9 +1304,8 @@ PAGES.stock = reportPage({
     }},
   ],
   exportRow:function(r){
-    var pctDatang = r.rap_qty!=null && r.rap_qty>0 ? pct(r.total_masuk/r.rap_qty) : '—';
-    return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, pctDatang, r.total_keluar,
-      r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.forecast_date||'—', r.status];
+    return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, r.total_keluar,
+      r.stok, r.forecast_date||'—', r.status];
   },
 });
 

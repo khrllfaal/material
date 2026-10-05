@@ -36,13 +36,17 @@ $stmt = db()->prepare(
         rbp.project_id, p.nama AS project_nama,
         rbp.material_id, m.nama AS material_nama, m.satuan,
         rbp.rap_qty,
-        COALESCE(usage_total.total, 0) AS aktual_pemakaian
+        COALESCE(usage_total.total, 0) AS aktual_pemakaian,
+        COALESCE(receipt_total.total, 0) AS total_masuk
      FROM rap_bahan_proyek rbp
      JOIN projects p ON p.id = rbp.project_id
      JOIN materials m ON m.id = rbp.material_id
      LEFT JOIN (
         SELECT project_id, material_id, SUM(qty) AS total FROM material_usage $usageWhere GROUP BY project_id, material_id
      ) usage_total ON usage_total.project_id = rbp.project_id AND usage_total.material_id = rbp.material_id
+     LEFT JOIN (
+        SELECT project_id, material_id, SUM(qty) AS total FROM material_receipts GROUP BY project_id, material_id
+     ) receipt_total ON receipt_total.project_id = rbp.project_id AND receipt_total.material_id = rbp.material_id
      $scopeSql
      ORDER BY p.nama, m.nama"
 );
@@ -51,12 +55,20 @@ $stmt->execute(array_merge($usageParams, $params));
 $out = array_map(function ($r) {
     $rap = (float)$r['rap_qty'];
     $aktual = (float)$r['aktual_pemakaian'];
+    $totalMasuk = (float)$r['total_masuk'];
     // PDO returns DECIMAL columns as strings (e.g. "300.000") — cast
     // back to real JSON numbers so the frontend's typeof-based number
     // formatting (exports especially) doesn't treat them as text.
     $r['rap_qty'] = $rap;
     $r['aktual_pemakaian'] = $aktual;
+    $r['total_masuk'] = $totalMasuk;
     $r['deviasi'] = $aktual - $rap;
+    // Receiving control (kedatangan vs pagu) — independent of
+    // Pemakaian entirely, so it still works even for a proyek whose
+    // admin lapangan never logs usage. Lives here (not Monitor Stok)
+    // because it's a RAP-budget question, not a physical-stock one.
+    $r['pct_didatangkan'] = $rap > 0 ? $totalMasuk / $rap : null;
+    $r['sisa_kebutuhan'] = max(0, $rap - $aktual);
     if ($rap <= 0) {
         $r['persentase'] = null;
         $r['status'] = 'DATA_TIDAK_LENGKAP';
