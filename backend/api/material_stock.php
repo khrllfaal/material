@@ -55,7 +55,7 @@ $stmt = db()->prepare(
         COALESCE(masuk.total, 0) AS total_masuk,
         COALESCE(keluar.total, 0) AS total_keluar,
         COALESCE(masuk.total, 0) - COALESCE(keluar.total, 0) AS stok,
-        masuk.last_tgl AS last_masuk_tgl, keluar.last_tgl AS last_keluar_tgl,
+        masuk.last_tgl AS last_masuk_tgl, keluar.last_tgl AS last_keluar_tgl, keluar.first_tgl AS first_keluar_tgl,
         COALESCE(masuk_p.total, 0) AS masuk_periode,
         COALESCE(keluar_p.total, 0) AS keluar_periode
      FROM (
@@ -69,7 +69,7 @@ $stmt = db()->prepare(
      JOIN materials m ON m.id = pm.material_id
      LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_receipts WHERE 1=1 $toCond GROUP BY project_id, material_id) masuk
         ON masuk.project_id = pm.project_id AND masuk.material_id = pm.material_id
-     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_usage WHERE 1=1 $toCond GROUP BY project_id, material_id) keluar
+     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl, MIN(tgl) AS first_tgl FROM material_usage WHERE 1=1 $toCond GROUP BY project_id, material_id) keluar
         ON keluar.project_id = pm.project_id AND keluar.material_id = pm.material_id
      LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total FROM material_receipts WHERE $periodCond GROUP BY project_id, material_id) masuk_p
         ON masuk_p.project_id = pm.project_id AND masuk_p.material_id = pm.material_id
@@ -87,7 +87,7 @@ if ($tglTo) $bindParams[] = $tglTo;     // keluar subquery
 if ($tglFrom && $tglTo) { $bindParams[] = $tglFrom; $bindParams[] = $tglTo; } // masuk_p
 if ($tglFrom && $tglTo) { $bindParams[] = $tglFrom; $bindParams[] = $tglTo; } // keluar_p
 $stmt->execute(array_merge($bindParams, $params));
-$out = array_map(function ($r) {
+$out = array_map(function ($r) use ($tglTo) {
     $stok = (float)$r['stok'];
     $pemakaian = (float)$r['total_keluar'];
     $hasRap = $r['rap_qty'] !== null;
@@ -119,6 +119,29 @@ $out = array_map(function ($r) {
         }
     }
     $r['usage_stale'] = $usageStale;
+    // Simple run-rate forecast (the standard "days of supply" metric
+    // construction/retail inventory systems use): average daily usage
+    // over the span actually observed, projected forward against
+    // current stock. Deliberately not shown when usage is stale/absent
+    // — a rate computed from almost no data, or data that stopped
+    // updating, would just be a confident-looking wrong number.
+    $forecastDays = null;
+    $dailyRate = null;
+    if (!$usageStale && $pemakaian > 0 && $r['last_keluar_tgl'] !== null && $r['first_keluar_tgl'] !== null) {
+        $spanDays = (strtotime($r['last_keluar_tgl']) - strtotime($r['first_keluar_tgl'])) / 86400 + 1;
+        $dailyRate = $pemakaian / max(1, $spanDays);
+        if ($dailyRate > 0 && $stok > 0) {
+            $forecastDays = (int)floor($stok / $dailyRate);
+        }
+    }
+    $r['daily_usage_rate'] = $dailyRate;
+    $r['forecast_days'] = $forecastDays;
+    // Anchor the projection to the stock snapshot date (tgl_to), not
+    // always "today" — if viewing stock as of a past date, the forecast
+    // is "from that date forward", not from right now.
+    $forecastAnchor = $tglTo ?: date('Y-m-d');
+    $r['forecast_date'] = $forecastDays !== null ? date('Y-m-d', strtotime("$forecastAnchor +$forecastDays days")) : null;
+    unset($r['first_keluar_tgl']);
     if ($stok <= 0) $status = 'HABIS';
     elseif (!$hasRap) $status = 'DATA_TIDAK_LENGKAP';
     elseif ($stok <= $sisaKebutuhan) $status = 'MENIPIS';

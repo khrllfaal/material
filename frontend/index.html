@@ -1251,7 +1251,7 @@ PAGES.stock = reportPage({
   title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan (bahan masuk − pemakaian) dan kontrol pengadaan vs RAP — independen dari rajin/tidaknya Pemakaian diinput.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:10,
+  statusCol:11,
   dateFilter:{
     fromLabel:'Pergerakan dari', toLabel:'Sampai (stok per tgl)',
     hint:'"Sampai" = snapshot stok PER TANGGAL itu (saldo sebelumnya tetap terbawa, tidak hilang). "Dari" hanya menambah kolom pergerakan periode — tidak mengubah Sisa Stok.'
@@ -1283,6 +1283,15 @@ PAGES.stock = reportPage({
       if(r.sisa_kebutuhan==null) return '<span class="text-slate-300 italic" title="Isi RAP per Proyek untuk bahan ini agar status stok bisa dihitung">— RAP belum diisi</span>';
       return num0(r.sisa_kebutuhan)+' <span class="text-xs text-slate-400">(sisa dari jatah '+num0(r.rap_qty)+')</span>';
     }},
+    {label:'Perkiraan Habis', get:function(r){
+      // Simple run-rate forecast (days-of-supply): avg daily usage
+      // observed so far, projected against current stock. Only shown
+      // when usage logging is active and recent — a rate from stale or
+      // near-zero data would just be a confident-looking wrong number.
+      if(r.forecast_date==null) return '<span class="text-slate-300 italic" title="Butuh riwayat Pemakaian yang aktif (bukan data lama) untuk dihitung">— belum cukup data</span>';
+      var soon = r.forecast_days<=14;
+      return '<span class="'+(soon?'text-red-600 font-bold':'text-slate-600')+'">'+esc(r.forecast_date)+'</span> <span class="text-xs text-slate-400">('+r.forecast_days+' hari lagi, ±'+fmtNum(r.daily_usage_rate)+'/hari)</span>';
+    }},
     {label:'Status', get:function(r){
       var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi']};
       var m=map[r.status]||['neutral',r.status];
@@ -1294,7 +1303,7 @@ PAGES.stock = reportPage({
     var hasRange = fv('rpFrom')&&fv('rpTo');
     return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, pctDatang, r.total_keluar,
       hasRange?r.masuk_periode:'—', hasRange?r.keluar_periode:'—',
-      r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.status];
+      r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.forecast_date||'—', r.status];
   },
 });
 
