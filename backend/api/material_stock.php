@@ -15,6 +15,18 @@ require_once __DIR__ . '/helpers.php';
  * When no RAP entry exists yet, there is no basis to call stock
  * low/sufficient, so the row is flagged DATA_TIDAK_LENGKAP instead of
  * guessing — the fix is to fill in RAP per Proyek, not a manual number.
+ *
+ * Date filtering here is deliberately not a simple [from, to] window:
+ * "Sisa Stok" is a running balance, so bounding it with a lower date
+ * would silently drop whatever was carried over from before that date
+ * and report a wrong physical quantity. Instead:
+ *   - tgl_to (optional, "as of" date) bounds the cumulative totals —
+ *     a valid point-in-time snapshot ("stock as of 30 Sept"), same
+ *     math as today's unbounded view, just evaluated at an earlier date.
+ *   - tgl_from (optional, requires tgl_to) additionally reports
+ *     masuk_periode/keluar_periode — movement strictly inside
+ *     [from, to] — as supplementary figures alongside the always-valid
+ *     snapshot, for "what happened this period" reporting.
  */
 send_cors_headers();
 $user = require_login();
@@ -30,6 +42,11 @@ if ($scope !== null) {
     $params = $scope;
 }
 
+$tglTo = !empty($_GET['tgl_to']) ? $_GET['tgl_to'] : null;
+$tglFrom = !empty($_GET['tgl_from']) ? $_GET['tgl_from'] : null;
+$toCond = $tglTo ? 'AND tgl <= ?' : '';
+$periodCond = ($tglFrom && $tglTo) ? 'tgl BETWEEN ? AND ?' : '1=0';
+
 $stmt = db()->prepare(
     "SELECT
         p.id AS project_id, p.nama AS project_nama,
@@ -38,7 +55,9 @@ $stmt = db()->prepare(
         COALESCE(masuk.total, 0) AS total_masuk,
         COALESCE(keluar.total, 0) AS total_keluar,
         COALESCE(masuk.total, 0) - COALESCE(keluar.total, 0) AS stok,
-        masuk.last_tgl AS last_masuk_tgl, keluar.last_tgl AS last_keluar_tgl
+        masuk.last_tgl AS last_masuk_tgl, keluar.last_tgl AS last_keluar_tgl,
+        COALESCE(masuk_p.total, 0) AS masuk_periode,
+        COALESCE(keluar_p.total, 0) AS keluar_periode
      FROM (
         SELECT project_id, material_id FROM material_receipts
         UNION
@@ -48,16 +67,26 @@ $stmt = db()->prepare(
      ) pm
      JOIN projects p ON p.id = pm.project_id
      JOIN materials m ON m.id = pm.material_id
-     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_receipts GROUP BY project_id, material_id) masuk
+     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_receipts WHERE 1=1 $toCond GROUP BY project_id, material_id) masuk
         ON masuk.project_id = pm.project_id AND masuk.material_id = pm.material_id
-     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_usage GROUP BY project_id, material_id) keluar
+     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_usage WHERE 1=1 $toCond GROUP BY project_id, material_id) keluar
         ON keluar.project_id = pm.project_id AND keluar.material_id = pm.material_id
+     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total FROM material_receipts WHERE $periodCond GROUP BY project_id, material_id) masuk_p
+        ON masuk_p.project_id = pm.project_id AND masuk_p.material_id = pm.material_id
+     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total FROM material_usage WHERE $periodCond GROUP BY project_id, material_id) keluar_p
+        ON keluar_p.project_id = pm.project_id AND keluar_p.material_id = pm.material_id
      LEFT JOIN rap_bahan_proyek rap
         ON rap.project_id = pm.project_id AND rap.material_id = pm.material_id
      $scopeSql
      ORDER BY p.nama, m.nama"
 );
-$stmt->execute($params);
+// Bind order must match placeholder order left-to-right in the SQL above.
+$bindParams = [];
+if ($tglTo) $bindParams[] = $tglTo;     // masuk subquery
+if ($tglTo) $bindParams[] = $tglTo;     // keluar subquery
+if ($tglFrom && $tglTo) { $bindParams[] = $tglFrom; $bindParams[] = $tglTo; } // masuk_p
+if ($tglFrom && $tglTo) { $bindParams[] = $tglFrom; $bindParams[] = $tglTo; } // keluar_p
+$stmt->execute(array_merge($bindParams, $params));
 $out = array_map(function ($r) {
     $stok = (float)$r['stok'];
     $pemakaian = (float)$r['total_keluar'];
@@ -70,6 +99,8 @@ $out = array_map(function ($r) {
     $r['stok'] = $stok;
     $r['total_masuk'] = (float)$r['total_masuk'];
     $r['total_keluar'] = (float)$r['total_keluar'];
+    $r['masuk_periode'] = (float)$r['masuk_periode'];
+    $r['keluar_periode'] = (float)$r['keluar_periode'];
     $r['rap_qty'] = $rapQty;
     $r['sisa_kebutuhan'] = $sisaKebutuhan;
     // Flags a project+material that keeps receiving deliveries but

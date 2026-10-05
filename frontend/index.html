@@ -131,6 +131,18 @@ function numSigned(n){ n=Number(n)||0; return (n<0?'-':'')+Math.round(Math.abs(n
 function fmtNum(n){ return Number(n||0).toLocaleString('id-ID', {maximumFractionDigits:2}); }
 function pct(n){ if(n==null||Number.isNaN(n)) return '–'; return (n*100).toFixed(1)+'%'; }
 function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+/* Auto-generates a short, sequential-looking code for a field the user
+   shouldn't have to invent themselves — unlike a delivery note number
+   (a real document someone else issued), an internal catalog code has
+   no "correct" value to match, only a uniqueness requirement, so the
+   system picks one. */
+function genSeqCode(prefix, existingCodes){
+  var n = existingCodes.length + 1;
+  var code;
+  do { code = prefix + '-' + String(n).padStart(3,'0'); n++; }
+  while (existingCodes.indexOf(code) > -1);
+  return code;
+}
 function today(){ return new Date().toISOString().slice(0,10); }
 function fv(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; }
 function icons(){ if(window.lucide) lucide.createIcons(); }
@@ -204,9 +216,16 @@ function enhanceSelect(sel){
   btn.appendChild(label); btn.appendChild(right);
   wrap.appendChild(btn);
 
+  // Every panel gets an explicit, always-visible way out — a search box
+  // with no visible close control leaves "I opened this by accident" or
+  // "I don't actually want to change this" with no obvious move besides
+  // guessing that a click outside works.
   var panel = document.createElement('div');
   panel.className = 'hidden absolute z-30 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-hidden flex flex-col';
-  panel.innerHTML = '<div class="p-2 border-b border-slate-100 shrink-0"><input type="text" placeholder="Cari…" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+  panel.innerHTML = '<div class="p-2 border-b border-slate-100 shrink-0 flex items-center gap-1.5">'+
+      '<input type="text" placeholder="Cari…" class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+      '<button type="button" class="ss-close shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Tutup tanpa mengubah pilihan"><i data-lucide="x" class="w-4 h-4"></i></button>'+
+    '</div>'+
     '<div class="overflow-y-auto py-1"></div>'+
     (multiple ? '<div class="p-2 border-t border-slate-100 flex justify-between gap-2 shrink-0"><button type="button" class="ss-clearall text-xs font-semibold text-slate-400 hover:text-slate-600">Batal Semua</button><button type="button" class="ss-done text-xs font-semibold text-blue-600 hover:text-blue-700">Selesai</button></div>' : '');
   wrap.appendChild(panel);
@@ -261,7 +280,9 @@ function enhanceSelect(sel){
   function open(){ panel.classList.remove('hidden'); searchInput.value=''; renderList(''); searchInput.focus(); }
   function close(){ panel.classList.add('hidden'); }
   btn.onclick = function(e){ e.stopPropagation(); panel.classList.contains('hidden') ? open() : close(); };
+  panel.querySelector('.ss-close').onclick = function(e){ e.stopPropagation(); close(); };
   searchInput.addEventListener('input', function(){ renderList(searchInput.value); });
+  searchInput.addEventListener('keydown', function(e){ if(e.key==='Escape'){ close(); btn.focus(); } });
   clearBtn.onclick = function(e){
     e.stopPropagation();
     if(multiple) optsArr().forEach(function(o){ o.selected = false; }); else sel.value = '';
@@ -665,7 +686,7 @@ function masterPage(cfg){
     function form(id){
       var rec = id ? rows.find(function(x){ return x.id===id; }) : null;
       var html = '<div class="space-y-4">'+cfg.fields.map(function(f){
-        var val = rec ? (rec[f.key]!==undefined?rec[f.key]:'') : (f.default!==undefined?f.default:'');
+        var val = rec ? (rec[f.key]!==undefined?rec[f.key]:'') : (typeof f.default==='function' ? f.default(rows) : (f.default!==undefined?f.default:''));
         if(f.type==='select-dyn'){
           var opts=f.optionsFn();
           return '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">'+esc(f.label)+(f.required?' *':'')+'</label><select id="f_'+f.key+'" class="'+fieldCls+'">'+
@@ -946,7 +967,7 @@ PAGES.bahan = masterPage({
   title:'Master Bahan', sub:'Katalog material — dipakai di semua proyek. Ambang batas "Perlu Dikirim" dihitung otomatis dari RAP per Proyek, bukan diisi di sini.',
   endpoint:'/materials.php', addLabel:'Bahan', idPrefix:'mat_',
   fields:[
-    {key:'kode', label:'Kode Bahan', required:true},
+    {key:'kode', label:'Kode Bahan (otomatis, boleh diubah)', required:true, default:function(rows){ return genSeqCode('BHN', rows.map(function(r){ return r.kode; })); }},
     {key:'nama', label:'Nama Bahan', required:true},
     {key:'satuan', label:'Satuan', required:true},
   ],
@@ -1052,9 +1073,17 @@ function reportPage(cfg){
           '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
           '<input type="text" id="q" placeholder="'+esc(cfg.searchPlaceholder)+'" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
           '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[180px]"><option value="">Semua Proyek</option></select>'+
+          (cfg.dateFilter ? (
+            '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.fromLabel||'Dari')+'</span>'+
+            '<input type="date" id="rpFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+            '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.toLabel||'Sampai')+'</span>'+
+            '<input type="date" id="rpTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+            '<button id="rpDateReset" class="'+btnGhostSm+'">Reset</button>'
+          ) : '')+
           '</div>'+
           '<span class="text-xs text-slate-400" id="cnt"></span>'+
         '</div>'+
+        (cfg.dateFilter && cfg.dateFilter.hint ? '<div class="text-xs text-slate-400 -mt-2 mb-4">'+esc(cfg.dateFilter.hint)+'</div>' : '')+
         '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
       );
     icons();
@@ -1075,18 +1104,39 @@ function reportPage(cfg){
       bindExportBtns(cfg.filename, cfg.title, cfg.sub, cfg.columns.map(function(cl){ return cl.label; }),
         function(){ return filteredList.map(cfg.exportRow); }, STATUS_COL);
     }
-    apiFetch(cfg.endpoint).then(function(data){
-      rows=data;
-      var seen={}, opts=[];
-      rows.forEach(function(r){ if(r.project_id && !seen[r.project_id]){ seen[r.project_id]=1; opts.push({id:r.project_id, nama:r.project_nama}); } });
-      opts.sort(function(a,b){ return a.nama.localeCompare(b.nama); });
-      document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
-        opts.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
-      enhanceSelect(document.getElementById('fProj'));
-      draw();
+    function load(){
+      var qs = [];
+      if(cfg.dateFilter){
+        var from=fv('rpFrom'), to=fv('rpTo');
+        if(from) qs.push('tgl_from='+encodeURIComponent(from));
+        if(to) qs.push('tgl_to='+encodeURIComponent(to));
+      }
+      return apiFetch(cfg.endpoint+(qs.length?'?'+qs.join('&'):'')).then(function(data){
+        rows=data;
+        var seen={}, opts=[];
+        rows.forEach(function(r){ if(r.project_id && !seen[r.project_id]){ seen[r.project_id]=1; opts.push({id:r.project_id, nama:r.project_nama}); } });
+        opts.sort(function(a,b){ return a.nama.localeCompare(b.nama); });
+        var projSel = document.getElementById('fProj');
+        var curProj = fv('fProj');
+        projSel.innerHTML = '<option value="">Semua Proyek</option>'+
+          opts.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===curProj?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('');
+        if(projSel._enhanced) projSel.dispatchEvent(new Event('ss-refresh'));
+        else enhanceSelect(projSel);
+        draw();
+      }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+    }
+    load().then(function(){
       document.getElementById('q').addEventListener('input',draw);
       document.getElementById('fProj').addEventListener('change',draw);
-    }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+      if(cfg.dateFilter){
+        document.getElementById('rpFrom').addEventListener('change', load);
+        document.getElementById('rpTo').addEventListener('change', load);
+        document.getElementById('rpDateReset').onclick = function(){
+          document.getElementById('rpFrom').value=''; document.getElementById('rpTo').value='';
+          load();
+        };
+      }
+    });
   };
 }
 
@@ -1095,6 +1145,7 @@ PAGES.rap_proyek_report = reportPage({
   endpoint:'/material_rap_proyek_report.php', filename:'Analisis_RAP_per_Proyek', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
   statusCol:7, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
+  dateFilter:{hint:'Rentang tanggal hanya menyaring Pemakaian yang dihitung (mis. "pemakaian bulan ini vs jatah total") — Jatah (RAP) selalu angka penuh, tidak ikut terpotong oleh tanggal.'},
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
@@ -1197,20 +1248,37 @@ PAGES.riwayat = function(c){
 };
 
 PAGES.stock = reportPage({
-  title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok berjalan (bahan masuk − pemakaian) per proyek, seperti stok minimarket.',
+  title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan (bahan masuk − pemakaian) dan kontrol pengadaan vs RAP — independen dari rajin/tidaknya Pemakaian diinput.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:7, emptyMsg:'Belum ada data bahan masuk/pemakaian.',
+  statusCol:10,
+  dateFilter:{
+    fromLabel:'Pergerakan dari', toLabel:'Sampai (stok per tgl)',
+    hint:'"Sampai" = snapshot stok PER TANGGAL itu (saldo sebelumnya tetap terbawa, tidak hilang). "Dari" hanya menambah kolom pergerakan periode — tidak mengubah Sisa Stok.'
+  },
+  emptyMsg:'Belum ada data bahan masuk/pemakaian.',
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
     {label:'Satuan', get:function(r){ return esc(r.satuan); }},
     {label:'Total Masuk', get:function(r){ return num0(r.total_masuk); }},
+    {label:'% Jatah Didatangkan', get:function(r){
+      // Receiving control, independent of Pemakaian entirely — catches
+      // over-procurement (menerima lebih dari jatah RAP) the moment it
+      // happens at the gate, regardless of whether usage ever gets
+      // logged afterward. This is the "kedatangan" half of the picture;
+      // Analisis RAP per Proyek covers the "pemakaian" half.
+      if(r.rap_qty==null) return '<span class="text-slate-300 italic">—</span>';
+      var p = r.rap_qty>0 ? r.total_masuk/r.rap_qty : 0;
+      return '<b class="'+(p>1?'text-red-600':'text-slate-700')+'">'+pct(p)+'</b>';
+    }},
     {label:'Total Pemakaian', get:function(r){
       return num0(r.total_keluar)+
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
-    {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'; }},
+    {label:'Masuk (Periode)', get:function(r){ return fv('rpFrom')&&fv('rpTo') ? num0(r.masuk_periode) : '<span class="text-slate-300">—</span>'; }},
+    {label:'Pemakaian (Periode)', get:function(r){ return fv('rpFrom')&&fv('rpTo') ? num0(r.keluar_periode) : '<span class="text-slate-300">—</span>'; }},
+    {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':''); }},
     {label:'Ambang Batas (RAP)', get:function(r){
       if(r.sisa_kebutuhan==null) return '<span class="text-slate-300 italic" title="Isi RAP per Proyek untuk bahan ini agar status stok bisa dihitung">— RAP belum diisi</span>';
       return num0(r.sisa_kebutuhan)+' <span class="text-xs text-slate-400">(sisa dari jatah '+num0(r.rap_qty)+')</span>';
@@ -1221,7 +1289,13 @@ PAGES.stock = reportPage({
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){ return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, r.total_keluar, r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.status]; },
+  exportRow:function(r){
+    var pctDatang = r.rap_qty!=null && r.rap_qty>0 ? pct(r.total_masuk/r.rap_qty) : '—';
+    var hasRange = fv('rpFrom')&&fv('rpTo');
+    return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, pctDatang, r.total_keluar,
+      hasRange?r.masuk_periode:'—', hasRange?r.keluar_periode:'—',
+      r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.status];
+  },
 });
 
 PAGES.rap_report = reportPage({
