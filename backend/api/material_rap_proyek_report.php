@@ -22,6 +22,15 @@ if ($scope !== null) {
     $params = $scope;
 }
 
+// Optional date range narrows which Pemakaian entries are summed (e.g.
+// "how much was used this month against the whole budget") — rap_qty
+// itself is never date-scoped, it's the project's one fixed budget.
+$usageConds = [];
+$usageParams = [];
+if (!empty($_GET['tgl_from'])) { $usageConds[] = 'tgl >= ?'; $usageParams[] = $_GET['tgl_from']; }
+if (!empty($_GET['tgl_to']))   { $usageConds[] = 'tgl <= ?'; $usageParams[] = $_GET['tgl_to']; }
+$usageWhere = $usageConds ? ('WHERE ' . implode(' AND ', $usageConds)) : '';
+
 $stmt = db()->prepare(
     "SELECT
         rbp.project_id, p.nama AS project_nama,
@@ -32,12 +41,12 @@ $stmt = db()->prepare(
      JOIN projects p ON p.id = rbp.project_id
      JOIN materials m ON m.id = rbp.material_id
      LEFT JOIN (
-        SELECT project_id, material_id, SUM(qty) AS total FROM material_usage GROUP BY project_id, material_id
+        SELECT project_id, material_id, SUM(qty) AS total FROM material_usage $usageWhere GROUP BY project_id, material_id
      ) usage_total ON usage_total.project_id = rbp.project_id AND usage_total.material_id = rbp.material_id
      $scopeSql
      ORDER BY p.nama, m.nama"
 );
-$stmt->execute($params);
+$stmt->execute(array_merge($usageParams, $params));
 
 $out = array_map(function ($r) {
     $rap = (float)$r['rap_qty'];
