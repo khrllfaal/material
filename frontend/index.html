@@ -146,12 +146,126 @@ function openModal(title, html, onSave){
   document.getElementById('modalBack').classList.add('flex');
   document.getElementById('mCancel').onclick = closeModal;
   if(onSave) document.getElementById('mSave').onclick = onSave;
+  // Every <select> inside a form modal gets the searchable widget for
+  // free — no per-field wiring needed as new fields/forms are added.
+  document.querySelectorAll('#modalBody select').forEach(enhanceSelect);
 }
 function closeModal(){ document.getElementById('modalBack').classList.add('hidden'); document.getElementById('modalBack').classList.remove('flex'); }
 function confirmModal(title, msg, onYes){
   openModal(title, '<p class="text-sm text-slate-600">'+msg+'</p>', function(){ closeModal(); onYes(); });
 }
 var fieldCls = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500";
+
+/* ---------------- searchable dropdown ----------------
+   Wraps a plain <select> (single or multiple) with a type-to-filter
+   panel and a clear/cancel control, while the original <select> stays
+   in the DOM as the single source of truth — every existing fv()
+   read, form submit, and change-listener keeps working untouched.
+   Needed once an option list grows past a handful of entries (87
+   proyek in a native dropdown is unusable to scroll through). */
+function enhanceSelect(sel){
+  if(!sel || sel._enhanced) return;
+  sel._enhanced = true;
+  var multiple = sel.multiple;
+  var placeholder = sel.getAttribute('data-placeholder') || (multiple ? '— Pilih —' : '');
+
+  var wrap = document.createElement('div');
+  wrap.className = 'relative';
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(sel);
+  sel.style.cssText = 'position:absolute;opacity:0;height:0;width:0;pointer-events:none;';
+  sel.tabIndex = -1;
+
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = fieldCls + ' flex items-center justify-between text-left gap-2 cursor-pointer bg-slate-50';
+  var label = document.createElement('span');
+  label.className = 'truncate';
+  var clearBtn = document.createElement('span');
+  clearBtn.innerHTML = '<i data-lucide="x" class="w-3.5 h-3.5"></i>';
+  clearBtn.className = 'text-slate-300 hover:text-slate-500 shrink-0 hidden';
+  var caret = document.createElement('i');
+  caret.setAttribute('data-lucide', 'chevron-down');
+  caret.className = 'w-4 h-4 text-slate-400 shrink-0';
+  var right = document.createElement('span');
+  right.className = 'flex items-center gap-2 shrink-0';
+  right.appendChild(clearBtn); right.appendChild(caret);
+  btn.appendChild(label); btn.appendChild(right);
+  wrap.appendChild(btn);
+
+  var panel = document.createElement('div');
+  panel.className = 'hidden absolute z-30 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-hidden flex flex-col';
+  panel.innerHTML = '<div class="p-2 border-b border-slate-100 shrink-0"><input type="text" placeholder="Cari…" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+    '<div class="overflow-y-auto py-1"></div>'+
+    (multiple ? '<div class="p-2 border-t border-slate-100 flex justify-between gap-2 shrink-0"><button type="button" class="ss-clearall text-xs font-semibold text-slate-400 hover:text-slate-600">Batal Semua</button><button type="button" class="ss-done text-xs font-semibold text-blue-600 hover:text-blue-700">Selesai</button></div>' : '');
+  wrap.appendChild(panel);
+
+  var searchInput = panel.querySelector('input');
+  var listEl = panel.querySelector('div.overflow-y-auto');
+  function optsArr(){ return Array.from(sel.options); }
+
+  function renderLabel(){
+    if(multiple){
+      var sels = optsArr().filter(function(o){ return o.selected; });
+      label.textContent = sels.length ? (sels.length===1 ? sels[0].textContent : sels.length+' dipilih') : placeholder;
+      label.classList.toggle('text-slate-400', !sels.length);
+      clearBtn.classList.toggle('hidden', !sels.length);
+    } else {
+      var o = sel.options[sel.selectedIndex];
+      var hasValue = o && o.value !== '';
+      label.textContent = hasValue ? o.textContent : (placeholder || (o?o.textContent:''));
+      label.classList.toggle('text-slate-400', !hasValue);
+      clearBtn.classList.toggle('hidden', !(hasValue && placeholder));
+    }
+  }
+  function renderList(filter){
+    var q = (filter||'').toLowerCase();
+    var opts = optsArr().filter(function(o){ return multiple || o.value !== ''; });
+    var matched = opts.filter(function(o){ return o.textContent.toLowerCase().indexOf(q) > -1; });
+    listEl.innerHTML = matched.length ? matched.map(function(o){
+      if(multiple){
+        return '<label class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"><input type="checkbox" data-val="'+esc(o.value)+'" '+(o.selected?'checked':'')+' class="rounded border-slate-300 text-blue-600 focus:ring-blue-200">'+esc(o.textContent)+'</label>';
+      }
+      return '<div data-val="'+esc(o.value)+'" class="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer '+(o.selected?'bg-blue-50 text-blue-700 font-semibold':'text-slate-700')+'">'+esc(o.textContent)+'</div>';
+    }).join('') : '<div class="px-3 py-6 text-center text-sm text-slate-400">Tidak ditemukan</div>';
+    if(multiple){
+      listEl.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+        cb.onchange = function(){
+          var opt = optsArr().find(function(o){ return o.value === cb.getAttribute('data-val'); });
+          if(opt) opt.selected = cb.checked;
+          sel.dispatchEvent(new Event('change'));
+          renderLabel();
+        };
+      });
+    } else {
+      listEl.querySelectorAll('[data-val]').forEach(function(d){
+        d.onclick = function(){
+          sel.value = d.getAttribute('data-val');
+          sel.dispatchEvent(new Event('change'));
+          renderLabel(); close();
+        };
+      });
+    }
+  }
+  function open(){ panel.classList.remove('hidden'); searchInput.value=''; renderList(''); searchInput.focus(); }
+  function close(){ panel.classList.add('hidden'); }
+  btn.onclick = function(e){ e.stopPropagation(); panel.classList.contains('hidden') ? open() : close(); };
+  searchInput.addEventListener('input', function(){ renderList(searchInput.value); });
+  clearBtn.onclick = function(e){
+    e.stopPropagation();
+    if(multiple) optsArr().forEach(function(o){ o.selected = false; }); else sel.value = '';
+    sel.dispatchEvent(new Event('change'));
+    renderLabel(); if(panel.classList.contains('hidden')===false) renderList(searchInput.value);
+  };
+  if(multiple){
+    panel.querySelector('.ss-clearall').onclick = function(){ optsArr().forEach(function(o){ o.selected=false; }); sel.dispatchEvent(new Event('change')); renderLabel(); renderList(searchInput.value); };
+    panel.querySelector('.ss-done').onclick = function(){ close(); };
+  }
+  document.addEventListener('click', function(e){ if(!wrap.contains(e.target)) close(); });
+  sel.addEventListener('ss-refresh', function(){ renderLabel(); });
+  renderLabel();
+  icons();
+}
 
 /* ---------------- auth ---------------- */
 document.getElementById('loginForm').addEventListener('submit', function(e){
@@ -489,6 +603,7 @@ function masterPage(cfg){
         '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
       );
     icons();
+    if(cfg.projectFilter) enhanceSelect(document.getElementById('fProj'));
 
     var rows=[], filteredList=[];
     function draw(){
@@ -686,6 +801,7 @@ PAGES.dashboard = function(c){
     var projects=r[0], materials=r[1], stockAll=r[2], rapReportAll=r[3];
     document.getElementById('dashProj').innerHTML = '<option value="">Semua Proyek</option>'+
       projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+    enhanceSelect(document.getElementById('dashProj'));
 
     function render(){
       var projId = fv('dashProj');
@@ -913,6 +1029,7 @@ function reportPage(cfg){
       opts.sort(function(a,b){ return a.nama.localeCompare(b.nama); });
       document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
         opts.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+      enhanceSelect(document.getElementById('fProj'));
       draw();
       document.getElementById('q').addEventListener('input',draw);
       document.getElementById('fProj').addEventListener('change',draw);
@@ -1009,6 +1126,7 @@ PAGES.riwayat = function(c){
     rows.sort(function(a,b){ return a.tgl<b.tgl?1:(a.tgl>b.tgl?-1:0); });
     document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
       projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+    enhanceSelect(document.getElementById('fProj'));
     draw();
     document.getElementById('q').addEventListener('input', draw);
     document.getElementById('fProj').addEventListener('change', draw);
@@ -1127,6 +1245,7 @@ PAGES.users = function(c){
       rows=r[0]; projects=r[1];
       document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
         projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+      enhanceSelect(document.getElementById('fProj'));
       draw();
     }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
   }
@@ -1148,9 +1267,9 @@ PAGES.users = function(c){
       '</select></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Password '+(id?'(kosongkan jika tidak diubah)':'*')+'</label><input id="f_password" type="password" placeholder="Min. 10 karakter" class="'+fieldCls+'"></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek yang Ditugaskan (khusus Admin Lapangan)</label>'+
-        '<select id="f_projectIds" multiple size="6" class="'+fieldCls+'">'+
+        '<select id="f_projectIds" multiple data-placeholder="— Pilih proyek —" class="'+fieldCls+'">'+
           projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+((rec&&rec.projectIds||[]).indexOf(p.id)>-1?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('')+
-        '</select><div class="text-xs text-slate-400 mt-1">Ctrl/Cmd+klik untuk pilih lebih dari satu.</div></div>'+
+        '</select></div>'+
       '</div>';
     openModal((id?'Edit ':'Tambah ')+'User', html, function(){
       var nama=fv('f_nama'), username=fv('f_username'), role=fv('f_role'), password=fv('f_password');
