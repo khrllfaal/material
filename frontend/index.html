@@ -86,7 +86,7 @@
     </button>
   </div>
   <div id="mProjSel" class="px-5 pt-4"></div>
-  <div id="mTabs" class="flex gap-2 px-5 pt-4 pb-1 overflow-x-auto tab-scroll"></div>
+  <div id="mTabs" class="flex gap-2 px-5 pt-4 pb-1 overflow-x-auto tab-scroll" style="-webkit-mask-image:linear-gradient(to right, black 92%, transparent 100%); mask-image:linear-gradient(to right, black 92%, transparent 100%);"></div>
   <div id="mContent" class="flex-1 px-5 pb-10 pt-2"></div>
 </div>
 
@@ -178,7 +178,11 @@ function enhanceSelect(sel){
 
   var btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = fieldCls + ' flex items-center justify-between text-left gap-2 cursor-pointer bg-slate-50';
+  // Inherit the original select's own classes (size/padding/font) so
+  // the widget matches whatever context it's dropped into — the small
+  // desktop form fields (fieldCls) and the larger mobile touch targets
+  // (inputCls) end up sized correctly without two separate components.
+  btn.className = (sel.className || fieldCls) + ' flex items-center justify-between text-left gap-2 cursor-pointer';
   var label = document.createElement('span');
   label.className = 'truncate';
   var clearBtn = document.createElement('span');
@@ -1379,13 +1383,11 @@ function renderProjSel(){
     return;
   }
   el.innerHTML =
-    '<div class="relative">'+
-    '<select id="projPick" class="w-full appearance-none bg-white border border-slate-200 rounded-2xl px-4 py-3.5 pr-10 font-bold text-[15px] shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-100">'+
+    '<select id="projPick" class="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 font-bold text-[15px] shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-100">'+
     STATE.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===STATE.projectId?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('') +
-    '</select>'+
-    '<i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>'+
-    '</div>';
+    '</select>';
   document.getElementById('projPick').onchange = function(e){ STATE.projectId = e.target.value; renderTab(); };
+  enhanceSelect(document.getElementById('projPick'));
   icons();
 }
 
@@ -1426,9 +1428,8 @@ function fieldWrap(label, inputHtml){
 }
 var inputCls = "w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500";
 
-function materialOptions(selected, query){
+function materialOptions(selected){
   var list = STATE.materials;
-  if(query) list = list.filter(function(m){ return (m.nama+' '+m.kode).toLowerCase().indexOf(query.toLowerCase())>-1; });
   if(!list.length) return '<option value="">— Tidak ditemukan —</option>';
   return list.map(function(m){
     return '<option value="'+esc(m.id)+'"'+(m.id===selected?' selected':'')+'>'+esc(m.nama)+' ('+esc(m.satuan)+')</option>';
@@ -1455,8 +1456,7 @@ function renderInputForm(c, mode){
       '<h3 class="font-bold text-[15px]">'+(isMasuk?'Catat Bahan Masuk':'Catat Pemakaian Bahan')+'</h3>'+
     '</div>'+
     fieldWrap('Tanggal', '<input type="date" id="f_tgl" value="'+today()+'" class="'+inputCls+'">')+
-    fieldWrap('Material', '<input type="text" id="f_material_q" placeholder="Ketik untuk mencari bahan…" class="'+inputCls+' mb-2">'+
-      '<select id="f_material" class="'+inputCls+'">'+materialOptions()+'</select>')+
+    fieldWrap('Material', '<select id="f_material" class="'+inputCls+'">'+materialOptions()+'</select>')+
     (isMasuk ? '' : fieldWrap('Pekerjaan (untuk analisis RAP)', '<select id="f_pekerjaan" class="'+inputCls+'">'+pekerjaanOptions()+'</select>'))+
     fieldWrap('Jumlah (Qty)', '<input type="number" id="f_qty" inputmode="decimal" min="0" step="any" placeholder="0" class="'+inputCls+'">')+
     (isMasuk ? fieldWrap('No. Surat Jalan / Nota', '<input type="text" id="f_ref" placeholder="Opsional" class="'+inputCls+'">') : '')+
@@ -1466,11 +1466,8 @@ function renderInputForm(c, mode){
   );
   icons();
   document.getElementById('f_save').onclick = function(){ submitInput(mode); };
-  document.getElementById('f_material_q').addEventListener('input', function(e){
-    var sel = document.getElementById('f_material');
-    var current = sel.value;
-    sel.innerHTML = materialOptions(current, e.target.value);
-  });
+  enhanceSelect(document.getElementById('f_material'));
+  if(!isMasuk) enhanceSelect(document.getElementById('f_pekerjaan'));
 }
 
 function submitInput(mode){
