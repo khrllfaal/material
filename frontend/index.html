@@ -534,6 +534,12 @@ async function exportPdf(title, sub, headers, rows, opts){
   doc.text(title, 40, 36);
   if(sub){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139); doc.text(sub, 40, 52); }
 
+  // Right-align columns that are numbers in every row — makes a
+  // numeric report scannable (digits line up) instead of ragged
+  // left-aligned text, which is how the on-screen tables already read.
+  var isNumCol = headers.map(function(_, ci){
+    return rows.length>0 && ci!==opts.statusCol && rows.every(function(r){ return r[ci]==null || typeof r[ci]==='number'; });
+  });
   var body = rows.map(function(r){
     return r.map(function(v, ci){
       var style=(opts.statusCol===ci && STATUS_STYLE[v]) ? STATUS_STYLE[v] : null;
@@ -551,6 +557,9 @@ async function exportPdf(title, sub, headers, rows, opts){
     headStyles: {fillColor:[30,58,138], textColor:255, fontStyle:'bold', fontSize:8},
     alternateRowStyles: {fillColor:[247,249,252]},
     didParseCell: function(data){
+      if(isNumCol[data.column.index] && data.column.index!==opts.statusCol){
+        data.cell.styles.halign = 'right';
+      }
       if(opts.statusCol!=null && data.section==='body' && data.column.index===opts.statusCol){
         var rawVal = rows[data.row.index][opts.statusCol];
         var style = STATUS_STYLE[rawVal];
@@ -1073,12 +1082,13 @@ PAGES.rap_proyek_report = reportPage({
   title:'Analisis RAP per Proyek', sub:'Pemakaian aktual vs jatah total (RAP) per bahan per proyek — cara paling cepat untuk lihat proyek mana yang sudah lewat jatah.',
   endpoint:'/material_rap_proyek_report.php', filename:'Analisis_RAP_per_Proyek', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:6, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
+  statusCol:7, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
-    {label:'Jatah (RAP)', get:function(r){ return num0(r.rap_qty)+' '+esc(r.satuan); }},
-    {label:'Aktual Pemakaian', get:function(r){ return num0(r.aktual_pemakaian)+' '+esc(r.satuan); }},
+    {label:'Satuan', get:function(r){ return esc(r.satuan); }},
+    {label:'Jatah (RAP)', get:function(r){ return num0(r.rap_qty); }},
+    {label:'Aktual Pemakaian', get:function(r){ return num0(r.aktual_pemakaian); }},
     {label:'Deviasi', get:function(r){ return '<b class="'+(r.deviasi>0?'text-red-600':'text-emerald-600')+'">'+numSigned(r.deviasi)+'</b>'; }},
     {label:'%', get:function(r){ return r.persentase==null?'–':pct(r.persentase); }},
     {label:'Status', get:function(r){
@@ -1087,7 +1097,7 @@ PAGES.rap_proyek_report = reportPage({
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){ return [r.project_nama, r.material_nama, r.rap_qty, r.aktual_pemakaian, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; },
+  exportRow:function(r){ return [r.project_nama, r.material_nama, r.satuan, r.rap_qty, r.aktual_pemakaian, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; },
 });
 
 PAGES.riwayat = function(c){
@@ -1120,11 +1130,12 @@ PAGES.riwayat = function(c){
     {label:'Jenis', get:function(r){ return r.jenis==='Masuk' ? badge('aman','Bahan Masuk') : badge('warn','Pemakaian'); }},
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
-    {label:'Qty', get:function(r){ return (r.jenis==='Masuk'?'+':'−')+num0(r.qty)+' '+esc(r.satuan); }},
+    {label:'Qty', get:function(r){ return (r.jenis==='Masuk'?'+':'−')+num0(r.qty); }},
+    {label:'Satuan', get:function(r){ return esc(r.satuan); }},
     {label:'Pekerjaan / Referensi', get:function(r){ return r.ref?esc(r.ref):'<span class="text-slate-300 italic">–</span>'; }},
     {label:'Keterangan', get:function(r){ return r.ket?esc(r.ket):'<span class="text-slate-300 italic">–</span>'; }},
   ];
-  function exportRow(r){ return [r.tgl, r.jenis, r.project_nama, r.material_nama, (r.jenis==='Masuk'?r.qty:-r.qty), r.ref||'', r.ket||'']; }
+  function exportRow(r){ return [r.tgl, r.jenis, r.project_nama, r.material_nama, (r.jenis==='Masuk'?r.qty:-r.qty), r.satuan, r.ref||'', r.ket||'']; }
   function draw(){
     var q=fv('q').toLowerCase(), jenis=fv('fJenis'), from=fv('fFrom'), to=fv('fTo'), projId=fv('fProj');
     filteredList = rows.filter(function(r){
@@ -1177,19 +1188,20 @@ PAGES.stock = reportPage({
   title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok berjalan (bahan masuk − pemakaian) per proyek, seperti stok minimarket.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:6, emptyMsg:'Belum ada data bahan masuk/pemakaian.',
+  statusCol:7, emptyMsg:'Belum ada data bahan masuk/pemakaian.',
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
-    {label:'Total Masuk', get:function(r){ return num0(r.total_masuk)+' '+esc(r.satuan); }},
+    {label:'Satuan', get:function(r){ return esc(r.satuan); }},
+    {label:'Total Masuk', get:function(r){ return num0(r.total_masuk); }},
     {label:'Total Pemakaian', get:function(r){
-      return num0(r.total_keluar)+' '+esc(r.satuan)+
+      return num0(r.total_keluar)+
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
-    {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+' '+esc(r.satuan)+'</b>'; }},
+    {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'; }},
     {label:'Ambang Batas (RAP)', get:function(r){
       if(r.sisa_kebutuhan==null) return '<span class="text-slate-300 italic" title="Isi RAP per Proyek untuk bahan ini agar status stok bisa dihitung">— RAP belum diisi</span>';
-      return num0(r.sisa_kebutuhan)+' '+esc(r.satuan)+' <span class="text-xs text-slate-400">(sisa dari jatah '+num0(r.rap_qty)+')</span>';
+      return num0(r.sisa_kebutuhan)+' <span class="text-xs text-slate-400">(sisa dari jatah '+num0(r.rap_qty)+')</span>';
     }},
     {label:'Status', get:function(r){
       var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi']};
@@ -1197,21 +1209,23 @@ PAGES.stock = reportPage({
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.status]; },
+  exportRow:function(r){ return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, r.total_keluar, r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.status]; },
 });
 
 PAGES.rap_report = reportPage({
   title:'Analisis RAP Bahan (Semua Proyek)', sub:'Pemakaian aktual vs target ideal (koefisien RAP × progress volume pekerjaan) — mendeteksi pemborosan.',
   endpoint:'/material_rap_report.php', filename:'Analisis_RAP_Bahan', searchPlaceholder:'Cari proyek / pekerjaan / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.pekerjaan_nama+' '+r.material_nama; },
-  statusCol:7, emptyMsg:'Belum ada konfigurasi RAP / progress pekerjaan.',
+  statusCol:10, emptyMsg:'Belum ada konfigurasi RAP / progress pekerjaan.',
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Pekerjaan', get:function(r){ return esc(r.pekerjaan_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
-    {label:'Progress Volume', get:function(r){ return num0(r.volume_aktual)+' '+esc(r.pekerjaan_satuan); }},
-    {label:'Target Ideal', get:function(r){ return num0(r.target_material_ideal)+' '+esc(r.material_satuan); }},
-    {label:'Aktual Pemakaian', get:function(r){ return num0(r.aktual_material)+' '+esc(r.material_satuan); }},
+    {label:'Progress Volume', get:function(r){ return num0(r.volume_aktual); }},
+    {label:'Satuan Pekerjaan', get:function(r){ return esc(r.pekerjaan_satuan); }},
+    {label:'Target Ideal', get:function(r){ return num0(r.target_material_ideal); }},
+    {label:'Aktual Pemakaian', get:function(r){ return num0(r.aktual_material); }},
+    {label:'Satuan Bahan', get:function(r){ return esc(r.material_satuan); }},
     {label:'Deviasi', get:function(r){ return '<b class="'+(r.deviasi>0?'text-red-600':'text-emerald-600')+'">'+numSigned(r.deviasi)+'</b>'; }},
     {label:'%', get:function(r){ return r.persentase==null?'–':pct(r.persentase); }},
     {label:'Status', get:function(r){
@@ -1220,7 +1234,7 @@ PAGES.rap_report = reportPage({
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){ return [r.project_nama, r.pekerjaan_nama, r.material_nama, r.volume_aktual, r.target_material_ideal, r.aktual_material, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; },
+  exportRow:function(r){ return [r.project_nama, r.pekerjaan_nama, r.material_nama, r.volume_aktual, r.pekerjaan_satuan, r.target_material_ideal, r.aktual_material, r.material_satuan, r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status]; },
 });
 
 /* ---------------- user management (admin only) ---------------- */
