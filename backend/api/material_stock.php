@@ -8,12 +8,13 @@ require_once __DIR__ . '/helpers.php';
  * at a glance which projects need a resupply without opening every
  * project one by one.
  *
- * The reorder point is derived, not typed in: when the project has a
- * RAP Bahan budget for this material, the threshold is "remaining need"
- * (rap_qty - total pemakaian so far) — stock below that means there
- * isn't enough on site to finish the budgeted work. Only when no RAP
- * entry exists at all does it fall back to the material's manual
- * stok_minimum, so the warning still works before RAP is filled in.
+ * The reorder point is derived entirely from RAP, never typed in: when
+ * the project has a RAP Bahan budget for this material, the threshold
+ * is "remaining need" (rap_qty - total pemakaian so far) — stock below
+ * that means there isn't enough on site to finish the budgeted work.
+ * When no RAP entry exists yet, there is no basis to call stock
+ * low/sufficient, so the row is flagged DATA_TIDAK_LENGKAP instead of
+ * guessing — the fix is to fill in RAP per Proyek, not a manual number.
  */
 send_cors_headers();
 $user = require_login();
@@ -32,11 +33,12 @@ if ($scope !== null) {
 $stmt = db()->prepare(
     "SELECT
         p.id AS project_id, p.nama AS project_nama,
-        m.id AS material_id, m.nama AS material_nama, m.satuan, m.stok_minimum,
+        m.id AS material_id, m.nama AS material_nama, m.satuan,
         rap.rap_qty AS rap_qty,
         COALESCE(masuk.total, 0) AS total_masuk,
         COALESCE(keluar.total, 0) AS total_keluar,
-        COALESCE(masuk.total, 0) - COALESCE(keluar.total, 0) AS stok
+        COALESCE(masuk.total, 0) - COALESCE(keluar.total, 0) AS stok,
+        masuk.last_tgl AS last_masuk_tgl, keluar.last_tgl AS last_keluar_tgl
      FROM (
         SELECT project_id, material_id FROM material_receipts
         UNION
@@ -46,9 +48,9 @@ $stmt = db()->prepare(
      ) pm
      JOIN projects p ON p.id = pm.project_id
      JOIN materials m ON m.id = pm.material_id
-     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total FROM material_receipts GROUP BY project_id, material_id) masuk
+     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_receipts GROUP BY project_id, material_id) masuk
         ON masuk.project_id = pm.project_id AND masuk.material_id = pm.material_id
-     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total FROM material_usage GROUP BY project_id, material_id) keluar
+     LEFT JOIN (SELECT project_id, material_id, SUM(qty) AS total, MAX(tgl) AS last_tgl FROM material_usage GROUP BY project_id, material_id) keluar
         ON keluar.project_id = pm.project_id AND keluar.material_id = pm.material_id
      LEFT JOIN rap_bahan_proyek rap
         ON rap.project_id = pm.project_id AND rap.material_id = pm.material_id
@@ -58,26 +60,37 @@ $stmt = db()->prepare(
 $stmt->execute($params);
 $out = array_map(function ($r) {
     $stok = (float)$r['stok'];
-    $min = (float)$r['stok_minimum'];
     $pemakaian = (float)$r['total_keluar'];
     $hasRap = $r['rap_qty'] !== null;
     $rapQty = $hasRap ? (float)$r['rap_qty'] : null;
     $sisaKebutuhan = $hasRap ? max(0, $rapQty - $pemakaian) : null;
-    // Reorder threshold: remaining budgeted need when RAP exists,
-    // otherwise the material's manual stok_minimum as a fallback.
-    $threshold = $hasRap ? $sisaKebutuhan : $min;
     // PDO returns DECIMAL columns as strings — cast back to real JSON
     // numbers so the frontend's typeof-based number formatting
     // (exports especially) doesn't treat them as pre-formatted text.
     $r['stok'] = $stok;
-    $r['stok_minimum'] = $min;
     $r['total_masuk'] = (float)$r['total_masuk'];
     $r['total_keluar'] = (float)$r['total_keluar'];
     $r['rap_qty'] = $rapQty;
     $r['sisa_kebutuhan'] = $sisaKebutuhan;
-    $r['threshold_basis'] = $hasRap ? 'rap' : 'manual';
+    // Flags a project+material that keeps receiving deliveries but
+    // hasn't had a Pemakaian entry logged in a while (or ever) — a
+    // common field-data gap where usage is under-reported because it
+    // takes a deliberate extra input, unlike a receipt that's tied to
+    // an obvious delivery event. Left unflagged, stock/RAP status both
+    // look falsely healthy while real consumption goes untracked.
+    $usageStale = false;
+    if ($r['last_masuk_tgl'] !== null) {
+        if ($r['last_keluar_tgl'] === null) {
+            $usageStale = true;
+        } else {
+            $gapDays = (strtotime($r['last_masuk_tgl']) - strtotime($r['last_keluar_tgl'])) / 86400;
+            $usageStale = $gapDays > 14;
+        }
+    }
+    $r['usage_stale'] = $usageStale;
     if ($stok <= 0) $status = 'HABIS';
-    elseif ($stok <= $threshold) $status = 'MENIPIS';
+    elseif (!$hasRap) $status = 'DATA_TIDAK_LENGKAP';
+    elseif ($stok <= $sisaKebutuhan) $status = 'MENIPIS';
     else $status = 'AMAN';
     $r['status'] = $status;
     return $r;

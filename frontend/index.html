@@ -51,7 +51,7 @@
     </div>
     <div class="px-5 py-3.5 text-xs text-slate-400 border-b border-white/10" id="whoInfo">—</div>
     <div id="navList" class="py-2 flex-1"></div>
-    <a id="btnLogout" class="mx-3 mb-4 mt-2 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:bg-white/5 hover:text-white cursor-pointer transition-colors">
+    <a id="btnLogout" class="lg:hidden mx-3 mb-4 mt-2 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:bg-white/5 hover:text-white cursor-pointer transition-colors">
       <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
     </a>
   </div>
@@ -59,7 +59,19 @@
     <button id="btnOpenSidebar" class="text-slate-600"><i data-lucide="menu" class="w-6 h-6"></i></button>
     <span class="font-extrabold text-slate-800 text-[15px]">Material & Stok</span>
   </div>
-  <div class="lg:ml-60 p-5 lg:p-8 max-w-6xl"><div id="content"></div></div>
+  <div class="lg:ml-60">
+    <div id="topbarDesktop" class="hidden lg:flex items-center justify-end gap-3 sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200 px-8 py-3">
+      <div class="text-right leading-tight">
+        <div class="text-sm font-semibold text-slate-700" id="topbarName">—</div>
+        <div class="text-xs text-slate-400" id="topbarRole">—</div>
+      </div>
+      <div class="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0" id="topbarAvatar">—</div>
+      <button id="btnLogoutTop" title="Keluar" class="ml-1 w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors shrink-0">
+        <i data-lucide="log-out" class="w-4.5 h-4.5"></i>
+      </button>
+    </div>
+    <div class="p-5 lg:p-8 max-w-6xl"><div id="content"></div></div>
+  </div>
 </div>
 
 <!-- ============== MOBILE SHELL (admin lapangan) ============== -->
@@ -156,6 +168,7 @@ function doLogout(){
   apiFetch('/auth_logout.php', {method:'POST'}).catch(function(){}).finally(function(){ location.reload(); });
 }
 document.getElementById('btnLogout').onclick=doLogout;
+document.getElementById('btnLogoutTop').onclick=doLogout;
 document.getElementById('mBtnLogout').onclick=doLogout;
 document.getElementById('btnOpenSidebar').onclick=function(){ openSidebar(); };
 document.getElementById('btnCloseSidebar').onclick=function(){ closeSidebar(); };
@@ -174,8 +187,12 @@ function boot(user){
     document.getElementById('mobileShell').classList.add('hidden');
     document.getElementById('desktopShell').classList.remove('hidden');
     document.getElementById('desktopShell').style.display='block';
+    var roleLabel = {admin:'Admin Pusat',owner:'Owner (read-only)'}[user.role]||user.role;
     document.getElementById('whoInfo').innerHTML = '<div class="font-semibold text-slate-200">'+esc(user.nama)+'</div>'+
-      '<div class="mt-0.5">'+({admin:'Admin Pusat',owner:'Owner (read-only)'}[user.role]||user.role)+'</div>';
+      '<div class="mt-0.5">'+roleLabel+'</div>';
+    document.getElementById('topbarName').textContent = user.nama;
+    document.getElementById('topbarRole').textContent = roleLabel;
+    document.getElementById('topbarAvatar').textContent = (user.nama||'?').trim().charAt(0).toUpperCase();
     renderNav();
     icons();
     go('dashboard');
@@ -652,10 +669,12 @@ PAGES.dashboard = function(c){
       '<div>'+panelTitle('layers','Perlu Perhatian — Stok')+'<div id="stockPreview"></div></div>'+
       '<div>'+panel('<div id="chartB_title"></div><div id="chartB"></div>')+'</div>'+
     '</div>'+
-    '<div>'+panel(
+    '<div class="mb-5">'+panel(
       '<div class="flex justify-between items-center mb-1">'+panelTitle('trending-up','Bahan Melebihi RAP — Detail Lengkap','Semua bahan yang pemakaiannya sudah melewati jatah RAP, urut dari paling parah')+
       '<button class="'+btnGhostSm+' shrink-0 -mt-4" id="btnGoRapReport">Buka Analisis Lengkap</button></div>'+
       '<div id="overTable"></div>')+
+    '</div>'+
+    '<div>'+panel(panelTitle('history','Proyek Perlu Update Pemakaian','Ada Bahan Masuk tercatat tapi Pemakaian belum/lama tidak diupdate — stok & RAP di proyek ini kemungkinan under-reported')+'<div id="staleUsagePanel"></div>')+
     '</div>';
   icons();
   document.getElementById('btnGoRapReport').onclick=function(){ go('rap_proyek_report'); };
@@ -684,9 +703,9 @@ PAGES.dashboard = function(c){
         statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length&&!projId?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null);
 
       // Stock status distribution (count-based, safe to compare across units)
-      var stockCounts = {AMAN:0, MENIPIS:0, HABIS:0};
+      var stockCounts = {AMAN:0, MENIPIS:0, HABIS:0, DATA_TIDAK_LENGKAP:0};
       stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
-      document.getElementById('stockChart').innerHTML = statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS'], stock.length);
+      document.getElementById('stockChart').innerHTML = statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS','DATA_TIDAK_LENGKAP'], stock.length);
 
       // Chart A / B — directly answer "which proyek is over" and "which
       // bahan is over" as two separate, clearly-labeled groupings, instead
@@ -722,6 +741,24 @@ PAGES.dashboard = function(c){
       }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Semua stok aman ✓</div>');
 
       document.getElementById('overTable').innerHTML = overDetailTable(over);
+
+      // Group stale-usage rows by project — one line per project naming
+      // which bahan are affected, so pusat knows exactly who to follow up.
+      var staleRows = stock.filter(function(s){ return s.usage_stale; });
+      var staleMap = {};
+      staleRows.forEach(function(r){
+        if(!staleMap[r.project_id]) staleMap[r.project_id] = {name:r.project_nama, items:[]};
+        staleMap[r.project_id].items.push(r.material_nama);
+      });
+      var staleByProject = Object.keys(staleMap).map(function(k){ return staleMap[k]; })
+        .sort(function(a,b){ return b.items.length-a.items.length; });
+      var stalePanel = document.getElementById('staleUsagePanel');
+      stalePanel.innerHTML = staleByProject.length ? staleByProject.map(function(g){
+        var names = g.items.slice(0,4).join(', ') + (g.items.length>4?' +'+(g.items.length-4)+' lagi':'');
+        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm gap-3">'+
+          '<div class="min-w-0"><b>'+esc(g.name)+'</b><div class="text-xs text-slate-400 truncate">'+esc(names)+'</div></div>'+
+          badge('warn', g.items.length+' bahan')+'</div>';
+      }).join('') : '<div class="text-center text-sm text-slate-400 py-6">Semua proyek rutin update Pemakaian ✓</div>';
       icons();
     }
     render();
@@ -737,19 +774,18 @@ PAGES.proyek = masterPage({
 });
 
 PAGES.bahan = masterPage({
-  title:'Master Bahan', sub:'Katalog material — dipakai di semua proyek', endpoint:'/materials.php', addLabel:'Bahan', idPrefix:'mat_',
+  title:'Master Bahan', sub:'Katalog material — dipakai di semua proyek. Ambang batas "Perlu Dikirim" dihitung otomatis dari RAP per Proyek, bukan diisi di sini.',
+  endpoint:'/materials.php', addLabel:'Bahan', idPrefix:'mat_',
   fields:[
     {key:'kode', label:'Kode Bahan', required:true},
     {key:'nama', label:'Nama Bahan', required:true},
     {key:'satuan', label:'Satuan', required:true},
-    {key:'stok_minimum', label:'Stok Minimum (ambang batas "Perlu Dikirim")', type:'number', default:0},
   ],
   searchFn:function(r){ return r.kode+' '+r.nama; },
   columns:[
     {key:'kode', label:'Kode', render:function(r){ return '<span class="text-slate-500">'+esc(r.kode)+'</span>'; }},
     {key:'nama', label:'Nama Bahan', render:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
     {key:'satuan', label:'Satuan', render:function(r){ return esc(r.satuan); }},
-    {key:'stok_minimum', label:'Stok Min.', render:function(r){ return num0(r.stok_minimum); }},
   ],
 });
 
@@ -996,21 +1032,22 @@ PAGES.stock = reportPage({
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
     {label:'Total Masuk', get:function(r){ return num0(r.total_masuk)+' '+esc(r.satuan); }},
-    {label:'Total Pemakaian', get:function(r){ return num0(r.total_keluar)+' '+esc(r.satuan); }},
+    {label:'Total Pemakaian', get:function(r){
+      return num0(r.total_keluar)+' '+esc(r.satuan)+
+        (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
+    }},
     {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+' '+esc(r.satuan)+'</b>'; }},
-    {label:'Ambang Batas', get:function(r){
-      var isRap = r.threshold_basis==='rap';
-      var val = isRap ? num0(r.sisa_kebutuhan) : num0(r.stok_minimum);
-      var tip = isRap ? 'Dari sisa kebutuhan RAP Bahan ('+num0(r.rap_qty)+' − '+num0(r.total_keluar)+' terpakai)' : 'Dari Stok Minimum manual (belum ada RAP Bahan untuk proyek ini)';
-      return val+' <span class="text-[10px] px-1.5 py-0.5 rounded '+(isRap?'bg-blue-50 text-blue-600':'bg-slate-100 text-slate-400')+'" title="'+esc(tip)+'">'+(isRap?'RAP':'manual')+'</span>';
+    {label:'Ambang Batas (RAP)', get:function(r){
+      if(r.sisa_kebutuhan==null) return '<span class="text-slate-300 italic" title="Isi RAP per Proyek untuk bahan ini agar status stok bisa dihitung">— RAP belum diisi</span>';
+      return num0(r.sisa_kebutuhan)+' '+esc(r.satuan)+' <span class="text-xs text-slate-400">(sisa dari jatah '+num0(r.rap_qty)+')</span>';
     }},
     {label:'Status', get:function(r){
-      var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis']};
+      var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi']};
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.threshold_basis==='rap'?r.sisa_kebutuhan:r.stok_minimum, r.status]; },
+  exportRow:function(r){ return [r.project_nama, r.material_nama, r.total_masuk, r.total_keluar, r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.status]; },
 });
 
 PAGES.rap_report = reportPage({
