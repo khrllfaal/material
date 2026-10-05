@@ -59,7 +59,15 @@ function handle_project_scoped_resource(string $table, array $columns, string $p
             $existing = db()->prepare("SELECT `$projectColumn` FROM `$table` WHERE id = ?");
             $existing->execute([$data['id']]);
             $row = $existing->fetch();
-            if ($row) require_project_access($user, $row[$projectColumn]);
+            if ($row) {
+                require_project_access($user, $row[$projectColumn]);
+                // Admin Lapangan can only record new Bahan Masuk/Pemakaian —
+                // once saved, a row is history, correctable only by Admin
+                // Pusat (who can see it in Riwayat Transaksi). Without this,
+                // the upsert-by-id below would let a lapangan session silently
+                // overwrite an existing transaction it happens to know the id of.
+                json_error('Admin Lapangan tidak bisa mengubah data yang sudah tersimpan. Hubungi Admin Pusat.', 403);
+            }
         }
 
         $cols = array_keys($data);
@@ -78,14 +86,12 @@ function handle_project_scoped_resource(string $table, array $columns, string $p
     }
 
     if ($method === 'DELETE') {
+        // Riwayat is read-only for Admin Lapangan — deleting a mistaken
+        // entry is Admin Pusat's job, so the field can't quietly erase
+        // its own history.
+        if ($scope !== null) json_error('Admin Lapangan tidak bisa menghapus data. Hubungi Admin Pusat.', 403);
         $id = $_GET['id'] ?? '';
         if ($id === '') json_error('id wajib diisi', 422);
-        if ($scope !== null) {
-            $existing = db()->prepare("SELECT `$projectColumn` FROM `$table` WHERE id = ?");
-            $existing->execute([$id]);
-            $row = $existing->fetch();
-            if ($row) require_project_access($user, $row[$projectColumn]);
-        }
         $stmt = db()->prepare("DELETE FROM `$table` WHERE id = ?");
         $stmt->execute([$id]);
         audit('delete', $table, (string)$id);

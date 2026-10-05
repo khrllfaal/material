@@ -27,7 +27,7 @@
 <!-- ============== LOGIN (shared — role is only known after login) ============== -->
 <div id="loginScreen" class="min-h-screen flex items-center justify-center p-6">
   <div class="bg-white rounded-3xl shadow-lg shadow-slate-200 p-9 w-full max-w-sm">
-    <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center mb-5">
+    <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mb-5">
       <i data-lucide="boxes" class="w-6 h-6"></i>
     </div>
     <h1 class="text-xl font-extrabold text-slate-800">Material & Stok</h1>
@@ -36,13 +36,13 @@
     <form id="loginForm" class="space-y-4">
       <div>
         <label class="block text-xs font-semibold text-slate-500 mb-1.5">Username</label>
-        <input type="text" id="loginEmail" autocomplete="username" autocapitalize="none" autocorrect="off" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500">
+        <input type="text" id="loginEmail" autocomplete="username" autocapitalize="none" autocorrect="off" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500">
       </div>
       <div>
         <label class="block text-xs font-semibold text-slate-500 mb-1.5">Password</label>
-        <input type="password" id="loginPassword" autocomplete="current-password" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500">
+        <input type="password" id="loginPassword" autocomplete="current-password" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500">
       </div>
-      <button class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[.98] transition text-white font-bold py-3 rounded-xl text-sm disabled:opacity-60" id="loginSubmit" type="submit">Masuk</button>
+      <button class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-[.98] transition text-white font-bold py-3 rounded-xl text-sm disabled:opacity-60" id="loginSubmit" type="submit">Masuk</button>
     </form>
   </div>
 </div>
@@ -50,9 +50,9 @@
 <!-- ============== DESKTOP SHELL (admin / owner) ============== -->
 <div id="desktopShell" class="hidden">
   <div id="sidebarBackdrop" class="hidden fixed inset-0 bg-slate-900/50 z-30 lg:hidden"></div>
-  <div id="sidebar" class="w-64 bg-slate-900 text-slate-300 fixed top-0 bottom-0 left-0 overflow-y-auto flex flex-col z-40 transform -translate-x-full transition-transform duration-200 lg:translate-x-0 lg:w-60">
+  <div id="sidebar" class="w-64 bg-slate-800 text-slate-300 fixed top-0 bottom-0 left-0 overflow-y-auto flex flex-col z-40 transform -translate-x-full transition-transform duration-200 lg:translate-x-0 lg:w-60">
     <div class="px-5 py-5 flex items-center gap-2.5 border-b border-white/10">
-      <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0"><i data-lucide="boxes" class="w-4.5 h-4.5"></i></div>
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0"><i data-lucide="boxes" class="w-4.5 h-4.5"></i></div>
       <span class="font-extrabold text-white text-[15px] tracking-tight">Material & Stok</span>
       <button id="btnCloseSidebar" class="ml-auto text-slate-400 hover:text-white lg:hidden"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
@@ -72,7 +72,7 @@
         <div class="text-sm font-semibold text-slate-700" id="topbarName">—</div>
         <div class="text-xs text-slate-400" id="topbarRole">—</div>
       </div>
-      <div class="w-9 h-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0" id="topbarAvatar">—</div>
+      <div class="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0" id="topbarAvatar">—</div>
       <button id="btnLogoutTop" title="Keluar" class="ml-1 w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors shrink-0">
         <i data-lucide="log-out" class="w-4.5 h-4.5"></i>
       </button>
@@ -111,7 +111,27 @@
    there is exactly one HTML file to redeploy on every revision.
    Plain fetch, no build step, no framework.
    ============================================================ */
-var STATE = { user:null, page:'dashboard', cache:{}, projects:[], materials:[], pekerjaanAll:[], projectId:null, tab:'masuk' };
+var STATE = { user:null, page:'dashboard', cache:{}, projects:[], materials:[], pekerjaanAll:[], projectId:null, tab:'masuk', pendingFilter:null };
+/* Lets a dashboard panel row ("Besi — RS Cirebon perlu dikirim") jump
+   straight to the detail page already filtered to that row, instead of
+   landing on an unfiltered list the user has to re-search by hand. The
+   target page's own load() picks this up once (see reportPage) and
+   clears it, so navigating there again normally isn't sticky. */
+function goFiltered(page, filter){
+  STATE.pendingFilter = filter || null;
+  go(page);
+}
+/* Delegated click handler for any element marked data-nav-page (dashboard
+   chart bars, table rows, list items) — avoids re-wiring listeners every
+   time a panel re-renders, since the markup is just data attributes. */
+document.addEventListener('click', function(e){
+  var el = e.target.closest ? e.target.closest('[data-nav-page]') : null;
+  if(!el) return;
+  goFiltered(el.getAttribute('data-nav-page'), {
+    projId: el.getAttribute('data-nav-projid') || null,
+    q: el.hasAttribute('data-nav-q') ? el.getAttribute('data-nav-q') : null,
+  });
+});
 
 /* ---------------- shared helpers ---------------- */
 function apiFetch(path, opts){
@@ -160,7 +180,7 @@ function openModal(title, html, onSave){
     '<h2 class="text-lg font-bold mb-5">'+esc(title)+'</h2>'+html+
     '<div class="flex justify-end gap-2.5 mt-6">'+
     '<button class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 hover:bg-slate-200 transition" id="mCancel">Batal</button>'+
-    (onSave?'<button class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition" id="mSave">Simpan</button>':'')+'</div>';
+    (onSave?'<button class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition" id="mSave">Simpan</button>':'')+'</div>';
   document.getElementById('modalBack').classList.remove('hidden');
   document.getElementById('modalBack').classList.add('flex');
   document.getElementById('mCancel').onclick = closeModal;
@@ -173,7 +193,7 @@ function closeModal(){ document.getElementById('modalBack').classList.add('hidde
 function confirmModal(title, msg, onYes){
   openModal(title, '<p class="text-sm text-slate-600">'+msg+'</p>', function(){ closeModal(); onYes(); });
 }
-var fieldCls = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500";
+var fieldCls = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500";
 
 /* ---------------- searchable dropdown ----------------
    Wraps a plain <select> (single or multiple) with a type-to-filter
@@ -223,11 +243,11 @@ function enhanceSelect(sel){
   var panel = document.createElement('div');
   panel.className = 'hidden absolute z-30 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-hidden flex flex-col';
   panel.innerHTML = '<div class="p-2 border-b border-slate-100 shrink-0 flex items-center gap-1.5">'+
-      '<input type="text" placeholder="Cari…" class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+      '<input type="text" placeholder="Cari…" class="flex-1 min-w-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
       '<button type="button" class="ss-close shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Tutup tanpa mengubah pilihan"><i data-lucide="x" class="w-4 h-4"></i></button>'+
     '</div>'+
     '<div class="overflow-y-auto py-1"></div>'+
-    (multiple ? '<div class="p-2 border-t border-slate-100 flex justify-between gap-2 shrink-0"><button type="button" class="ss-clearall text-xs font-semibold text-slate-400 hover:text-slate-600">Batal Semua</button><button type="button" class="ss-done text-xs font-semibold text-blue-600 hover:text-blue-700">Selesai</button></div>' : '');
+    (multiple ? '<div class="p-2 border-t border-slate-100 flex justify-between gap-2 shrink-0"><button type="button" class="ss-clearall text-xs font-semibold text-slate-400 hover:text-slate-600">Batal Semua</button><button type="button" class="ss-done text-xs font-semibold text-indigo-600 hover:text-indigo-700">Selesai</button></div>' : '');
   wrap.appendChild(panel);
 
   var searchInput = panel.querySelector('input');
@@ -254,9 +274,9 @@ function enhanceSelect(sel){
     var matched = opts.filter(function(o){ return o.textContent.toLowerCase().indexOf(q) > -1; });
     listEl.innerHTML = matched.length ? matched.map(function(o){
       if(multiple){
-        return '<label class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"><input type="checkbox" data-val="'+esc(o.value)+'" '+(o.selected?'checked':'')+' class="rounded border-slate-300 text-blue-600 focus:ring-blue-200">'+esc(o.textContent)+'</label>';
+        return '<label class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"><input type="checkbox" data-val="'+esc(o.value)+'" '+(o.selected?'checked':'')+' class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">'+esc(o.textContent)+'</label>';
       }
-      return '<div data-val="'+esc(o.value)+'" class="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer '+(o.selected?'bg-blue-50 text-blue-700 font-semibold':'text-slate-700')+'">'+esc(o.textContent)+'</div>';
+      return '<div data-val="'+esc(o.value)+'" class="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer '+(o.selected?'bg-indigo-50 text-indigo-700 font-semibold':'text-slate-700')+'">'+esc(o.textContent)+'</div>';
     }).join('') : '<div class="px-3 py-6 text-center text-sm text-slate-400">Tidak ditemukan</div>';
     if(multiple){
       listEl.querySelectorAll('input[type=checkbox]').forEach(function(cb){
@@ -383,7 +403,7 @@ function go(page){
   STATE.page=page;
   document.querySelectorAll('.nav-link').forEach(function(a){
     var on = a.getAttribute('data-page')===page;
-    a.classList.toggle('bg-blue-600', on);
+    a.classList.toggle('bg-indigo-600', on);
     a.classList.toggle('text-white', on);
     a.classList.toggle('text-slate-300', !on);
     a.classList.toggle('hover:bg-white/5', !on);
@@ -398,7 +418,7 @@ function pageHead(title, sub, actionsHTML){
     '<div><h1 class="text-xl font-extrabold text-slate-800">'+esc(title)+'</h1>'+(sub?'<div class="text-sm text-slate-500 mt-1">'+esc(sub)+'</div>':'')+'</div>'+
     (actionsHTML?'<div>'+actionsHTML+'</div>':'')+'</div>';
 }
-var btnPrimary = 'inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors';
+var btnPrimary = 'inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors';
 var btnGhostSm = 'text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors';
 var btnDangerSm = 'text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors';
 function panel(inner){ return '<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">'+inner+'</div>'; }
@@ -411,7 +431,7 @@ function badge(kind, label){
    the free-text search — the two filters combine (AND), never replace
    each other. */
 function projectFilterSelectHtml(projects){
-  return '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[180px]">'+
+  return '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[180px]">'+
     '<option value="">Semua Proyek</option>'+
     projects.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('')+
     '</select>';
@@ -637,7 +657,7 @@ function masterPage(cfg){
         '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
           '<div class="flex items-center gap-3 flex-wrap flex-1">'+
           '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-          '<input type="text" id="q" placeholder="Cari…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+          '<input type="text" id="q" placeholder="Cari…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
           (cfg.projectFilter ? projectFilterSelectHtml(cfg.projectFilter.projects) : '')+
           '</div>'+
           '<span class="text-xs text-slate-400" id="cnt"></span>'+
@@ -728,7 +748,7 @@ function statCard(icon, colorCls, label, value, sub, gotoPage){
     '<div><div class="text-2xl font-extrabold text-slate-800 leading-tight">'+value+'</div>'+
     '<div class="text-sm text-slate-500 mt-0.5">'+esc(label)+'</div>'+
     (sub?'<div class="text-xs text-slate-400 mt-1">'+sub+'</div>':'')+
-    (gotoPage?'<div class="text-[11px] font-semibold text-blue-600 mt-1.5 flex items-center gap-1">Lihat detail <i data-lucide="arrow-right" class="w-3 h-3"></i></div>':'')+
+    (gotoPage?'<div class="text-[11px] font-semibold text-indigo-600 mt-1.5 flex items-center gap-1">Lihat detail <i data-lucide="arrow-right" class="w-3 h-3"></i></div>':'')+
     '</div></div>';
 }
 function panelTitle(icon, label, sub){
@@ -742,9 +762,14 @@ var STATUS_BAR_COLOR = {AMAN:'#10b981', MENIPIS:'#f59e0b', HABIS:'#ef4444', HAMP
 var STATUS_BAR_LABEL = {AMAN:'Aman', MENIPIS:'Perlu Dikirim', HABIS:'Stok Habis', HAMPIR_HABIS:'Hampir Habis RAP', MELEBIHI:'Melebihi RAP', DATA_TIDAK_LENGKAP:'Data Tidak Lengkap'};
 /* Horizontal bar row: label left, filled track right, value as a direct
    label (never color-only) so the number reads even in grayscale/print. */
-function hbarRow(label, sublabel, pctWidth, color, valueLabel){
+function navAttrsHtml(nav){
+  if(!nav) return '';
+  return ' data-nav-page="'+esc(nav.page)+'"'+(nav.projId?' data-nav-projid="'+esc(nav.projId)+'"':'')+(nav.q!=null?' data-nav-q="'+esc(nav.q)+'"':'');
+}
+function hbarRow(label, sublabel, pctWidth, color, valueLabel, nav){
   var w = Math.max(3, Math.min(100, pctWidth));
-  return '<div class="py-2">'+
+  var navCls = nav ? ' cursor-pointer hover:bg-slate-50 rounded-lg -mx-2 px-2 transition-colors' : '';
+  return '<div class="py-2'+navCls+'"'+navAttrsHtml(nav)+'>'+
     '<div class="flex justify-between items-baseline gap-2 mb-1">'+
       '<div class="text-sm text-slate-700 truncate"><b>'+esc(label)+'</b>'+(sublabel?' <span class="text-xs text-slate-400">'+esc(sublabel)+'</span>':'')+'</div>'+
       '<div class="text-xs font-bold shrink-0" style="color:'+color+'">'+esc(valueLabel)+'</div>'+
@@ -788,10 +813,10 @@ function groupOverRows(rows, keyFn, nameFn){
   arr.sort(function(a,b){ return b.worst.persentase-a.worst.persentase; });
   return arr;
 }
-function overGroupChart(groups, emptyMsg, sublabelFn, limit){
+function overGroupChart(groups, emptyMsg, sublabelFn, limit, navFn){
   if(!groups.length) return '<div class="text-center text-sm text-slate-400 py-8">'+esc(emptyMsg)+'</div>';
   return groups.slice(0,limit||8).map(function(g){
-    return hbarRow(g.name, sublabelFn(g), g.worst.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(g.worst.persentase));
+    return hbarRow(g.name, sublabelFn(g), g.worst.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(g.worst.persentase), navFn?navFn(g):null);
   }).join('');
 }
 /* Full drilldown table for "melebihi RAP" — every row, not a capped
@@ -805,7 +830,7 @@ function overDetailTable(rows){
   return '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm">'+
     '<thead><tr class="border-b border-slate-200">'+head.map(function(h){ return '<th class="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 py-2.5 pr-4 whitespace-nowrap">'+esc(h)+'</th>'; }).join('')+'</tr></thead>'+
     '<tbody>'+sorted.map(function(r){
-      return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+
+      return '<tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" title="Buka di Analisis RAP per Proyek"'+navAttrsHtml({page:'rap_proyek_report', projId:r.project_id, q:r.material_nama})+'>'+
         '<td class="py-2.5 pr-4">'+esc(r.project_nama)+'</td>'+
         '<td class="py-2.5 pr-4"><b>'+esc(r.material_nama)+'</b></td>'+
         '<td class="py-2.5 pr-4">'+num0(r.rap_qty)+' '+esc(r.satuan)+'</td>'+
@@ -819,11 +844,11 @@ function overDetailTable(rows){
 PAGES.dashboard = function(c){
   c.innerHTML = pageHead('Dashboard', 'Ringkasan lintas proyek untuk pengambilan keputusan — pilih satu proyek untuk melihat detailnya.',
       '<div class="flex items-center gap-2 flex-wrap justify-end">'+
-      '<input type="date" id="dashFrom" title="Dari tanggal (pemakaian vs RAP)" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+      '<input type="date" id="dashFrom" title="Dari tanggal (pemakaian vs RAP)" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
       '<span class="text-slate-300 text-sm">–</span>'+
-      '<input type="date" id="dashTo" title="Sampai tanggal (pemakaian vs RAP)" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+      '<input type="date" id="dashTo" title="Sampai tanggal (pemakaian vs RAP)" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
       '<button id="dashDateReset" class="'+btnGhostSm+'" title="Reset rentang tanggal">Reset</button>'+
-      '<select id="dashProj" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[200px]"><option value="">Semua Proyek</option></select>'+
+      '<select id="dashProj" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[200px]"><option value="">Semua Proyek</option></select>'+
       '</div>') +
     '<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-3" id="statGrid">'+
       '<div class="col-span-full text-center text-sm text-slate-400 py-8">Memuat ringkasan…</div>'+
@@ -881,7 +906,7 @@ PAGES.dashboard = function(c){
       var materialCount = projId ? new Set(stock.map(function(x){return x.material_id;})).size : materials.length;
 
       document.getElementById('statGrid').innerHTML =
-        statCard('briefcase','bg-blue-50 text-blue-600', projId?'Proyek Terpilih':'Total Proyek', projectCount, null, 'proyek') +
+        statCard('briefcase','bg-sky-50 text-sky-600', projId?'Proyek Terpilih':'Total Proyek', projectCount, null, 'proyek') +
         statCard('box','bg-indigo-50 text-indigo-600', projId?'Bahan Dipakai':'Total Bahan Terdaftar', materialCount, null, 'bahan') +
         statCard('layers','bg-amber-50 text-amber-600','Bahan Perlu Restock', critical.length, critical.length&&!projId?'di '+new Set(critical.map(function(x){return x.project_id;})).size+' proyek':null, 'stock') +
         statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length&&!projId?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null, 'rap_proyek_report');
@@ -899,27 +924,27 @@ PAGES.dashboard = function(c){
         var byProject = groupOverRows(over, function(r){return r.project_id;}, function(r){return r.project_nama;});
         document.getElementById('chartA').innerHTML = overGroupChart(byProject, 'Semua proyek masih dalam pagu RAP ✓', function(g){
           return g.count+' bahan melebihi — terparah: '+g.worst.material_nama;
-        });
+        }, 8, function(g){ return {page:'rap_proyek_report', projId:g.worst.project_id}; });
         document.getElementById('chartB_title').innerHTML = panelTitle('box','Bahan Sering Melebihi','Bahan yang paling sering melewati pagu lintas proyek');
         var byMaterial = groupOverRows(over, function(r){return r.material_id;}, function(r){return r.material_nama;});
         document.getElementById('chartB').innerHTML = overGroupChart(byMaterial, 'Belum ada bahan yang melebihi RAP ✓', function(g){
           return 'melebihi di '+g.count+' proyek — terparah: '+g.worst.project_nama;
-        });
+        }, 8, function(g){ return {page:'rap_proyek_report', q:g.name}; });
       } else {
         document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Bahan Melebihi RAP di Proyek Ini','Urut dari persentase pemakaian tertinggi');
         document.getElementById('chartA').innerHTML = over.length ? over.slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8).map(function(r){
-          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(r.persentase));
+          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(r.persentase), {page:'rap_proyek_report', projId:r.project_id, q:r.material_nama});
         }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Proyek ini masih dalam pagu RAP ✓</div>';
         document.getElementById('chartB_title').innerHTML = panelTitle('box','Pemakaian vs RAP — Semua Bahan','Seluruh bahan di proyek ini, urut dari persentase tertinggi');
         var allRanked = rapReport.filter(function(r){ return r.persentase!=null; }).slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8);
         document.getElementById('chartB').innerHTML = allRanked.length ? allRanked.map(function(r){
-          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR[r.status]||'#94a3b8', pct(r.persentase));
+          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR[r.status]||'#94a3b8', pct(r.persentase), {page:'rap_proyek_report', projId:r.project_id, q:r.material_nama});
         }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Belum ada RAP yang diisi untuk proyek ini.</div>';
       }
 
       var stockPrev=document.getElementById('stockPreview');
       stockPrev.innerHTML = critical.length ? panel(critical.slice(0,6).map(function(r){
-        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm">'+
+        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors" title="Buka di Monitor Stok"'+navAttrsHtml({page:'stock', projId:r.project_id, q:r.material_nama})+'>'+
           '<div><b>'+esc(r.material_nama)+'</b>'+(projId?'':'<div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div>')+'</div>'+
           badge(r.status==='HABIS'?'danger':'warn', r.status==='HABIS'?'Habis':'Perlu Dikirim')+'</div>';
       }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Semua stok aman ✓</div>');
@@ -931,7 +956,7 @@ PAGES.dashboard = function(c){
       var staleRows = stock.filter(function(s){ return s.usage_stale; });
       var staleMap = {};
       staleRows.forEach(function(r){
-        if(!staleMap[r.project_id]) staleMap[r.project_id] = {name:r.project_nama, items:[]};
+        if(!staleMap[r.project_id]) staleMap[r.project_id] = {id:r.project_id, name:r.project_nama, items:[]};
         staleMap[r.project_id].items.push(r.material_nama);
       });
       var staleByProject = Object.keys(staleMap).map(function(k){ return staleMap[k]; })
@@ -939,7 +964,7 @@ PAGES.dashboard = function(c){
       var stalePanel = document.getElementById('staleUsagePanel');
       stalePanel.innerHTML = staleByProject.length ? staleByProject.map(function(g){
         var names = g.items.slice(0,4).join(', ') + (g.items.length>4?' +'+(g.items.length-4)+' lagi':'');
-        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm gap-3">'+
+        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm gap-3 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors" title="Buka Riwayat Transaksi proyek ini"'+navAttrsHtml({page:'riwayat', projId:g.id})+'>'+
           '<div class="min-w-0"><b>'+esc(g.name)+'</b><div class="text-xs text-slate-400 truncate">'+esc(names)+'</div></div>'+
           badge('warn', g.items.length+' bahan')+'</div>';
       }).join('') : '<div class="text-center text-sm text-slate-400 py-6">Semua proyek rutin update Pemakaian ✓</div>';
@@ -1071,15 +1096,15 @@ function reportPage(cfg){
         '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
           '<div class="flex items-center gap-3 flex-wrap flex-1">'+
           '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-          '<input type="text" id="q" placeholder="'+esc(cfg.searchPlaceholder)+'" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
-          '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[180px]"><option value="">Semua Proyek</option></select>'+
+          '<input type="text" id="q" placeholder="'+esc(cfg.searchPlaceholder)+'" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
+          '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[180px]"><option value="">Semua Proyek</option></select>'+
           (cfg.dateFilter ? (
             (cfg.dateFilter.single ? '' : (
               '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.fromLabel||'Dari')+'</span>'+
-              '<input type="date" id="rpFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'
+              '<input type="date" id="rpFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'
             ))+
             '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.toLabel||'Sampai')+'</span>'+
-            '<input type="date" id="rpTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+            '<input type="date" id="rpTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
             '<button id="rpDateReset" class="'+btnGhostSm+'">Reset</button>'
           ) : '')+
           '</div>'+
@@ -1091,6 +1116,11 @@ function reportPage(cfg){
     icons();
     var rows=[], filteredList=[];
     var STATUS_COL = cfg.statusCol!=null ? cfg.statusCol : null;
+    // A dashboard row ("Besi — perlu dikirim") can hand this page a
+    // one-time project/search filter via goFiltered() — consumed once
+    // on first load so it doesn't stick around on later visits.
+    var pending = STATE.pendingFilter; STATE.pendingFilter = null;
+    if(pending && pending.q!=null) document.getElementById('q').value = pending.q;
     function draw(){
       var q=fv('q').toLowerCase(), projId=fv('fProj');
       filteredList = rows.filter(function(r){
@@ -1119,7 +1149,8 @@ function reportPage(cfg){
         rows.forEach(function(r){ if(r.project_id && !seen[r.project_id]){ seen[r.project_id]=1; opts.push({id:r.project_id, nama:r.project_nama}); } });
         opts.sort(function(a,b){ return a.nama.localeCompare(b.nama); });
         var projSel = document.getElementById('fProj');
-        var curProj = fv('fProj');
+        var curProj = (pending && pending.projId!=null) ? pending.projId : fv('fProj');
+        pending = null;
         projSel.innerHTML = '<option value="">Semua Proyek</option>'+
           opts.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===curProj?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('');
         if(projSel._enhanced) projSel.dispatchEvent(new Event('ss-refresh'));
@@ -1189,17 +1220,17 @@ PAGES.riwayat = function(c){
       '<div class="flex flex-wrap items-end gap-3 mb-4">'+
         '<div class="relative flex-1 min-w-[220px]"><label class="block text-xs font-semibold text-slate-500 mb-1.5">Cari</label>'+
         '<i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-[38px] -translate-y-1/2"></i>'+
-        '<input type="text" id="q" placeholder="Proyek / bahan / keterangan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<input type="text" id="q" placeholder="Proyek / bahan / keterangan…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek</label>'+
-        '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[160px]"><option value="">Semua Proyek</option></select></div>'+
+        '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[160px]"><option value="">Semua Proyek</option></select></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis</label>'+
-        '<select id="fJenis" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+        '<select id="fJenis" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
           '<option value="">Semua</option><option value="Masuk">Bahan Masuk</option><option value="Pemakaian">Pemakaian</option>'+
         '</select></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Dari Tanggal</label>'+
-        '<input type="date" id="fFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<input type="date" id="fFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Sampai Tanggal</label>'+
-        '<input type="date" id="fTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
+        '<input type="date" id="fTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
         '<button id="btnResetFilter" class="'+btnGhostSm+'">Reset</button>'+
         '<span class="text-xs text-slate-400 ml-auto self-center" id="cnt"></span>'+
       '</div>'+
@@ -1207,6 +1238,8 @@ PAGES.riwayat = function(c){
     );
 
   var rows=[], filteredList=[];
+  var pending = STATE.pendingFilter; STATE.pendingFilter = null;
+  if(pending && pending.q!=null) document.getElementById('q').value = pending.q;
   var cols=[
     {label:'Tanggal', get:function(r){ return esc(r.tgl); }},
     {label:'Jenis', get:function(r){ return r.jenis==='Masuk' ? badge('aman','Bahan Masuk') : badge('warn','Pemakaian'); }},
@@ -1249,9 +1282,11 @@ PAGES.riwayat = function(c){
     rows = receipts.map(function(x){ return {jenis:'Masuk', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.no_referensi||'', ket:x.ket||''}; })
       .concat(usage.map(function(x){ return {jenis:'Pemakaian', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.pekerjaan_id?pkName(x.pekerjaan_id):'', ket:x.ket||''}; }));
     rows.sort(function(a,b){ return a.tgl<b.tgl?1:(a.tgl>b.tgl?-1:0); });
+    var curProj = (pending && pending.projId!=null) ? pending.projId : '';
     document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
-      projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+      projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===curProj?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('');
     enhanceSelect(document.getElementById('fProj'));
+    pending = null;
     draw();
     document.getElementById('q').addEventListener('input', draw);
     document.getElementById('fProj').addEventListener('change', draw);
@@ -1346,8 +1381,8 @@ PAGES.users = function(c){
       '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
         '<div class="flex items-center gap-3 flex-wrap flex-1">'+
         '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-        '<input type="text" id="q" placeholder="Cari nama / username…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
-        '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[200px]"><option value="">Semua Proyek</option></select>'+
+        '<input type="text" id="q" placeholder="Cari nama / username…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
+        '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[200px]"><option value="">Semua Proyek</option></select>'+
         '</div>'+
         '<span class="text-xs text-slate-400" id="cnt"></span>'+
       '</div>'+
@@ -1558,11 +1593,18 @@ function renderInputForm(c, mode){
     fieldWrap('Jumlah (Qty)', '<input type="number" id="f_qty" inputmode="decimal" min="0" step="any" placeholder="0" class="'+inputCls+'">')+
     (isMasuk ? fieldWrap('No. Surat Jalan / Nota', '<input type="text" id="f_ref" placeholder="Opsional" class="'+inputCls+'">') : '')+
     fieldWrap('Keterangan', '<input type="text" id="f_ket" placeholder="Opsional" class="'+inputCls+'">')+
-    '<button id="f_save" class="w-full bg-'+accent+'-600 hover:bg-'+accent+'-700 active:scale-[.98] transition text-white font-bold py-3.5 rounded-xl text-[15px] mt-1">'+
-      (isMasuk?'Simpan Bahan Masuk':'Simpan Pemakaian')+'</button>'
+    '<div class="flex gap-2.5 mt-1">'+
+    '<button id="f_cancel" type="button" class="flex-1 bg-slate-100 hover:bg-slate-200 active:scale-[.98] transition text-slate-600 font-bold py-3.5 rounded-xl text-[15px]">Batal</button>'+
+    '<button id="f_save" class="flex-[2] bg-'+accent+'-600 hover:bg-'+accent+'-700 active:scale-[.98] transition text-white font-bold py-3.5 rounded-xl text-[15px]">'+
+      (isMasuk?'Simpan Bahan Masuk':'Simpan Pemakaian')+'</button>'+
+    '</div>'
   );
   icons();
   document.getElementById('f_save').onclick = function(){ submitInput(mode); };
+  // A field admin who opened this form by mistake, or wants to start
+  // over, needs an explicit way out that doesn't require touching every
+  // field — mirrors the "Batal" button every desktop modal already has.
+  document.getElementById('f_cancel').onclick = function(){ renderInputForm(c, mode); };
   enhanceSelect(document.getElementById('f_material'));
   if(!isMasuk) enhanceSelect(document.getElementById('f_pekerjaan'));
 }
@@ -1669,11 +1711,15 @@ function renderRiwayat(c){
     }
     function draw(){
       var list = applyFilter().slice(0, 60);
+      // Read-only log for Admin Lapangan — no edit/delete here. A wrong
+      // entry gets fixed by Admin Pusat (who can see it in Riwayat
+      // Transaksi), not silently removed by whoever typed it in the
+      // field; that's also the only honest record if a correction is
+      // ever questioned later.
       var thead = '<thead><tr class="border-b border-slate-200">'+
-        ['Tgl','Jenis','Bahan','Qty','Ref/Pekerjaan','Ket',''].map(function(h){ return '<th class="text-left text-[10px] font-bold uppercase tracking-wide text-slate-400 py-2 pr-3 whitespace-nowrap">'+esc(h)+'</th>'; }).join('')+
+        ['Tgl','Jenis','Bahan','Qty','Ref/Pekerjaan','Ket'].map(function(h){ return '<th class="text-left text-[10px] font-bold uppercase tracking-wide text-slate-400 py-2 pr-3 whitespace-nowrap">'+esc(h)+'</th>'; }).join('')+
         '</tr></thead>';
       var tbody = '<tbody>'+(list.length ? list.map(function(x){
-        var kind = x.jenis==='Masuk' ? 'masuk' : 'pakai';
         return '<tr class="border-b border-slate-100">'+
           '<td class="py-2 pr-3 text-[13px] whitespace-nowrap">'+esc(x.tgl)+'</td>'+
           '<td class="py-2 pr-3">'+(x.jenis==='Masuk'?'<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 whitespace-nowrap">Masuk</span>':'<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">Pakai</span>')+'</td>'+
@@ -1681,20 +1727,10 @@ function renderRiwayat(c){
           '<td class="py-2 pr-3 text-[13px] font-bold whitespace-nowrap '+(x.jenis==='Masuk'?'text-emerald-600':'text-amber-600')+'">'+(x.jenis==='Masuk'?'+':'−')+fmtNum(x.qty)+'</td>'+
           '<td class="py-2 pr-3 text-[12px] text-slate-500">'+(x.ref?esc(x.ref):'<span class="text-slate-300">–</span>')+'</td>'+
           '<td class="py-2 pr-3 text-[12px] text-slate-500">'+(x.ket?esc(x.ket):'<span class="text-slate-300">–</span>')+'</td>'+
-          '<td class="py-2 pr-1"><button data-del="'+kind+'" data-id="'+esc(x.id)+'" class="text-slate-300 hover:text-red-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>'+
         '</tr>';
-      }).join('') : '<tr><td colspan="7" class="text-center text-slate-400 text-sm py-8">Tidak ada data.</td></tr>')+'</tbody>';
+      }).join('') : '<tr><td colspan="6" class="text-center text-slate-400 text-sm py-8">Tidak ada data.</td></tr>')+'</tbody>';
       document.getElementById('rw_tbl_wrap').innerHTML = card('<div class="overflow-x-auto -mx-1 px-1"><table class="w-full">'+thead+tbody+'</table></div>');
       icons();
-      c.querySelectorAll('[data-del]').forEach(function(b){
-        b.onclick = function(){
-          if(!confirm('Hapus data ini?')) return;
-          var endpoint = b.getAttribute('data-del') === 'masuk' ? '/material_receipts.php' : '/material_usage.php';
-          apiFetch(endpoint + '?id=' + encodeURIComponent(b.getAttribute('data-id')), {method:'DELETE'})
-            .then(function(){ toast('Data dihapus.'); renderRiwayat(c); })
-            .catch(function(e){ toast('Gagal menghapus: ' + e.message, true); });
-        };
-      });
     }
     icons();
     draw();
