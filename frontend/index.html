@@ -1074,8 +1074,10 @@ function reportPage(cfg){
           '<input type="text" id="q" placeholder="'+esc(cfg.searchPlaceholder)+'" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"></div>'+
           '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[180px]"><option value="">Semua Proyek</option></select>'+
           (cfg.dateFilter ? (
-            '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.fromLabel||'Dari')+'</span>'+
-            '<input type="date" id="rpFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
+            (cfg.dateFilter.single ? '' : (
+              '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.fromLabel||'Dari')+'</span>'+
+              '<input type="date" id="rpFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'
+            ))+
             '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.toLabel||'Sampai')+'</span>'+
             '<input type="date" id="rpTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">'+
             '<button id="rpDateReset" class="'+btnGhostSm+'">Reset</button>'
@@ -1129,10 +1131,11 @@ function reportPage(cfg){
       document.getElementById('q').addEventListener('input',draw);
       document.getElementById('fProj').addEventListener('change',draw);
       if(cfg.dateFilter){
-        document.getElementById('rpFrom').addEventListener('change', load);
+        if(!cfg.dateFilter.single) document.getElementById('rpFrom').addEventListener('change', load);
         document.getElementById('rpTo').addEventListener('change', load);
         document.getElementById('rpDateReset').onclick = function(){
-          document.getElementById('rpFrom').value=''; document.getElementById('rpTo').value='';
+          if(!cfg.dateFilter.single) document.getElementById('rpFrom').value='';
+          document.getElementById('rpTo').value='';
           load();
         };
       }
@@ -1248,14 +1251,16 @@ PAGES.riwayat = function(c){
 };
 
 PAGES.stock = reportPage({
-  title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan (bahan masuk − pemakaian) dan kontrol pengadaan vs RAP — independen dari rajin/tidaknya Pemakaian diinput.',
+  title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan, kontrol pengadaan vs RAP, dan perkiraan kapan perlu kirim lagi.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:11,
-  dateFilter:{
-    fromLabel:'Pergerakan dari', toLabel:'Sampai (stok per tgl)',
-    hint:'"Sampai" = snapshot stok PER TANGGAL itu (saldo sebelumnya tetap terbawa, tidak hilang). "Dari" hanya menambah kolom pergerakan periode — tidak mengubah Sisa Stok.'
-  },
+  statusCol:9,
+  // Single "as of" date only — not a [from,to] range. "Sisa Stok" is a
+  // running balance; a range would drop whatever carried over from
+  // before it and misreport physical stock. One date keeps the filter
+  // bar and the table both readable instead of doubling both for a
+  // "movement this period" feature nobody asked for.
+  dateFilter:{single:true, toLabel:'Stok per Tanggal', hint:'Kosongkan untuk lihat stok saat ini. Isi untuk lihat stok seolah-olah per tanggal itu (saldo sebelumnya tetap terbawa).'},
   emptyMsg:'Belum ada data bahan masuk/pemakaian.',
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
@@ -1276,8 +1281,6 @@ PAGES.stock = reportPage({
       return num0(r.total_keluar)+
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
-    {label:'Masuk (Periode)', get:function(r){ return fv('rpFrom')&&fv('rpTo') ? num0(r.masuk_periode) : '<span class="text-slate-300">—</span>'; }},
-    {label:'Pemakaian (Periode)', get:function(r){ return fv('rpFrom')&&fv('rpTo') ? num0(r.keluar_periode) : '<span class="text-slate-300">—</span>'; }},
     {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':''); }},
     {label:'Ambang Batas (RAP)', get:function(r){
       if(r.sisa_kebutuhan==null) return '<span class="text-slate-300 italic" title="Isi RAP per Proyek untuk bahan ini agar status stok bisa dihitung">— RAP belum diisi</span>';
@@ -1290,7 +1293,7 @@ PAGES.stock = reportPage({
       // near-zero data would just be a confident-looking wrong number.
       if(r.forecast_date==null) return '<span class="text-slate-300 italic" title="Butuh riwayat Pemakaian yang aktif (bukan data lama) untuk dihitung">— belum cukup data</span>';
       var soon = r.forecast_days<=14;
-      return '<span class="'+(soon?'text-red-600 font-bold':'text-slate-600')+'">'+esc(r.forecast_date)+'</span> <span class="text-xs text-slate-400">('+r.forecast_days+' hari lagi, ±'+fmtNum(r.daily_usage_rate)+'/hari)</span>';
+      return '<span class="'+(soon?'text-red-600 font-bold':'text-slate-600')+'">'+esc(r.forecast_date)+'</span> <span class="text-xs text-slate-400">('+r.forecast_days+' hari lagi)</span>';
     }},
     {label:'Status', get:function(r){
       var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi']};
@@ -1300,9 +1303,7 @@ PAGES.stock = reportPage({
   ],
   exportRow:function(r){
     var pctDatang = r.rap_qty!=null && r.rap_qty>0 ? pct(r.total_masuk/r.rap_qty) : '—';
-    var hasRange = fv('rpFrom')&&fv('rpTo');
     return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, pctDatang, r.total_keluar,
-      hasRange?r.masuk_periode:'—', hasRange?r.keluar_periode:'—',
       r.stok, r.sisa_kebutuhan==null?'—':r.sisa_kebutuhan, r.forecast_date||'—', r.status];
   },
 });
@@ -1522,7 +1523,11 @@ var inputCls = "w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl 
 function materialOptions(selected){
   var list = STATE.materials;
   if(!list.length) return '<option value="">— Tidak ditemukan —</option>';
-  return list.map(function(m){
+  // A plain <select> auto-selects its first option — without this
+  // blank placeholder, the form silently started every entry on
+  // whichever material happened to sort first, and an admin who didn't
+  // notice could submit real data against the wrong bahan.
+  return '<option value="">— Pilih Bahan —</option>' + list.map(function(m){
     return '<option value="'+esc(m.id)+'"'+(m.id===selected?' selected':'')+'>'+esc(m.nama)+' ('+esc(m.satuan)+')</option>';
   }).join('');
 }
