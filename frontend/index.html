@@ -1137,30 +1137,43 @@ PAGES.rap_proyek = function(c){
 /* ---------------- generic read-only report page (search + project filter + export) ---------------- */
 function reportPage(cfg){
   return function(c){
+    // Two fixed rows (what-to-show, then time-range) instead of one row
+    // that free-wraps — with search + proyek + status all on one line,
+    // a free wrap put "Sampai" on its own line arbitrarily depending on
+    // viewport width, which read as broken rather than intentional.
+    var rowWhat = '<div class="flex items-center gap-3 flex-wrap">'+
+        '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
+        '<input type="text" id="q" placeholder="'+esc(cfg.searchPlaceholder)+'" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
+        '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[180px]"><option value="">Semua Proyek</option></select>'+
+        (cfg.statusFilter ? (
+          '<select id="fStatus" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[160px]">'+
+            '<option value="">Semua Status</option>'+
+            cfg.statusFilter.options.map(function(o){ return '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>'; }).join('')+
+          '</select>'
+        ) : '')+
+        (cfg.dateFilter ? '' : '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span>')+
+      '</div>';
+    var rowWhen = cfg.dateFilter ? (
+      '<div class="flex items-center gap-3 flex-wrap mt-3">'+
+        (cfg.dateFilter.single ? '' : (
+          '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.fromLabel||'Dari')+'</span>'+
+          '<input type="date" id="rpFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'
+        ))+
+        '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.toLabel||'Sampai')+'</span>'+
+        '<input type="date" id="rpTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
+        '<button id="rpDateReset" class="'+btnGhostSm+'">Reset</button>'+
+        '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span>'+
+      '</div>'
+    ) : '';
     c.innerHTML = pageHead(cfg.title, cfg.sub, exportBtnsHtml()) +
       panel(
-        '<div class="flex justify-between items-center mb-4 gap-3 flex-wrap">'+
-          '<div class="flex items-center gap-3 flex-wrap flex-1">'+
-          '<div class="relative flex-1 min-w-[220px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>'+
-          '<input type="text" id="q" placeholder="'+esc(cfg.searchPlaceholder)+'" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
-          '<select id="fProj" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[180px]"><option value="">Semua Proyek</option></select>'+
-          (cfg.dateFilter ? (
-            (cfg.dateFilter.single ? '' : (
-              '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.fromLabel||'Dari')+'</span>'+
-              '<input type="date" id="rpFrom" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'
-            ))+
-            '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.toLabel||'Sampai')+'</span>'+
-            '<input type="date" id="rpTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
-            '<button id="rpDateReset" class="'+btnGhostSm+'">Reset</button>'
-          ) : '')+
-          '</div>'+
-          '<span class="text-xs text-slate-400" id="cnt"></span>'+
-        '</div>'+
+        '<div class="mb-4">'+rowWhat+rowWhen+'</div>'+
         (cfg.dateFilter && cfg.dateFilter.hint ? '<div class="text-xs text-slate-400 -mt-2 mb-4">'+esc(cfg.dateFilter.hint)+'</div>' : '')+
         '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
       );
     icons();
     enhanceClearable(document.getElementById('q'));
+    if(cfg.statusFilter) enhanceSelect(document.getElementById('fStatus'));
     var rows=[], filteredList=[];
     var STATUS_COL = cfg.statusCol!=null ? cfg.statusCol : null;
     // A dashboard row ("Besi — perlu dikirim") can hand this page a
@@ -1169,10 +1182,11 @@ function reportPage(cfg){
     var pending = STATE.pendingFilter; STATE.pendingFilter = null;
     if(pending && pending.q!=null) document.getElementById('q').value = pending.q;
     function draw(){
-      var q=fv('q').toLowerCase(), projId=fv('fProj');
+      var q=fv('q').toLowerCase(), projId=fv('fProj'), statusVal=cfg.statusFilter?fv('fStatus'):'';
       filteredList = rows.filter(function(r){
         if(q && cfg.searchFn(r).toLowerCase().indexOf(q)===-1) return false;
         if(projId && r.project_id!==projId) return false;
+        if(statusVal && r.status!==statusVal) return false;
         return true;
       });
       var list=filteredList;
@@ -1208,6 +1222,7 @@ function reportPage(cfg){
     load().then(function(){
       document.getElementById('q').addEventListener('input',draw);
       document.getElementById('fProj').addEventListener('change',draw);
+      if(cfg.statusFilter) document.getElementById('fStatus').addEventListener('change',draw);
       if(cfg.dateFilter){
         if(!cfg.dateFilter.single) document.getElementById('rpFrom').addEventListener('change', load);
         document.getElementById('rpTo').addEventListener('change', load);
@@ -1226,6 +1241,10 @@ PAGES.rap_proyek_report = reportPage({
   endpoint:'/material_rap_proyek_report.php', filename:'Analisis_RAP_per_Proyek', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
   statusCol:10, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
+  statusFilter:{options:[
+    {value:'AMAN', label:'Aman'}, {value:'HAMPIR_HABIS', label:'Hampir Habis'},
+    {value:'MELEBIHI', label:'Melebihi RAP'}, {value:'DATA_TIDAK_LENGKAP', label:'Data Tidak Lengkap'},
+  ]},
   dateFilter:{hint:'Rentang tanggal hanya menyaring Pemakaian yang dihitung (mis. "pemakaian bulan ini vs pagu total") — Pagu (RAP), Total Masuk, dan % Pagu Didatangkan selalu angka penuh, tidak ikut terpotong oleh tanggal.'},
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
@@ -1415,6 +1434,10 @@ PAGES.stock = reportPage({
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
   statusCol:9,
+  statusFilter:{options:[
+    {value:'AMAN', label:'Aman'}, {value:'MENIPIS', label:'Perlu Dikirim'},
+    {value:'HABIS', label:'Stok Habis'}, {value:'DATA_TIDAK_LENGKAP', label:'RAP Belum Diisi'},
+  ]},
   // Same Dari/Sampai layout as Analisis RAP per Proyek. "Sampai" still
   // works as a stock snapshot date (Total Masuk/Pemakaian/Sisa Stok
   // evaluated as of that date); "Dari" only narrows the two "Periode
@@ -1466,6 +1489,10 @@ PAGES.rap_report = reportPage({
   endpoint:'/material_rap_report.php', filename:'Analisis_RAP_Bahan', searchPlaceholder:'Cari proyek / pekerjaan / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.pekerjaan_nama+' '+r.material_nama; },
   statusCol:10, emptyMsg:'Belum ada konfigurasi RAP / progress pekerjaan.',
+  statusFilter:{options:[
+    {value:'AMAN', label:'Aman'}, {value:'HAMPIR_HABIS', label:'Hampir Habis RAP'},
+    {value:'MELEBIHI', label:'Melebihi RAP'}, {value:'DATA_TIDAK_LENGKAP', label:'Data Tidak Lengkap'},
+  ]},
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
     {label:'Pekerjaan', get:function(r){ return esc(r.pekerjaan_nama); }},
