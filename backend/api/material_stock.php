@@ -16,17 +16,19 @@ require_once __DIR__ . '/helpers.php';
  * low/sufficient, so the row is flagged DATA_TIDAK_LENGKAP instead of
  * guessing — the fix is to fill in RAP per Proyek, not a manual number.
  *
- * Date filtering here is deliberately not a simple [from, to] window:
- * "Sisa Stok" is a running balance, so bounding it with a lower date
- * would silently drop whatever was carried over from before that date
- * and report a wrong physical quantity. Instead:
+ * Date filtering here is deliberately not a simple [from, to] window on
+ * everything: "Sisa Stok" is a running balance, so bounding it with a
+ * lower date would silently drop whatever was carried over from before
+ * that date and report a wrong physical quantity. Instead:
  *   - tgl_to (optional, "as of" date) bounds the cumulative totals —
  *     a valid point-in-time snapshot ("stock as of 30 Sept"), same
  *     math as today's unbounded view, just evaluated at an earlier date.
- *   - tgl_from (optional, requires tgl_to) additionally reports
- *     masuk_periode/keluar_periode — movement strictly inside
- *     [from, to] — as supplementary figures alongside the always-valid
- *     snapshot, for "what happened this period" reporting.
+ *   - tgl_from/tgl_to independently narrow masuk_periode/keluar_periode
+ *     ("movement in this window") the same way Analisis RAP per Proyek's
+ *     own tgl_from/tgl_to narrow its Pemakaian — a from-only, to-only, or
+ *     both bound all work. Total Masuk, Total Pemakaian and Sisa Stok
+ *     never take the lower bound, so the running balance stays correct
+ *     regardless of what the period fields are set to.
  */
 send_cors_headers();
 $user = require_login();
@@ -45,7 +47,15 @@ if ($scope !== null) {
 $tglTo = !empty($_GET['tgl_to']) ? $_GET['tgl_to'] : null;
 $tglFrom = !empty($_GET['tgl_from']) ? $_GET['tgl_from'] : null;
 $toCond = $tglTo ? 'AND tgl <= ?' : '';
-$periodCond = ($tglFrom && $tglTo) ? 'tgl BETWEEN ? AND ?' : '1=0';
+// Same partial-range shape as material_rap_proyek_report.php's usage
+// filter: each bound is independent, and with neither set this matches
+// everything (so masuk_periode/keluar_periode equal the full totals by
+// default, not zero).
+$periodConds = [];
+$periodParams = [];
+if ($tglFrom) { $periodConds[] = 'tgl >= ?'; $periodParams[] = $tglFrom; }
+if ($tglTo)   { $periodConds[] = 'tgl <= ?'; $periodParams[] = $tglTo; }
+$periodCond = $periodConds ? implode(' AND ', $periodConds) : '1=1';
 
 $stmt = db()->prepare(
     "SELECT
@@ -84,8 +94,7 @@ $stmt = db()->prepare(
 $bindParams = [];
 if ($tglTo) $bindParams[] = $tglTo;     // masuk subquery
 if ($tglTo) $bindParams[] = $tglTo;     // keluar subquery
-if ($tglFrom && $tglTo) { $bindParams[] = $tglFrom; $bindParams[] = $tglTo; } // masuk_p
-if ($tglFrom && $tglTo) { $bindParams[] = $tglFrom; $bindParams[] = $tglTo; } // keluar_p
+$bindParams = array_merge($bindParams, $periodParams, $periodParams); // masuk_p, keluar_p
 $stmt->execute(array_merge($bindParams, $params));
 $out = array_map(function ($r) use ($tglTo) {
     $stok = (float)$r['stok'];

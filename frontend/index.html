@@ -1414,13 +1414,13 @@ PAGES.stock = reportPage({
   title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan dan perkiraan kapan perlu kirim lagi — metrik RAP (pagu/ambang batas) ada di Analisis RAP per Proyek.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:7,
-  // Single "as of" date only — not a [from,to] range. "Sisa Stok" is a
-  // running balance; a range would drop whatever carried over from
-  // before it and misreport physical stock. One date keeps the filter
-  // bar and the table both readable instead of doubling both for a
-  // "movement this period" feature nobody asked for.
-  dateFilter:{single:true, toLabel:'Stok per Tanggal', hint:'Kosongkan untuk lihat stok saat ini. Isi untuk lihat stok seolah-olah per tanggal itu (saldo sebelumnya tetap terbawa).'},
+  statusCol:9,
+  // Same Dari/Sampai layout as Analisis RAP per Proyek. "Sampai" still
+  // works as a stock snapshot date (Total Masuk/Pemakaian/Sisa Stok
+  // evaluated as of that date); "Dari" only narrows the two "Periode
+  // Ini" columns below — never the running balance, which a lower
+  // bound would otherwise silently corrupt.
+  dateFilter:{hint:'"Sampai" = lihat Sisa Stok seolah-olah per tanggal itu (saldo sebelumnya tetap terbawa). "Dari" hanya menyaring kolom Periode Ini — Total Masuk, Total Pemakaian, dan Sisa Stok tidak ikut terpotong oleh "Dari".'},
   emptyMsg:'Belum ada data bahan masuk/pemakaian.',
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
@@ -1432,6 +1432,14 @@ PAGES.stock = reportPage({
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
     {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':''); }},
+    {label:'Masuk Periode Ini', get:function(r){
+      if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
+      return num0(r.masuk_periode);
+    }},
+    {label:'Pemakaian Periode Ini', get:function(r){
+      if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
+      return num0(r.keluar_periode);
+    }},
     {label:'Perkiraan Habis', get:function(r){
       // Simple run-rate forecast (days-of-supply): avg daily usage
       // observed so far, projected against current stock. Only shown
@@ -1449,7 +1457,7 @@ PAGES.stock = reportPage({
   ],
   exportRow:function(r){
     return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, r.total_keluar,
-      r.stok, r.forecast_date||'—', r.status];
+      r.stok, r.masuk_periode, r.keluar_periode, r.forecast_date||'—', r.status];
   },
 });
 
