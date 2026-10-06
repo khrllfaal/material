@@ -151,7 +151,15 @@ $out = array_map(function ($r) use ($tglTo) {
     $forecastAnchor = $tglTo ?: date('Y-m-d');
     $r['forecast_date'] = $forecastDays !== null ? date('Y-m-d', strtotime("$forecastAnchor +$forecastDays days")) : null;
     unset($r['first_keluar_tgl']);
-    if ($stok <= 0) $status = 'HABIS';
+    // A row with Pagu RAP but zero Bahan Masuk and zero Pemakaian (e.g.
+    // right after the one receipt that created it gets corrected/deleted,
+    // or a proyek whose material simply hasn't arrived yet) is not the
+    // same situation as "received some, then ran out" — labeling both
+    // HABIS reads as "stock ran out" when really nothing has happened
+    // yet, which misleads pusat into thinking a resupply is overdue.
+    $totalMasuk = (float)$r['total_masuk'];
+    if ($totalMasuk <= 0 && $pemakaian <= 0) $status = 'BELUM_ADA_TRANSAKSI';
+    elseif ($stok <= 0) $status = 'HABIS';
     elseif (!$hasRap) $status = 'DATA_TIDAK_LENGKAP';
     elseif ($stok <= $sisaKebutuhan) $status = 'MENIPIS';
     else $status = 'AMAN';

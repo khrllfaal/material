@@ -495,6 +495,7 @@ var STATUS_STYLE = {
   HAMPIR_HABIS:       {xlsxFill:'FFFFEB9C', xlsxFont:'FF9C6500', bg:'#FFEB9C', fg:'#9C6500', label:'Hampir Habis RAP'},
   MELEBIHI:           {xlsxFill:'FFFFC7CE', xlsxFont:'FF9C0006', bg:'#FFC7CE', fg:'#9C0006', label:'Melebihi RAP'},
   DATA_TIDAK_LENGKAP: {xlsxFill:'FFF2F2F2', xlsxFont:'FF7F7F7F', bg:'#F2F2F2', fg:'#7F7F7F', label:'Data Tidak Lengkap'},
+  BELUM_ADA_TRANSAKSI: {xlsxFill:'FFF2F2F2', xlsxFont:'FF7F7F7F', bg:'#F2F2F2', fg:'#7F7F7F', label:'Belum Ada Transaksi'},
 };
 
 var _exceljsLoading=null;
@@ -804,8 +805,8 @@ function panelTitle(icon, label, sub){
 /* Status colors are fixed/reserved across the whole app (same as badge()) —
    a chart segment's color always means the same status everywhere, and is
    always paired with a text label/legend, never color alone. */
-var STATUS_BAR_COLOR = {AMAN:'#10b981', MENIPIS:'#f59e0b', HABIS:'#ef4444', HAMPIR_HABIS:'#f59e0b', MELEBIHI:'#ef4444', DATA_TIDAK_LENGKAP:'#cbd5e1'};
-var STATUS_BAR_LABEL = {AMAN:'Aman', MENIPIS:'Perlu Dikirim', HABIS:'Stok Habis', HAMPIR_HABIS:'Hampir Habis RAP', MELEBIHI:'Melebihi RAP', DATA_TIDAK_LENGKAP:'Data Tidak Lengkap'};
+var STATUS_BAR_COLOR = {AMAN:'#10b981', MENIPIS:'#f59e0b', HABIS:'#ef4444', HAMPIR_HABIS:'#f59e0b', MELEBIHI:'#ef4444', DATA_TIDAK_LENGKAP:'#cbd5e1', BELUM_ADA_TRANSAKSI:'#cbd5e1'};
+var STATUS_BAR_LABEL = {AMAN:'Aman', MENIPIS:'Perlu Dikirim', HABIS:'Stok Habis', HAMPIR_HABIS:'Hampir Habis RAP', MELEBIHI:'Melebihi RAP', DATA_TIDAK_LENGKAP:'Data Tidak Lengkap', BELUM_ADA_TRANSAKSI:'Belum Ada Transaksi'};
 /* Horizontal bar row: label left, filled track right, value as a direct
    label (never color-only) so the number reads even in grayscale/print. */
 function navAttrsHtml(nav){
@@ -958,9 +959,9 @@ PAGES.dashboard = function(c){
         statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length&&!projId?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null, 'rap_proyek_report');
 
       // Stock status distribution (count-based, safe to compare across units)
-      var stockCounts = {AMAN:0, MENIPIS:0, HABIS:0, DATA_TIDAK_LENGKAP:0};
+      var stockCounts = {AMAN:0, MENIPIS:0, HABIS:0, DATA_TIDAK_LENGKAP:0, BELUM_ADA_TRANSAKSI:0};
       stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
-      document.getElementById('stockChart').innerHTML = statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS','DATA_TIDAK_LENGKAP'], stock.length);
+      document.getElementById('stockChart').innerHTML = statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS','DATA_TIDAK_LENGKAP','BELUM_ADA_TRANSAKSI'], stock.length);
 
       // Chart A / B — directly answer "which proyek is over" and "which
       // bahan is over" as two separate, clearly-labeled groupings, instead
@@ -1437,6 +1438,7 @@ PAGES.stock = reportPage({
   statusFilter:{options:[
     {value:'AMAN', label:'Aman'}, {value:'MENIPIS', label:'Perlu Dikirim'},
     {value:'HABIS', label:'Stok Habis'}, {value:'DATA_TIDAK_LENGKAP', label:'RAP Belum Diisi'},
+    {value:'BELUM_ADA_TRANSAKSI', label:'Belum Ada Transaksi'},
   ]},
   // Same Dari/Sampai layout as Analisis RAP per Proyek. "Sampai" still
   // works as a stock snapshot date (Total Masuk/Pemakaian/Sisa Stok
@@ -1473,7 +1475,7 @@ PAGES.stock = reportPage({
       return '<span class="'+(soon?'text-red-600 font-bold':'text-slate-600')+'">'+esc(r.forecast_date)+'</span> <span class="text-xs text-slate-400">('+r.forecast_days+' hari lagi)</span>';
     }},
     {label:'Status', get:function(r){
-      var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi']};
+      var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi'],BELUM_ADA_TRANSAKSI:['neutral','Belum Ada Transaksi']};
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
@@ -1803,6 +1805,7 @@ function statusBadge(status){
     MELEBIHI:['bg-red-50 text-red-700','Melebihi RAP'],
     HAMPIR_HABIS:['bg-amber-50 text-amber-700','Hampir Habis RAP'],
     DATA_TIDAK_LENGKAP:['bg-slate-100 text-slate-500','Data Tidak Lengkap'],
+    BELUM_ADA_TRANSAKSI:['bg-slate-100 text-slate-500','Belum Ada Transaksi'],
   };
   var m = map[status] || ['bg-slate-100 text-slate-500', status];
   return '<span class="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap '+m[0]+'">'+esc(m[1])+'</span>';
