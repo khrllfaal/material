@@ -20,6 +20,10 @@
   table{border-collapse:collapse;}
   #mobileShell{max-width:560px;margin:0 auto;}
   .tab-scroll::-webkit-scrollbar{display:none;}
+  /* Hides the native up/down spinner so a clear (×) button can sit in
+     that same corner of a number input without overlapping it. */
+  input.no-spinner::-webkit-outer-spin-button, input.no-spinner::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  input.no-spinner{ -moz-appearance:textfield; }
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -188,6 +192,9 @@ function openModal(title, html, onSave){
   // Every <select> inside a form modal gets the searchable widget for
   // free — no per-field wiring needed as new fields/forms are added.
   document.querySelectorAll('#modalBody select').forEach(enhanceSelect);
+  // Same deal for plain text/number fields — an inline × to fix one
+  // wrong value without resetting the whole form.
+  document.querySelectorAll('#modalBody input[type=text], #modalBody input[type=number]').forEach(enhanceClearable);
 }
 function closeModal(){ document.getElementById('modalBack').classList.add('hidden'); document.getElementById('modalBack').classList.remove('flex'); }
 function confirmModal(title, msg, onYes){
@@ -265,7 +272,14 @@ function enhanceSelect(sel){
       var hasValue = o && o.value !== '';
       label.textContent = hasValue ? o.textContent : (placeholder || (o?o.textContent:''));
       label.classList.toggle('text-slate-400', !hasValue);
-      clearBtn.classList.toggle('hidden', !(hasValue && placeholder));
+      // Show × whenever there's a value to clear back to blank — not
+      // only when a data-placeholder was set. Most selects here (Material,
+      // Pekerjaan, Proyek…) already have their own blank "— Pilih —"
+      // option baked into the <option> list rather than via that
+      // attribute, so requiring it too was hiding the × on exactly the
+      // selects people fill in most.
+      var hasEmptyOpt = optsArr().some(function(opt){ return opt.value===''; });
+      clearBtn.classList.toggle('hidden', !(hasValue && (placeholder || hasEmptyOpt)));
     }
   }
   function renderList(filter){
@@ -316,6 +330,37 @@ function enhanceSelect(sel){
   document.addEventListener('click', function(e){ if(!wrap.contains(e.target)) close(); });
   sel.addEventListener('ss-refresh', function(){ renderLabel(); });
   renderLabel();
+  icons();
+}
+
+/* Adds an inline × to a plain text/number input, shown only once it has
+   a value — the single-field equivalent of enhanceSelect's clear button,
+   for fixing one wrong field without resetting the whole form via Batal. */
+function enhanceClearable(input){
+  if(!input || input._clearable) return;
+  input._clearable = true;
+  var wrap = document.createElement('div');
+  wrap.className = 'relative';
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  input.classList.add('pr-9');
+  if(input.type==='number') input.classList.add('no-spinner');
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.tabIndex = -1;
+  btn.className = 'hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition';
+  btn.innerHTML = '<i data-lucide="x" class="w-4 h-4"></i>';
+  wrap.appendChild(btn);
+  function refresh(){ btn.classList.toggle('hidden', !input.value); }
+  input.addEventListener('input', refresh);
+  btn.onclick = function(e){
+    e.preventDefault(); e.stopPropagation();
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event('change'));
+    input.focus();
+  };
+  refresh();
   icons();
 }
 
@@ -665,6 +710,7 @@ function masterPage(cfg){
         '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
       );
     icons();
+    enhanceClearable(document.getElementById('q'));
     if(cfg.projectFilter) enhanceSelect(document.getElementById('fProj'));
 
     var rows=[], filteredList=[];
@@ -1114,6 +1160,7 @@ function reportPage(cfg){
         '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
       );
     icons();
+    enhanceClearable(document.getElementById('q'));
     var rows=[], filteredList=[];
     var STATUS_COL = cfg.statusCol!=null ? cfg.statusCol : null;
     // A dashboard row ("Besi — perlu dikirim") can hand this page a
@@ -1236,6 +1283,7 @@ PAGES.riwayat = function(c){
       '</div>'+
       '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
     );
+  enhanceClearable(document.getElementById('q'));
 
   var rows=[], filteredList=[];
   var pending = STATE.pendingFilter; STATE.pendingFilter = null;
@@ -1388,6 +1436,7 @@ PAGES.users = function(c){
       '</div>'+
       '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="tbl"></table></div>'
     );
+  enhanceClearable(document.getElementById('q'));
 
   var rows=[], projects=[];
   var cols=[
@@ -1607,6 +1656,9 @@ function renderInputForm(c, mode){
   document.getElementById('f_cancel').onclick = function(){ renderInputForm(c, mode); };
   enhanceSelect(document.getElementById('f_material'));
   if(!isMasuk) enhanceSelect(document.getElementById('f_pekerjaan'));
+  enhanceClearable(document.getElementById('f_qty'));
+  if(isMasuk) enhanceClearable(document.getElementById('f_ref'));
+  enhanceClearable(document.getElementById('f_ket'));
 }
 
 function submitInput(mode){
@@ -1734,6 +1786,7 @@ function renderRiwayat(c){
     }
     icons();
     draw();
+    enhanceClearable(document.getElementById('rw_q'));
     document.getElementById('rw_q').addEventListener('input', draw);
     document.getElementById('rw_from').addEventListener('change', draw);
     document.getElementById('rw_to').addEventListener('change', draw);
