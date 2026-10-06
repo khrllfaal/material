@@ -1285,9 +1285,10 @@ PAGES.riwayat = function(c){
     );
   enhanceClearable(document.getElementById('q'));
 
-  var rows=[], filteredList=[];
+  var rows=[], filteredList=[], projects=[], materials=[], pekerjaanList=[];
   var pending = STATE.pendingFilter; STATE.pendingFilter = null;
   if(pending && pending.q!=null) document.getElementById('q').value = pending.q;
+  var canEdit = !isOwner();
   var cols=[
     {label:'Tanggal', get:function(r){ return esc(r.tgl); }},
     {label:'Jenis', get:function(r){ return r.jenis==='Masuk' ? badge('aman','Bahan Masuk') : badge('warn','Pemakaian'); }},
@@ -1297,7 +1298,10 @@ PAGES.riwayat = function(c){
     {label:'Satuan', get:function(r){ return esc(r.satuan); }},
     {label:'Pekerjaan / Referensi', get:function(r){ return r.ref?esc(r.ref):'<span class="text-slate-300 italic">–</span>'; }},
     {label:'Keterangan', get:function(r){ return r.ket?esc(r.ket):'<span class="text-slate-300 italic">–</span>'; }},
-  ];
+  ].concat(canEdit ? [{label:'Aksi', get:function(r){
+    return '<button class="'+btnGhostSm+'" data-edit="'+esc(r.id)+'">Edit</button> '+
+      '<button class="'+btnDangerSm+'" data-del="'+esc(r.id)+'">Hapus</button>';
+  }}] : []);
   function exportRow(r){ return [r.tgl, r.jenis, r.project_nama, r.material_nama, (r.jenis==='Masuk'?r.qty:-r.qty), r.satuan, r.ref||'', r.ket||'']; }
   function draw(){
     var q=fv('q').toLowerCase(), jenis=fv('fJenis'), from=fv('fFrom'), to=fv('fTo'), projId=fv('fProj');
@@ -1316,37 +1320,94 @@ PAGES.riwayat = function(c){
       '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Tidak ada data pada rentang/filter ini.</td></tr>')+'</tbody>';
     bindExportBtns('Riwayat_Transaksi', 'Riwayat Transaksi (Semua Proyek)',
       (from||to) ? ('Periode '+(from||'awal')+' s/d '+(to||'sekarang')) : 'Seluruh riwayat',
-      cols.map(function(cl){ return cl.label; }), function(){ return filteredList.map(exportRow); });
+      cols.map(function(cl){ return cl.label; }).filter(function(l){ return l!=='Aksi'; }),
+      function(){ return filteredList.map(exportRow); });
+    if(!canEdit) return;
+    document.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ form(b.getAttribute('data-edit')); }; });
+    document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ del(b.getAttribute('data-del')); }; });
   }
-  Promise.all([
-    apiFetch('/material_receipts.php'), apiFetch('/material_usage.php'),
-    apiFetch('/projects.php'), apiFetch('/materials.php'), apiFetch('/pekerjaan.php'),
-  ]).then(function(r){
-    var receipts=r[0], usage=r[1], projects=r[2], materials=r[3], pekerjaanList=r[4];
-    var projName=function(id){ var p=projects.find(function(x){ return x.id===id; }); return p?p.nama:id; };
-    var matName=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.nama:id; };
-    var matSatuan=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.satuan:''; };
-    var pkName=function(id){ var pk=pekerjaanList.find(function(x){ return x.id===id; }); return pk?pk.nama:''; };
-    rows = receipts.map(function(x){ return {jenis:'Masuk', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.no_referensi||'', ket:x.ket||''}; })
-      .concat(usage.map(function(x){ return {jenis:'Pemakaian', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.pekerjaan_id?pkName(x.pekerjaan_id):'', ket:x.ket||''}; }));
-    rows.sort(function(a,b){ return a.tgl<b.tgl?1:(a.tgl>b.tgl?-1:0); });
-    var curProj = (pending && pending.projId!=null) ? pending.projId : '';
-    document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
-      projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===curProj?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('');
-    enhanceSelect(document.getElementById('fProj'));
-    pending = null;
-    draw();
-    document.getElementById('q').addEventListener('input', draw);
-    document.getElementById('fProj').addEventListener('change', draw);
-    document.getElementById('fJenis').addEventListener('change', draw);
-    document.getElementById('fFrom').addEventListener('change', draw);
-    document.getElementById('fTo').addEventListener('change', draw);
-    document.getElementById('btnResetFilter').onclick=function(){
-      document.getElementById('q').value=''; document.getElementById('fProj').value=''; document.getElementById('fJenis').value='';
-      document.getElementById('fFrom').value=''; document.getElementById('fTo').value='';
+  // Admin Pusat can correct a mistaken entry here (wrong qty, wrong
+  // bahan, typo'd referensi) without asking the field admin to re-enter
+  // it — unlike the mobile Riwayat (Admin Lapangan), which is read-only.
+  function del(id){
+    var r = rows.find(function(x){ return x.id===id; });
+    if(!r) return;
+    confirmModal('Hapus Data', 'Yakin mau menghapus data '+(r.jenis==='Masuk'?'Bahan Masuk':'Pemakaian')+' ini? Tindakan ini tidak bisa dibatalkan.', function(){
+      var endpoint = r.jenis==='Masuk' ? '/material_receipts.php' : '/material_usage.php';
+      apiFetch(endpoint+'?id='+encodeURIComponent(id), {method:'DELETE'})
+        .then(function(){ toast('Data dihapus.'); refresh(); })
+        .catch(function(e){ toast('Gagal menghapus: '+e.message, true); });
+    });
+  }
+  function form(id){
+    var r = rows.find(function(x){ return x.id===id; });
+    if(!r) return;
+    var isMasuk = r.jenis==='Masuk';
+    var html = '<div class="space-y-4">'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek *</label><select id="f_project_id" class="'+fieldCls+'">'+
+        projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===r.project_id?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Bahan *</label><select id="f_material_id" class="'+fieldCls+'">'+
+        materials.map(function(m){ return '<option value="'+esc(m.id)+'"'+(m.id===r.material_id?' selected':'')+'>'+esc(m.nama)+' ('+esc(m.satuan)+')</option>'; }).join('')+
+      '</select></div>'+
+      (isMasuk ? '' : '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Pekerjaan</label><select id="f_pekerjaan_id" class="'+fieldCls+'">'+
+        '<option value="">— Tidak ada —</option>'+
+        pekerjaanList.filter(function(pk){ return pk.project_id===r.project_id; }).map(function(pk){ return '<option value="'+esc(pk.id)+'"'+(pk.id===r.pekerjaan_id?' selected':'')+'>'+esc(pk.nama)+'</option>'; }).join('')+
+      '</select></div>')+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal *</label><input id="f_tgl" type="date" value="'+esc(r.tgl)+'" class="'+fieldCls+'"></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Qty *</label><input id="f_qty" type="number" step="any" min="0" value="'+esc(r.qty)+'" class="'+fieldCls+'"></div>'+
+      (isMasuk ? '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">No. Surat Jalan / Nota</label><input id="f_ref" type="text" value="'+esc(r.ref)+'" class="'+fieldCls+'"></div>' : '')+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="f_ket" type="text" value="'+esc(r.ket)+'" class="'+fieldCls+'"></div>'+
+      '</div>';
+    openModal('Edit '+(isMasuk?'Bahan Masuk':'Pemakaian'), html, function(){
+      var qty = parseFloat(fv('f_qty'));
+      if(!qty || qty<=0){ toast('Qty wajib diisi dan lebih dari 0.', true); return; }
+      var payload = {
+        id: id, project_id: fv('f_project_id'), material_id: fv('f_material_id'),
+        tgl: fv('f_tgl'), qty: qty, ket: fv('f_ket'),
+      };
+      var endpoint;
+      if(isMasuk){ payload.no_referensi = fv('f_ref'); endpoint = '/material_receipts.php'; }
+      else { payload.pekerjaan_id = fv('f_pekerjaan_id') || null; endpoint = '/material_usage.php'; }
+      apiFetch(endpoint, {method:'POST', body:JSON.stringify(payload)})
+        .then(function(){ closeModal(); toast('Data diperbarui.'); refresh(); })
+        .catch(function(e){ toast('Gagal menyimpan: '+e.message, true); });
+    });
+  }
+  function refresh(){
+    Promise.all([
+      apiFetch('/material_receipts.php'), apiFetch('/material_usage.php'),
+      apiFetch('/projects.php'), apiFetch('/materials.php'), apiFetch('/pekerjaan.php'),
+    ]).then(function(r){
+      var receipts=r[0], usage=r[1];
+      projects=r[2]; materials=r[3]; pekerjaanList=r[4];
+      var projName=function(id){ var p=projects.find(function(x){ return x.id===id; }); return p?p.nama:id; };
+      var matName=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.nama:id; };
+      var matSatuan=function(id){ var m=materials.find(function(x){ return x.id===id; }); return m?m.satuan:''; };
+      var pkName=function(id){ var pk=pekerjaanList.find(function(x){ return x.id===id; }); return pk?pk.nama:''; };
+      rows = receipts.map(function(x){ return {id:x.id, jenis:'Masuk', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_id:x.material_id, material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, ref:x.no_referensi||'', ket:x.ket||''}; })
+        .concat(usage.map(function(x){ return {id:x.id, jenis:'Pemakaian', tgl:x.tgl, project_id:x.project_id, project_nama:projName(x.project_id), material_id:x.material_id, material_nama:matName(x.material_id), satuan:matSatuan(x.material_id), qty:Number(x.qty)||0, pekerjaan_id:x.pekerjaan_id||'', ref:x.pekerjaan_id?pkName(x.pekerjaan_id):'', ket:x.ket||''}; }));
+      rows.sort(function(a,b){ return a.tgl<b.tgl?1:(a.tgl>b.tgl?-1:0); });
+      var curProj = (pending && pending.projId!=null) ? pending.projId : fv('fProj');
+      document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+
+        projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===curProj?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('');
+      if(document.getElementById('fProj')._enhanced) document.getElementById('fProj').dispatchEvent(new Event('ss-refresh'));
+      else enhanceSelect(document.getElementById('fProj'));
+      pending = null;
       draw();
-    };
-  }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+    }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+  }
+  refresh();
+  document.getElementById('q').addEventListener('input', draw);
+  document.getElementById('fProj').addEventListener('change', draw);
+  document.getElementById('fJenis').addEventListener('change', draw);
+  document.getElementById('fFrom').addEventListener('change', draw);
+  document.getElementById('fTo').addEventListener('change', draw);
+  document.getElementById('btnResetFilter').onclick=function(){
+    document.getElementById('q').value=''; document.getElementById('fProj').value=''; document.getElementById('fJenis').value='';
+    document.getElementById('fFrom').value=''; document.getElementById('fTo').value='';
+    draw();
+  };
 };
 
 PAGES.stock = reportPage({
