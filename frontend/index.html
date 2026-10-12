@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Material & Stok</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="vendor/tailwind.css">
 <script src="vendor/icons.js"></script>
 <style>
@@ -167,8 +168,39 @@ function apiFetch(path, opts){
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-function num0(n){ if(n==null||Number.isNaN(n)) return '0'; return Math.round(Number(n)).toLocaleString('id-ID'); }
-function numSigned(n){ n=Number(n)||0; return (n<0?'-':'')+Math.round(Math.abs(n)).toLocaleString('id-ID'); }
+function num0(n){ if(n==null||Number.isNaN(n)) return '0'; return Number(n).toLocaleString('id-ID', {maximumFractionDigits:3}); }
+/* Quantity/price inputs are plain text, not <input type=number>: Indonesian
+   browsers render a number field's decimal point as a comma and reject a
+   typed comma, so "0,322" could neither be typed nor displayed correctly.
+   Display: 1.800 / 0,322. Parse accepts either style — a comma is always the
+   decimal mark; dots are thousands marks unless a lone dot clearly is a
+   decimal (e.g. "0.322"). */
+function fmtIdNum(n){
+  if(n==null||n===''||Number.isNaN(Number(n))) return '';
+  return Number(n).toLocaleString('id-ID', {maximumFractionDigits:3});
+}
+function parseIdNum(s){
+  s = String(s==null?'':s).trim().replace(/\s/g,'');
+  if(!s) return NaN;
+  if(s.indexOf(',')>-1) s = s.replace(/\./g,'').replace(',','.');
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g,'');
+  return Number(s);
+}
+function numInputHtml(id, value, cls, extra){
+  return '<input id="'+esc(id)+'" type="text" inputmode="decimal" autocomplete="off" data-num value="'+esc(fmtIdNum(value))+'" class="'+cls+'"'+(extra||'')+'>';
+}
+document.addEventListener('blur', function(e){
+  if(e.target && e.target.hasAttribute && e.target.hasAttribute('data-num')){
+    var n = parseIdNum(e.target.value);
+    e.target.value = Number.isNaN(n) ? '' : fmtIdNum(n);
+  }
+}, true);
+function numSigned(n){
+  n=Number(n)||0;
+  var r = Math.round(Math.abs(n)*1000)/1000;
+  if(r===0) return '0';
+  return (n<0?'-':'')+r.toLocaleString('id-ID',{maximumFractionDigits:3});
+}
 function fmtNum(n){ return Number(n||0).toLocaleString('id-ID', {maximumFractionDigits:2}); }
 function pct(n){ if(n==null||Number.isNaN(n)) return '–'; return (n*100).toFixed(1)+'%'; }
 function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -555,11 +587,12 @@ function loadExcelJS(){
 }
 
 /* headers: string[]; rows: any[][] (numbers stay numbers so Excel can
-   sum/sort them); opts.statusCol: index of the column holding the RAW
-   status code (AMAN/MENIPIS/…) to color that cell — that column's
-   values are swapped for their human label after coloring. */
+   sum/sort them); opts.statusCols: indexes of columns holding RAW status
+   codes (AMAN/MENIPIS/…) to color — those cells are swapped for their
+   human label after coloring. */
 async function exportExcel(filename, title, headers, rows, opts){
   opts=opts||{};
+  var sc = opts.statusCols || [];
   try{ await loadExcelJS(); }
   catch(e){ toast('Gagal memuat modul Excel — cek koneksi lalu coba lagi.', true); return; }
 
@@ -571,7 +604,7 @@ async function exportExcel(filename, title, headers, rows, opts){
   var titleRow=ws.addRow([title]);
   titleRow.font={bold:true, size:13, name:'Calibri', color:{argb:'FF1E3A8A'}};
   ws.mergeCells(titleRow.number,1,titleRow.number,Math.max(headers.length,1));
-  var subRow=ws.addRow(['Diekspor '+new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})+' dari Material & Stok']);
+  var subRow=ws.addRow([(opts.sub?opts.sub+' · ':'')+'Diekspor '+new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})+' dari Material & Stok']);
   subRow.font={italic:true, size:9.5, name:'Calibri', color:{argb:'FF888888'}};
   ws.mergeCells(subRow.number,1,subRow.number,Math.max(headers.length,1));
   ws.addRow([]);
@@ -591,8 +624,11 @@ async function exportExcel(filename, title, headers, rows, opts){
 
   rows.forEach(function(r, ri){
     var displayRow = r.slice();
-    var style = (opts.statusCol!=null) ? STATUS_STYLE[r[opts.statusCol]] : null;
-    if(opts.statusCol!=null) displayRow[opts.statusCol] = style ? style.label : r[opts.statusCol];
+    var styles = {};
+    sc.forEach(function(ci){
+      styles[ci] = STATUS_STYLE[r[ci]] || null;
+      if(styles[ci]) displayRow[ci] = styles[ci].label;
+    });
     var row=ws.addRow(displayRow);
     row.eachCell({includeEmpty:true}, function(cell, ci){
       cell.font={name:'Calibri', size:10.5};
@@ -600,7 +636,8 @@ async function exportExcel(filename, title, headers, rows, opts){
       if(isNumCol[ci-1]){ cell.numFmt='#,##0.##'; cell.alignment={horizontal:'right'}; }
       else cell.alignment={horizontal:'left'};
       if(ri%2===1) cell.fill={type:'pattern', pattern:'solid', fgColor:{argb:'FFF7F9FC'}};
-      if(style && (ci-1)===opts.statusCol){
+      var style = styles[ci-1];
+      if(style){
         cell.fill={type:'pattern', pattern:'solid', fgColor:{argb:style.xlsxFill}};
         cell.font={name:'Calibri', size:10.5, bold:true, color:{argb:style.xlsxFont}};
         cell.alignment={horizontal:'center'};
@@ -611,7 +648,7 @@ async function exportExcel(filename, title, headers, rows, opts){
   headers.forEach(function(h, i){
     var maxLen=String(h).length;
     rows.forEach(function(r){
-      var v=(opts.statusCol===i && STATUS_STYLE[r[i]]) ? STATUS_STYLE[r[i]].label : r[i];
+      var v=(sc.indexOf(i)>-1 && STATUS_STYLE[r[i]]) ? STATUS_STYLE[r[i]].label : r[i];
       var len=(typeof v==='number')?num0(v).length:String(v==null?'':v).length;
       if(len>maxLen) maxLen=len;
     });
@@ -664,6 +701,7 @@ function filenameFromTitle(title){
    table and the Excel export, carried through as real cell fills. */
 async function exportPdf(title, sub, headers, rows, opts){
   opts=opts||{};
+  var sc = opts.statusCols || [];
   try{ await loadJsPdf(); }
   catch(e){ toast('Gagal memuat modul PDF — cek koneksi lalu coba lagi.', true); return; }
 
@@ -679,11 +717,11 @@ async function exportPdf(title, sub, headers, rows, opts){
   // numeric report scannable (digits line up) instead of ragged
   // left-aligned text, which is how the on-screen tables already read.
   var isNumCol = headers.map(function(_, ci){
-    return rows.length>0 && ci!==opts.statusCol && rows.every(function(r){ return r[ci]==null || typeof r[ci]==='number'; });
+    return rows.length>0 && sc.indexOf(ci)===-1 && rows.every(function(r){ return r[ci]==null || typeof r[ci]==='number'; });
   });
   var body = rows.map(function(r){
     return r.map(function(v, ci){
-      var style=(opts.statusCol===ci && STATUS_STYLE[v]) ? STATUS_STYLE[v] : null;
+      var style=(sc.indexOf(ci)>-1 && STATUS_STYLE[v]) ? STATUS_STYLE[v] : null;
       if(style) return style.label;
       return typeof v==='number' ? num0(v) : (v==null?'':String(v));
     });
@@ -698,11 +736,11 @@ async function exportPdf(title, sub, headers, rows, opts){
     headStyles: {fillColor:[30,58,138], textColor:255, fontStyle:'bold', fontSize:8},
     alternateRowStyles: {fillColor:[247,249,252]},
     didParseCell: function(data){
-      if(isNumCol[data.column.index] && data.column.index!==opts.statusCol){
+      if(isNumCol[data.column.index] && sc.indexOf(data.column.index)===-1){
         data.cell.styles.halign = 'right';
       }
-      if(opts.statusCol!=null && data.section==='body' && data.column.index===opts.statusCol){
-        var rawVal = rows[data.row.index][opts.statusCol];
+      if(data.section==='body' && sc.indexOf(data.column.index)>-1){
+        var rawVal = rows[data.row.index][data.column.index];
         var style = STATUS_STYLE[rawVal];
         if(style){
           data.cell.styles.fillColor = hexToRgb(style.bg);
@@ -728,10 +766,11 @@ function exportBtnsHtml(){
   return '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button> '+
     '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button>';
 }
-function bindExportBtns(filename, title, sub, headers, rowsFn, statusCol){
+function bindExportBtns(filename, title, sub, headers, rowsFn, statusCols){
+  var sc = statusCols==null ? [] : (Array.isArray(statusCols) ? statusCols : [statusCols]);
   var bx=document.getElementById('btnExportExcel'), bp=document.getElementById('btnExportPdf');
-  if(bx) bx.onclick=function(){ exportExcel(filename, title, headers, rowsFn(), {statusCol:statusCol}); };
-  if(bp) bp.onclick=function(){ exportPdf(title, sub, headers, rowsFn(), {statusCol:statusCol}); };
+  if(bx) bx.onclick=function(){ exportExcel(filename, title, headers, rowsFn(), {statusCols:sc, sub:sub}); };
+  if(bp) bp.onclick=function(){ exportPdf(title, sub, headers, rowsFn(), {statusCols:sc}); };
 }
 
 /* ---------------- generic master-data CRUD page ---------------- */
@@ -803,15 +842,21 @@ function masterPage(cfg){
             opts.map(function(o){ return '<option value="'+esc(o.value)+'"'+(String(val)===String(o.value)?' selected':'')+'>'+esc(o.label)+'</option>'; }).join('')+
             '</select></div>';
         }
-        return '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">'+esc(f.label)+(f.required?' *':'')+'</label>'+
-          '<input id="f_'+f.key+'" type="'+(f.type||'text')+'" value="'+esc(val)+'" class="'+fieldCls+'"></div>';
+        var inputHtml = f.type==='number'
+          ? numInputHtml('f_'+f.key, val, fieldCls)
+          : '<input id="f_'+f.key+'" type="text" value="'+esc(val)+'" class="'+fieldCls+'">';
+        return '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">'+esc(f.label)+(f.required?' *':'')+'</label>'+inputHtml+'</div>';
       }).join('')+'</div>';
       openModal((id?'Edit ':'Tambah ')+cfg.title.replace(/^Master\s+/i,''), html, function(){
         var obj = id ? Object.assign({}, rec) : {id: uid(cfg.idPrefix||'x')};
         for(var i=0;i<cfg.fields.length;i++){
           var f=cfg.fields[i], v=fv('f_'+f.key);
           if(f.required && !v){ toast('Kolom "'+f.label+'" wajib diisi.', true); return; }
-          obj[f.key] = (f.type==='number') ? (parseFloat(v)||0) : v;
+          if(f.type==='number'){
+            var n = parseIdNum(v);
+            if(Number.isNaN(n)){ if(f.required){ toast('Kolom "'+f.label+'" harus berupa angka.', true); return; } n = 0; }
+            obj[f.key] = n;
+          } else obj[f.key] = v;
         }
         apiFetch(cfg.endpoint, {method:'POST', body:JSON.stringify(obj)})
           .then(function(){ closeModal(); toast(id?'Data diperbarui.':'Data ditambahkan.'); refresh(); })
@@ -908,157 +953,224 @@ function overGroupChart(groups, emptyMsg, sublabelFn, limit, navFn){
     return hbarRow(g.name, sublabelFn(g), g.worst.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(g.worst.persentase), navFn?navFn(g):null);
   }).join('');
 }
-/* Full drilldown table for "melebihi RAP" — every row, not a capped
-   preview, so pusat/owner can see the whole picture without leaving
-   the dashboard (the capped 6-item list this replaces was the main
-   complaint: it hid how many proyek/bahan were actually over). */
-function overDetailTable(rows){
-  if(!rows.length) return '<div class="text-center text-sm text-slate-400 py-8">Belum ada bahan yang melebihi RAP ✓ (pastikan RAP per Proyek sudah diisi)</div>';
-  var sorted = rows.slice().sort(function(a,b){ return b.persentase-a.persentase; });
-  var head = ['Proyek','Bahan','Pagu (RAP)','Aktual Pemakaian','Deviasi','%'];
-  return '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm">'+
-    '<thead><tr class="border-b border-slate-200">'+head.map(function(h){ return '<th class="text-left text-xs font-semibold text-slate-500 py-3.5 pr-4 whitespace-nowrap">'+esc(h)+'</th>'; }).join('')+'</tr></thead>'+
-    '<tbody>'+sorted.map(function(r){
-      return '<tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" title="Buka di Analisis RAP per Proyek"'+navAttrsHtml({page:'rap_proyek_report', projId:r.project_id, q:r.material_nama})+'>'+
-        '<td class="py-3 pr-4">'+esc(r.project_nama)+'</td>'+
-        '<td class="py-3 pr-4"><b>'+esc(r.material_nama)+'</b></td>'+
-        '<td class="py-3 pr-4">'+num0(r.rap_qty)+' '+esc(r.satuan)+'</td>'+
-        '<td class="py-3 pr-4">'+num0(r.aktual_pemakaian)+' '+esc(r.satuan)+'</td>'+
-        '<td class="py-3 pr-4"><b class="text-red-600">+'+num0(r.deviasi)+'</b></td>'+
-        '<td class="py-3 pr-4"><b class="text-red-600">'+pct(r.persentase)+'</b></td>'+
-      '</tr>';
-    }).join('')+'</tbody></table></div>';
+/* Early-warning dashboard for Owner: what needs action now, where, and why.
+   Every number/status is clickable and routes to the detail report already
+   filtered to that proyek/bahan. Status priority decides a project's
+   headline status: the worst material wins. */
+var STOCK_PRIORITY = {HABIS:0, MENIPIS:1, DATA_TIDAK_LENGKAP:2, BELUM_ADA_TRANSAKSI:3, AMAN:4};
+var RAP_PRIORITY = {MELEBIHI:0, HAMPIR_HABIS:1, DATA_TIDAK_LENGKAP:2, AMAN:3};
+var ATTENTION_RANK = {HABIS:0, MELEBIHI:1, MENIPIS:2};
+var STATUS_KIND = {AMAN:'aman', MENIPIS:'warn', HABIS:'danger', HAMPIR_HABIS:'warn', MELEBIHI:'danger', DATA_TIDAK_LENGKAP:'neutral', BELUM_ADA_TRANSAKSI:'neutral'};
+
+function statusPill(code){
+  return badge(STATUS_KIND[code]||'neutral', STATUS_BAR_LABEL[code]||code);
+}
+function worstOf(rows, prio){
+  if(!rows.length) return null;
+  var worst = rows.reduce(function(a,b){ return (prio[b.status]<prio[a.status]) ? b : a; });
+  var count = rows.filter(function(r){ return r.status===worst.status; }).length;
+  return {status:worst.status, count:count};
+}
+function openStatusBreakdown(title, groups){
+  var body = groups.length ? groups.map(function(g){
+    return '<div class="mb-5 last:mb-0">'+
+      '<div class="flex items-center gap-2 mb-2">'+statusPill(g.status)+'<span class="text-xs text-slate-400">'+g.items.length+' bahan</span></div>'+
+      '<ul class="divide-y divide-slate-100 rounded-xl border border-slate-100">'+
+        g.items.map(function(it){
+          return '<li class="flex justify-between items-center gap-4 px-4 py-2.5 text-sm"><span class="font-semibold text-slate-700">'+esc(it.name)+'</span><span class="text-slate-500 text-right whitespace-nowrap">'+it.detail+'</span></li>';
+        }).join('')+
+      '</ul></div>';
+  }).join('') : '<div class="text-sm text-slate-400 py-4 text-center">Belum ada data untuk proyek ini.</div>';
+  openModal(title, body);
+}
+function groupByStatus(rows, prio, mapItem){
+  var map = {};
+  rows.forEach(function(r){ (map[r.status]=map[r.status]||[]).push(mapItem(r)); });
+  return Object.keys(map).sort(function(a,b){ return prio[a]-prio[b]; }).map(function(k){ return {status:k, items:map[k]}; });
 }
 
 PAGES.dashboard = function(c){
-  c.innerHTML = pageHead('Dashboard', 'Ringkasan lintas proyek untuk pengambilan keputusan — pilih satu proyek untuk melihat detailnya.',
-      '<div class="flex items-center gap-2 flex-wrap justify-end">'+
-      '<input type="date" id="dashFrom" title="Dari tanggal (pemakaian vs RAP)" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
+  var stockAll=[], rapReportAll=[], projects=[], rapRows=[];
+  var dateInput = 'px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100';
+  c.innerHTML = pageHead('Dashboard',
+      'Kondisi material seluruh proyek hari ini — deteksi dini untuk pengambilan keputusan. Klik angka atau status untuk melihat detailnya.',
+      exportBtnsHtml()) +
+    '<div class="flex flex-wrap items-center gap-2.5 mb-2">'+
+      '<input type="date" id="dashFrom" title="Dari tanggal (pemakaian vs RAP)" class="'+dateInput+'">'+
       '<span class="text-slate-300 text-sm">–</span>'+
-      '<input type="date" id="dashTo" title="Sampai tanggal (pemakaian vs RAP)" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
+      '<input type="date" id="dashTo" title="Sampai tanggal (pemakaian vs RAP)" class="'+dateInput+'">'+
       '<button id="dashDateReset" class="'+btnGhostSm+'" title="Reset rentang tanggal">Reset</button>'+
       '<select id="dashProj" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[200px]"><option value="">Semua Proyek</option></select>'+
-      '</div>') +
-    '<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-3" id="statGrid">'+
-      '<div class="col-span-full text-center text-sm text-slate-400 py-8">Memuat ringkasan…</div>'+
+      '<span id="dashUpdated" class="ml-auto text-xs text-slate-400"></span>'+
     '</div>'+
-    '<div class="text-xs text-slate-400 mb-6">Filter tanggal berlaku untuk pemakaian vs RAP (periode terpilih). Sisa Stok selalu kumulatif sejak awal proyek, tidak dipengaruhi filter tanggal.</div>'+
+    '<div class="text-xs text-slate-400 mb-6">Filter tanggal hanya berlaku untuk pemakaian vs RAP. Sisa stok selalu kumulatif sejak awal proyek.</div>'+
+    '<div id="dKpi" class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5"></div>'+
     '<div class="grid lg:grid-cols-2 gap-5 mb-5">'+
-      '<div>'+panel(panelTitle('layers','Distribusi Status Stok','Jumlah bahan per status, seluruh proyek terpilih (kumulatif)')+'<div id="stockChart"></div>')+'</div>'+
-      '<div>'+panel('<div id="chartA_title"></div><div id="chartA"></div>')+'</div>'+
+      '<div>'+panel('<div id="dStockHealth"></div>')+'</div>'+
+      '<div>'+panel('<div id="dRapHealth"></div>')+'</div>'+
     '</div>'+
-    '<div class="grid lg:grid-cols-2 gap-5 mb-5">'+
-      '<div>'+panelTitle('layers','Perlu Perhatian — Stok')+'<div id="stockPreview"></div></div>'+
-      '<div>'+panel('<div id="chartB_title"></div><div id="chartB"></div>')+'</div>'+
+    '<div class="grid lg:grid-cols-5 gap-5 mb-5">'+
+      '<div class="lg:col-span-3">'+panel(
+        '<div class="flex justify-between items-start gap-3 mb-3">'+panelTitle('alert-triangle','Perlu Perhatian Segera','Stok habis, stok menipis, dan pemakaian melebihi pagu')+
+        '<button class="'+btnGhostSm+' shrink-0" id="btnGoRapReport">Analisis RAP</button></div>'+
+        '<div id="dAttention"></div>')+'</div>'+
+      '<div class="lg:col-span-2">'+panel('<div id="dOverChart"></div>')+'</div>'+
     '</div>'+
-    '<div class="mb-5">'+panel(
-      '<div class="flex justify-between items-center mb-1">'+panelTitle('trending-up','Bahan Melebihi RAP — Detail Lengkap','Semua bahan yang pemakaiannya sudah melewati pagu RAP, urut dari paling parah')+
-      '<button class="'+btnGhostSm+' shrink-0 -mt-4" id="btnGoRapReport">Buka Analisis Lengkap</button></div>'+
-      '<div id="overTable"></div>')+
-    '</div>'+
-    '<div>'+panel(panelTitle('history','Proyek Perlu Update Pemakaian','Ada Bahan Masuk tercatat tapi Pemakaian belum/lama tidak diupdate — stok & RAP di proyek ini kemungkinan under-reported')+'<div id="staleUsagePanel"></div>')+
-    '</div>';
+    '<div class="mb-5">'+panel(panelTitle('history','Proyek Perlu Update Pemakaian','Bahan masuk tercatat tapi pemakaian belum/lama tidak diupdate — angka di proyek ini kemungkinan belum lengkap')+'<div id="staleUsagePanel"></div>')+'</div>'+
+    panel(
+      '<div class="flex justify-between items-start gap-3 flex-wrap mb-4">'+
+        '<div>'+panelTitle('layers','Ringkasan Status per Proyek','Status stok dan RAP tiap proyek — klik status untuk melihat rincian bahan')+'</div>'+
+        '<span id="dSummaryCount" class="text-xs text-slate-400"></span>'+
+      '</div>'+
+      '<div class="overflow-x-auto -mx-5 px-5"><table class="w-full text-sm" id="dSummary"></table></div>'
+    );
   icons();
   document.getElementById('btnGoRapReport').onclick=function(){ go('rap_proyek_report'); };
 
-  Promise.all([
-    apiFetch('/projects.php'), apiFetch('/materials.php'), apiFetch('/material_stock.php'),
-  ]).then(function(r){
-    var projects=r[0], materials=r[1], stockAll=r[2], rapReportAll=[];
+  var summaryRows = [];
+  function loadRapReport(){
+    var qs = [];
+    var from = fv('dashFrom'), to = fv('dashTo');
+    if(from) qs.push('tgl_from='+encodeURIComponent(from));
+    if(to) qs.push('tgl_to='+encodeURIComponent(to));
+    return apiFetch('/material_rap_proyek_report.php'+(qs.length?'?'+qs.join('&'):'')).then(function(data){
+      rapReportAll = data; render();
+    }).catch(function(e){ toast('Gagal memuat RAP: '+e.message, true); });
+  }
+
+  function render(){
+    var projId = fv('dashProj');
+    var inScope = function(r){ return !projId || r.project_id===projId; };
+    var stock = stockAll.filter(inScope);
+    var rapR = rapReportAll.filter(inScope);
+    var critical = stock.filter(function(s){ return s.status==='HABIS'||s.status==='MENIPIS'; });
+    var overRap = rapR.filter(function(s){ return s.status==='MELEBIHI'; });
+    var stale = stock.filter(function(s){ return s.usage_stale; });
+    var uniq = function(arr){ return Object.keys(arr.reduce(function(m,r){ m[r.project_id]=1; return m; },{})).length; };
+
+    document.getElementById('dKpi').innerHTML =
+      statCard('briefcase','bg-sky-50 text-sky-600','Proyek dipantau', projId?1:projects.length, projId?'':'seluruh proyek', null) +
+      statCard('layers','bg-amber-50 text-amber-600','Stok perlu tindakan', critical.length,
+        critical.length ? 'di '+uniq(critical)+' proyek' : 'Semua stok aman ✓', 'stock') +
+      statCard('trending-up','bg-red-50 text-red-600','Pemakaian melebihi pagu', overRap.length,
+        overRap.length ? 'di '+uniq(overRap)+' proyek' : 'Belum ada yang melewati ✓', 'rap_proyek_report') +
+      statCard('history','bg-orange-50 text-orange-600','Pemakaian belum diupdate', uniq(stale),
+        stale.length ? 'dari '+stale.length+' bahan' : 'Semua proyek rutin update ✓', 'stock');
+
+    var stockCounts = {HABIS:0, MENIPIS:0, DATA_TIDAK_LENGKAP:0, BELUM_ADA_TRANSAKSI:0, AMAN:0};
+    stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
+    document.getElementById('dStockHealth').innerHTML = panelTitle('layers','Kesehatan Stok','Sebaran status bahan di seluruh proyek terpilih')+
+      statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS','DATA_TIDAK_LENGKAP','BELUM_ADA_TRANSAKSI'], stock.length);
+
+    var rapCounts = {AMAN:0, HAMPIR_HABIS:0, MELEBIHI:0, DATA_TIDAK_LENGKAP:0};
+    rapR.forEach(function(s){ if(rapCounts[s.status]!=null) rapCounts[s.status]++; });
+    document.getElementById('dRapHealth').innerHTML = panelTitle('trending-up','Kesehatan Pemakaian vs Pagu','Sebaran status pemakaian terhadap pagu RAP per bahan')+
+      statusStackChart(rapCounts, ['AMAN','HAMPIR_HABIS','MELEBIHI','DATA_TIDAK_LENGKAP'], rapR.length);
+
+    var attention = critical.map(function(r){
+        return {rank:ATTENTION_RANK[r.status], status:r.status, pid:r.project_id, proj:r.project_nama, mat:r.material_nama,
+          page:'stock', detail:'stok '+num0(r.stok)+' '+esc(r.satuan)};
+      }).concat(overRap.map(function(r){
+        return {rank:ATTENTION_RANK.MELEBIHI, status:'MELEBIHI', pid:r.project_id, proj:r.project_nama, mat:r.material_nama,
+          page:'rap_proyek_report', detail:'terpakai '+pct(r.persentase)+' dari pagu'};
+      })).sort(function(a,b){ return a.rank-b.rank || a.proj.localeCompare(b.proj); });
+    document.getElementById('dAttention').innerHTML = attention.length
+      ? attention.slice(0,8).map(function(a){
+          return '<div class="flex items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors"'+
+            navAttrsHtml({page:a.page, projId:a.pid, q:a.mat})+'>'+
+            '<div class="min-w-0"><div class="font-semibold text-sm text-slate-800 truncate">'+esc(a.mat)+'</div>'+
+            '<div class="text-xs text-slate-400 truncate">'+esc(a.proj)+' · '+a.detail+'</div></div>'+
+            statusPill(a.status)+'</div>';
+        }).join('') + (attention.length>8 ? '<div class="text-xs text-slate-400 pt-3">+'+(attention.length-8)+' lainnya — buka menu Monitor Stok atau Analisis RAP</div>' : '')
+      : '<div class="text-center text-sm text-slate-400 py-8">Tidak ada bahan yang perlu tindakan ✓</div>';
+
+    var byProject = groupOverRows(overRap, function(r){return r.project_id;}, function(r){return r.project_nama;});
+    document.getElementById('dOverChart').innerHTML = panelTitle('trending-up','Proyek Melebihi Pagu','Diurutkan dari pemakaian tertinggi terhadap pagu')+
+      overGroupChart(byProject, 'Semua proyek masih dalam pagu RAP ✓', function(g){
+        return g.count+' bahan — terparah: '+g.worst.material_nama;
+      }, 6, function(g){ return {page:'rap_proyek_report', projId:g.worst.project_id}; });
+
+    var staleMap = {};
+    stale.forEach(function(r){
+      if(!staleMap[r.project_id]) staleMap[r.project_id] = {id:r.project_id, name:r.project_nama, items:[]};
+      staleMap[r.project_id].items.push(r.material_nama);
+    });
+    var staleByProject = Object.keys(staleMap).map(function(k){ return staleMap[k]; }).sort(function(a,b){ return b.items.length-a.items.length; });
+    document.getElementById('staleUsagePanel').innerHTML = staleByProject.length ? staleByProject.map(function(g){
+      var names = g.items.slice(0,4).join(', ') + (g.items.length>4?' +'+(g.items.length-4)+' lagi':'');
+      return '<div class="flex justify-between items-center py-3 border-b border-slate-100 last:border-0 gap-3 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors" title="Buka Riwayat Transaksi proyek ini"'+navAttrsHtml({page:'riwayat', projId:g.id})+'>'+
+        '<div class="min-w-0"><div class="font-semibold text-sm text-slate-800">'+esc(g.name)+'</div><div class="text-xs text-slate-400 truncate">'+esc(names)+'</div></div>'+
+        badge('warn', g.items.length+' bahan')+'</div>';
+    }).join('') : '<div class="text-center text-sm text-slate-400 py-6">Semua proyek rutin update Pemakaian ✓</div>';
+
+    var projList = projects.filter(inScope).slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); });
+    summaryRows = projList.map(function(p, i){
+      var s = worstOf(stock.filter(function(r){ return r.project_id===p.id; }), STOCK_PRIORITY);
+      var q = worstOf(rapR.filter(function(r){ return r.project_id===p.id; }), RAP_PRIORITY);
+      return {no:i+1, id:p.id, nama:p.nama, stock:s, rap:q};
+    });
+    document.getElementById('dSummaryCount').textContent = summaryRows.length+' proyek';
+    var statusCell = function(st, prio, kind, id){
+      if(!st) return '<span class="text-slate-300 italic">belum ada data</span>';
+      var more = st.count>1 ? ' <span class="text-xs text-slate-400">· '+st.count+' bahan</span>' : '';
+      return '<button type="button" class="group inline-flex items-center gap-1.5 whitespace-nowrap" data-breakdown="'+esc(kind)+':'+esc(id)+'" title="Lihat rincian">'+
+        statusPill(st.status)+more+
+        '<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-300 group-hover:text-indigo-600"></i></button>';
+    };
+    document.getElementById('dSummary').innerHTML =
+      '<thead><tr class="border-b border-slate-200">'+
+        ['No','Nama Proyek','Status Stok','Status RAP'].map(function(h){ return '<th class="text-left text-xs font-semibold text-slate-500 py-3 pr-4 whitespace-nowrap">'+h+'</th>'; }).join('')+
+      '</tr></thead><tbody>'+
+      (summaryRows.length ? summaryRows.map(function(r){
+        return '<tr class="border-b border-slate-100 hover:bg-slate-50/70 transition-colors">'+
+          '<td class="py-3 pr-4 text-slate-400 tabular-nums w-12">'+r.no+'</td>'+
+          '<td class="py-3 pr-4 font-semibold text-slate-800 cursor-pointer hover:text-indigo-600" title="Buka Monitor Stok proyek ini"'+navAttrsHtml({page:'stock', projId:r.id})+'>'+esc(r.nama)+'</td>'+
+          '<td class="py-3 pr-4">'+statusCell(r.stock,STOCK_PRIORITY,'stock',r.id)+'</td>'+
+          '<td class="py-3 pr-4">'+statusCell(r.rap,RAP_PRIORITY,'rap',r.id)+'</td>'+
+        '</tr>';
+      }).join('') : '<tr><td colspan="4" class="text-center text-slate-400 text-sm py-10">Belum ada proyek.</td></tr>')+
+      '</tbody>';
+    icons();
+
+    var stamp = new Date().toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('dashUpdated').textContent = 'Diperbarui '+stamp;
+    var projName = projId ? (projects.find(function(p){ return p.id===projId; })||{}).nama : 'Semua proyek';
+    bindExportBtns('Dashboard_Ringkasan', 'Ringkasan Dashboard Material & Stok',
+      projName+' · Stok perlu tindakan: '+critical.length+' · Melebihi pagu: '+overRap.length+' · Pemakaian belum diupdate: '+uniq(stale)+' proyek',
+      ['No','Nama Proyek','Status Stok','Status RAP'],
+      function(){ return summaryRows.map(function(r){
+        return [r.no, r.nama, r.stock?r.stock.status:'DATA_TIDAK_LENGKAP', r.rap?r.rap.status:'DATA_TIDAK_LENGKAP'];
+      }); },
+      [2,3]);
+  }
+
+  document.getElementById('dSummary').onclick = function(e){
+    var b = e.target.closest ? e.target.closest('[data-breakdown]') : null;
+    if(!b) return;
+    var parts = b.getAttribute('data-breakdown').split(':');
+    var kind = parts[0], pid = parts[1];
+    var projName = (projects.find(function(p){ return p.id===pid; })||{}).nama || '';
+    if(kind==='stock'){
+      var rows = stockAll.filter(function(r){ return r.project_id===pid; });
+      openStatusBreakdown('Status Stok — '+projName, groupByStatus(rows, STOCK_PRIORITY, function(r){
+        return {name:r.material_nama, detail:'stok '+num0(r.stok)+' '+esc(r.satuan)};
+      }));
+    } else {
+      var rrows = rapReportAll.filter(function(r){ return r.project_id===pid; });
+      openStatusBreakdown('Status RAP — '+projName, groupByStatus(rrows, RAP_PRIORITY, function(r){
+        return {name:r.material_nama, detail: r.persentase==null ? 'pagu belum diisi' : pct(r.persentase)+' dari pagu '+num0(r.rap_qty)+' '+esc(r.satuan)};
+      }));
+    }
+  };
+
+  apiFetch('/projects.php').then(function(list){
+    projects = list;
     document.getElementById('dashProj').innerHTML = '<option value="">Semua Proyek</option>'+
-      projects.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+      list.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
     enhanceSelect(document.getElementById('dashProj'));
-
-    // Pemakaian vs RAP is refetched whenever the date range changes —
-    // Sisa Stok stays cumulative (all-time) on purpose: a stock-on-hand
-    // number scoped to a date range would silently ignore stock carried
-    // over from before it and be plain wrong, so only the RAP-usage
-    // panels (which are legitimately "usage in this period") respond
-    // to the date filter.
-    function loadRapReport(){
-      var qs = [];
-      var from = fv('dashFrom'), to = fv('dashTo');
-      if(from) qs.push('tgl_from='+encodeURIComponent(from));
-      if(to) qs.push('tgl_to='+encodeURIComponent(to));
-      return apiFetch('/material_rap_proyek_report.php'+(qs.length?'?'+qs.join('&'):'')).then(function(data){
-        rapReportAll = data; render();
-      }).catch(function(e){ toast('Gagal memuat RAP: '+e.message, true); });
-    }
-
-    function render(){
-      var projId = fv('dashProj');
-      var stock = projId ? stockAll.filter(function(s){ return s.project_id===projId; }) : stockAll;
-      var rapReport = projId ? rapReportAll.filter(function(s){ return s.project_id===projId; }) : rapReportAll;
-      var critical = stock.filter(function(s){ return s.status==='MENIPIS'||s.status==='HABIS'; });
-      var over = rapReport.filter(function(s){ return s.status==='MELEBIHI'; });
-      var projectCount = projId ? 1 : projects.length;
-      var materialCount = projId ? new Set(stock.map(function(x){return x.material_id;})).size : materials.length;
-
-      document.getElementById('statGrid').innerHTML =
-        statCard('briefcase','bg-sky-50 text-sky-600', projId?'Proyek Terpilih':'Total Proyek', projectCount, null, 'proyek') +
-        statCard('box','bg-indigo-50 text-indigo-600', projId?'Bahan Dipakai':'Total Bahan Terdaftar', materialCount, null, 'bahan') +
-        statCard('layers','bg-amber-50 text-amber-600','Bahan Perlu Restock', critical.length, critical.length&&!projId?'di '+new Set(critical.map(function(x){return x.project_id;})).size+' proyek':null, 'stock') +
-        statCard('trending-up','bg-red-50 text-red-600','Bahan Melebihi RAP', over.length, over.length&&!projId?'di '+new Set(over.map(function(x){return x.project_id;})).size+' proyek':null, 'rap_proyek_report');
-
-      // Stock status distribution (count-based, safe to compare across units)
-      var stockCounts = {AMAN:0, MENIPIS:0, HABIS:0, DATA_TIDAK_LENGKAP:0, BELUM_ADA_TRANSAKSI:0};
-      stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
-      document.getElementById('stockChart').innerHTML = statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS','DATA_TIDAK_LENGKAP','BELUM_ADA_TRANSAKSI'], stock.length);
-
-      // Chart A / B — directly answer "which proyek is over" and "which
-      // bahan is over" as two separate, clearly-labeled groupings, instead
-      // of one flat ranked list that mixed entities and statuses together.
-      if(!projId){
-        document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Proyek Melebihi RAP','Proyek dengan bahan yang sudah melewati pagu, urut dari paling parah');
-        var byProject = groupOverRows(over, function(r){return r.project_id;}, function(r){return r.project_nama;});
-        document.getElementById('chartA').innerHTML = overGroupChart(byProject, 'Semua proyek masih dalam pagu RAP ✓', function(g){
-          return g.count+' bahan melebihi — terparah: '+g.worst.material_nama;
-        }, 8, function(g){ return {page:'rap_proyek_report', projId:g.worst.project_id}; });
-        document.getElementById('chartB_title').innerHTML = panelTitle('box','Bahan Sering Melebihi','Bahan yang paling sering melewati pagu lintas proyek');
-        var byMaterial = groupOverRows(over, function(r){return r.material_id;}, function(r){return r.material_nama;});
-        document.getElementById('chartB').innerHTML = overGroupChart(byMaterial, 'Belum ada bahan yang melebihi RAP ✓', function(g){
-          return 'melebihi di '+g.count+' proyek — terparah: '+g.worst.project_nama;
-        }, 8, function(g){ return {page:'rap_proyek_report', q:g.name}; });
-      } else {
-        document.getElementById('chartA_title').innerHTML = panelTitle('trending-up','Bahan Melebihi RAP di Proyek Ini','Urut dari persentase pemakaian tertinggi');
-        document.getElementById('chartA').innerHTML = over.length ? over.slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8).map(function(r){
-          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR.MELEBIHI, pct(r.persentase), {page:'rap_proyek_report', projId:r.project_id, q:r.material_nama});
-        }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Proyek ini masih dalam pagu RAP ✓</div>';
-        document.getElementById('chartB_title').innerHTML = panelTitle('box','Pemakaian vs RAP — Semua Bahan','Seluruh bahan di proyek ini, urut dari persentase tertinggi');
-        var allRanked = rapReport.filter(function(r){ return r.persentase!=null; }).slice().sort(function(a,b){return b.persentase-a.persentase;}).slice(0,8);
-        document.getElementById('chartB').innerHTML = allRanked.length ? allRanked.map(function(r){
-          return hbarRow(r.material_nama, null, r.persentase*100, STATUS_BAR_COLOR[r.status]||'#94a3b8', pct(r.persentase), {page:'rap_proyek_report', projId:r.project_id, q:r.material_nama});
-        }).join('') : '<div class="text-center text-sm text-slate-400 py-8">Belum ada RAP yang diisi untuk proyek ini.</div>';
-      }
-
-      var stockPrev=document.getElementById('stockPreview');
-      stockPrev.innerHTML = critical.length ? panel(critical.slice(0,6).map(function(r){
-        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors" title="Buka di Monitor Stok"'+navAttrsHtml({page:'stock', projId:r.project_id, q:r.material_nama})+'>'+
-          '<div><b>'+esc(r.material_nama)+'</b>'+(projId?'':'<div class="text-xs text-slate-400">'+esc(r.project_nama)+'</div>')+'</div>'+
-          badge(r.status==='HABIS'?'danger':'warn', r.status==='HABIS'?'Habis':'Perlu Dikirim')+'</div>';
-      }).join('')) : panel('<div class="text-center text-sm text-slate-400 py-6">Semua stok aman ✓</div>');
-
-      document.getElementById('overTable').innerHTML = overDetailTable(over);
-
-      // Group stale-usage rows by project — one line per project naming
-      // which bahan are affected, so pusat knows exactly who to follow up.
-      var staleRows = stock.filter(function(s){ return s.usage_stale; });
-      var staleMap = {};
-      staleRows.forEach(function(r){
-        if(!staleMap[r.project_id]) staleMap[r.project_id] = {id:r.project_id, name:r.project_nama, items:[]};
-        staleMap[r.project_id].items.push(r.material_nama);
-      });
-      var staleByProject = Object.keys(staleMap).map(function(k){ return staleMap[k]; })
-        .sort(function(a,b){ return b.items.length-a.items.length; });
-      var stalePanel = document.getElementById('staleUsagePanel');
-      stalePanel.innerHTML = staleByProject.length ? staleByProject.map(function(g){
-        var names = g.items.slice(0,4).join(', ') + (g.items.length>4?' +'+(g.items.length-4)+' lagi':'');
-        return '<div class="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0 text-sm gap-3 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-colors" title="Buka Riwayat Transaksi proyek ini"'+navAttrsHtml({page:'riwayat', projId:g.id})+'>'+
-          '<div class="min-w-0"><b>'+esc(g.name)+'</b><div class="text-xs text-slate-400 truncate">'+esc(names)+'</div></div>'+
-          badge('warn', g.items.length+' bahan')+'</div>';
-      }).join('') : '<div class="text-center text-sm text-slate-400 py-6">Semua proyek rutin update Pemakaian ✓</div>';
-      icons();
-    }
+    return apiFetch('/material_stock.php');
+  }).then(function(stockData){
+    stockAll = stockData;
     loadRapReport();
     document.getElementById('dashProj').addEventListener('change', render);
     document.getElementById('dashFrom').addEventListener('change', loadRapReport);
@@ -1067,7 +1179,7 @@ PAGES.dashboard = function(c){
       document.getElementById('dashFrom').value=''; document.getElementById('dashTo').value='';
       loadRapReport();
     };
-  }).catch(function(e){ document.getElementById('statGrid').innerHTML='<div class="col-span-full text-center text-sm text-red-500 py-8">Gagal memuat: '+esc(e.message)+'</div>'; });
+  }).catch(function(e){ document.getElementById('dKpi').innerHTML='<div class="col-span-full text-center text-sm text-red-500 py-8">Gagal memuat: '+esc(e.message)+'</div>'; });
 };
 
 PAGES.proyek = masterPage({
@@ -1208,7 +1320,11 @@ function reportPage(cfg){
         '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span>'+
       '</div>'
     ) : '';
-    c.innerHTML = pageHead(cfg.title, cfg.sub, exportBtnsHtml()) +
+    var CARD_COLS = {2:'lg:grid-cols-2', 3:'lg:grid-cols-3', 4:'lg:grid-cols-4', 5:'lg:grid-cols-5'};
+    var cardsHtml = cfg.statusFilter
+      ? '<div id="stCards" class="grid grid-cols-2 sm:grid-cols-3 '+(CARD_COLS[cfg.statusFilter.options.length]||'')+' gap-3 mb-5"></div>'
+      : '';
+    c.innerHTML = pageHead(cfg.title, cfg.sub, exportBtnsHtml()) + cardsHtml +
       panel(
         '<div class="mb-4">'+rowWhat+rowWhen+'</div>'+
         (cfg.dateFilter && cfg.dateFilter.hint ? '<div class="text-xs text-slate-400 -mt-2 mb-4">'+esc(cfg.dateFilter.hint)+'</div>' : '')+
@@ -1224,7 +1340,32 @@ function reportPage(cfg){
     // on first load so it doesn't stick around on later visits.
     var pending = STATE.pendingFilter; STATE.pendingFilter = null;
     if(pending && pending.q!=null) document.getElementById('q').value = pending.q;
+    function renderCards(){
+      var el = document.getElementById('stCards');
+      if(!el) return;
+      var projId = fv('fProj'), cur = fv('fStatus');
+      var pool = projId ? rows.filter(function(r){ return r.project_id===projId; }) : rows;
+      var counts = {};
+      pool.forEach(function(r){ counts[r.status] = (counts[r.status]||0)+1; });
+      el.innerHTML = cfg.statusFilter.options.map(function(o){
+        var on = cur===o.value;
+        return '<button type="button" data-card="'+esc(o.value)+'" title="Klik untuk menyaring, klik lagi untuk menghapus filter" class="text-left bg-white rounded-2xl border p-4 shadow-sm transition-all hover:shadow-md '+
+          (on ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200')+'">'+
+          '<div class="flex items-center gap-2 text-xs font-semibold text-slate-500"><span class="w-2 h-2 rounded-full shrink-0" style="background:'+(STATUS_BAR_COLOR[o.value]||'#94a3b8')+'"></span>'+esc(o.label)+'</div>'+
+          '<div class="text-2xl font-extrabold text-slate-800 mt-2 tabular-nums">'+(counts[o.value]||0)+'</div>'+
+        '</button>';
+      }).join('');
+      el.querySelectorAll('[data-card]').forEach(function(b){
+        b.onclick = function(){
+          var sel = document.getElementById('fStatus'), v = b.getAttribute('data-card');
+          sel.value = sel.value===v ? '' : v;
+          sel.dispatchEvent(new Event('change'));
+          sel.dispatchEvent(new Event('ss-refresh'));
+        };
+      });
+    }
     function draw(){
+      renderCards();
       var q=fv('q').toLowerCase(), projId=fv('fProj'), statusVal=cfg.statusFilter?fv('fStatus'):'';
       filteredList = rows.filter(function(r){
         if(q && cfg.searchFn(r).toLowerCase().indexOf(q)===-1) return false;
@@ -1233,12 +1374,23 @@ function reportPage(cfg){
         return true;
       });
       var list=filteredList;
+      // Period-only columns (movement inside Dari–Sampai) appear only when a
+      // date is actually chosen; otherwise they are dead "–" columns that
+      // push the status column off-screen. Export follows the same rule.
+      var showPeriod = !!(fv('rpFrom') || fv('rpTo'));
+      var expCols = cfg.columns.filter(function(cl){ return !cl.periodOnly || showPeriod; });
+      var visCols = expCols.filter(function(cl){ return !cl.screenHidden; });
+      var dropIdx = (!showPeriod && cfg.periodExportIdx) ? cfg.periodExportIdx : [];
+      var exportStatus = STATUS_COL==null ? null : STATUS_COL - dropIdx.filter(function(i){ return i<STATUS_COL; }).length;
       document.getElementById('cnt').textContent=list.length+' data';
-      document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+cfg.columns.map(function(cl){ return '<th class="text-left text-xs font-semibold text-slate-500 py-3.5 pr-4 whitespace-nowrap">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
-        '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+cfg.columns.map(function(cl){ return '<td class="py-3 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
-        '<tr><td colspan="'+cfg.columns.length+'" class="text-center text-slate-400 text-sm py-10">'+esc(cfg.emptyMsg)+'</td></tr>')+'</tbody>';
-      bindExportBtns(cfg.filename, cfg.title, cfg.sub, cfg.columns.map(function(cl){ return cl.label; }),
-        function(){ return filteredList.map(cfg.exportRow); }, STATUS_COL);
+      document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+visCols.map(function(cl){ return '<th class="text-left text-xs font-semibold text-slate-500 py-3.5 pr-4 leading-snug">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+        '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+visCols.map(function(cl){ return '<td class="py-3 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
+        '<tr><td colspan="'+visCols.length+'" class="text-center text-slate-400 text-sm py-10">'+esc(cfg.emptyMsg)+'</td></tr>')+'</tbody>';
+      bindExportBtns(cfg.filename, cfg.title, cfg.sub, expCols.map(function(cl){ return cl.label; }),
+        function(){ return filteredList.map(function(r){
+          var row = cfg.exportRow(r);
+          return dropIdx.length ? row.filter(function(_,i){ return dropIdx.indexOf(i)===-1; }) : row;
+        }); }, exportStatus);
     }
     function load(){
       var qs = [];
@@ -1291,8 +1443,8 @@ PAGES.rap_proyek_report = reportPage({
   dateFilter:{hint:'Rentang tanggal hanya menyaring Pemakaian yang dihitung (mis. "pemakaian bulan ini vs pagu total") — Pagu (RAP), Total Masuk, dan % Pagu Didatangkan selalu angka penuh, tidak ikut terpotong oleh tanggal.'},
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
-    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
-    {label:'Satuan', get:function(r){ return esc(r.satuan); }},
+    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.satuan)+'</span>'; }},
+    {label:'Satuan', screenHidden:true, get:function(r){ return esc(r.satuan); }},
     {label:'Pagu (RAP)', get:function(r){ return num0(r.rap_qty); }},
     {label:'Total Masuk', get:function(r){ return num0(r.total_masuk); }},
     {label:'% Pagu Didatangkan', get:function(r){
@@ -1417,12 +1569,12 @@ PAGES.riwayat = function(c){
         pekerjaanList.filter(function(pk){ return pk.project_id===r.project_id; }).map(function(pk){ return '<option value="'+esc(pk.id)+'"'+(pk.id===r.pekerjaan_id?' selected':'')+'>'+esc(pk.nama)+'</option>'; }).join('')+
       '</select></div>')+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal *</label><input id="f_tgl" type="date" value="'+esc(r.tgl)+'" class="'+fieldCls+'"></div>'+
-      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Qty *</label><input id="f_qty" type="number" step="any" min="0" value="'+esc(r.qty)+'" class="'+fieldCls+'"></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Qty *</label>'+numInputHtml('f_qty', r.qty, fieldCls)+'</div>'+
       (isMasuk ? '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">No. Surat Jalan / Nota</label><input id="f_ref" type="text" value="'+esc(r.ref)+'" class="'+fieldCls+'"></div>' : '')+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="f_ket" type="text" value="'+esc(r.ket)+'" class="'+fieldCls+'"></div>'+
       '</div>';
     openModal('Edit '+(isMasuk?'Bahan Masuk':'Pemakaian'), html, function(){
-      var qty = parseFloat(fv('f_qty'));
+      var qty = parseIdNum(fv('f_qty'));
       if(!qty || qty<=0){ toast('Qty wajib diisi dan lebih dari 0.', true); return; }
       var payload = {
         id: id, project_id: fv('f_project_id'), material_id: fv('f_material_id'),
@@ -1476,7 +1628,7 @@ PAGES.stock = reportPage({
   title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan dan perkiraan kapan perlu kirim lagi — metrik RAP (pagu/ambang batas) ada di Analisis RAP per Proyek.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:9,
+  statusCol:9, periodExportIdx:[6,7],
   statusFilter:{options:[
     {value:'AMAN', label:'Aman'}, {value:'MENIPIS', label:'Perlu Dikirim'},
     {value:'HABIS', label:'Stok Habis'}, {value:'DATA_TIDAK_LENGKAP', label:'RAP Belum Diisi'},
@@ -1491,19 +1643,19 @@ PAGES.stock = reportPage({
   emptyMsg:'Belum ada data bahan masuk/pemakaian.',
   columns:[
     {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
-    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b>'; }},
-    {label:'Satuan', get:function(r){ return esc(r.satuan); }},
+    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.satuan)+'</span>'; }},
+    {label:'Satuan', screenHidden:true, get:function(r){ return esc(r.satuan); }},
     {label:'Total Masuk', get:function(r){ return num0(r.total_masuk); }},
     {label:'Total Pemakaian', get:function(r){
       return num0(r.total_keluar)+
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
     {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':''); }},
-    {label:'Masuk Periode Ini', get:function(r){
+    {label:'Masuk Periode Ini', periodOnly:true, get:function(r){
       if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
       return num0(r.masuk_periode);
     }},
-    {label:'Pemakaian Periode Ini', get:function(r){
+    {label:'Pemakaian Periode Ini', periodOnly:true, get:function(r){
       if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
       return num0(r.keluar_periode);
     }},
@@ -1779,7 +1931,7 @@ function renderInputForm(c, mode){
     fieldWrap('Tanggal', '<input type="date" id="f_tgl" value="'+today()+'" class="'+inputCls+'">')+
     fieldWrap('Material', '<select id="f_material" class="'+inputCls+'">'+materialOptions()+'</select>')+
     (isMasuk ? '' : fieldWrap('Pekerjaan (untuk analisis RAP)', '<select id="f_pekerjaan" class="'+inputCls+'">'+pekerjaanOptions()+'</select>'))+
-    fieldWrap('Jumlah (Qty)', '<input type="number" id="f_qty" inputmode="decimal" min="0" step="any" placeholder="0" class="'+inputCls+'">')+
+    fieldWrap('Jumlah (Qty)', numInputHtml('f_qty', '', inputCls, ' placeholder="0"'))+
     (isMasuk ? fieldWrap('No. Surat Jalan / Nota', '<input type="text" id="f_ref" placeholder="Opsional" class="'+inputCls+'">') : '')+
     fieldWrap('Keterangan', '<input type="text" id="f_ket" placeholder="Opsional" class="'+inputCls+'">')+
     '<div class="flex gap-2.5 mt-1">'+
@@ -1802,7 +1954,7 @@ function renderInputForm(c, mode){
 }
 
 function submitInput(mode){
-  var qty = parseFloat(document.getElementById('f_qty').value);
+  var qty = parseIdNum(document.getElementById('f_qty').value);
   var materialId = document.getElementById('f_material').value;
   if(!materialId){ toast('Pilih material.', true); return; }
   if(!qty || qty <= 0){ toast('Isi jumlah (qty) yang valid.', true); return; }
