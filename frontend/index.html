@@ -850,9 +850,38 @@ async function exportPdf(title, sub, headers, rows, opts){
   doc.save(filenameFromTitle(title) + '.pdf');
 }
 
-function exportBtnsHtml(){
-  return '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button> '+
-    '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button>';
+/* Download periods: a preset just sets the page's date filter, so the file
+   always matches what is on screen. "kustom" appears once the dates are typed
+   by hand, so the picker never claims a period that is not applied. */
+function localISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function periodRange(key){
+  var now = new Date(), end = localISO(now);
+  if(key==='hari') return {from:end, to:end};
+  if(key==='minggu'){
+    var mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay()+6)%7));
+    return {from:localISO(mon), to:end};
+  }
+  if(key==='bulan') return {from:localISO(new Date(now.getFullYear(), now.getMonth(), 1)), to:end};
+  return {from:'', to:''};
+}
+function periodLabel(from, to){
+  if(from && to) return from===to ? 'Tanggal '+from : 'Periode '+from+' s/d '+to;
+  if(from) return 'Sejak '+from;
+  if(to) return 'Stok per '+to;
+  return 'Seluruh periode';
+}
+function periodSuffix(from, to){
+  if(from && to) return from===to ? '_'+from : '_'+from+'_sd_'+to;
+  if(to) return '_per_'+to;
+  return '';
+}
+function exportBtnsHtml(periodId){
+  var picker = periodId ? '<select id="'+periodId+'" title="Pilih periode data yang diunduh" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
+      '<option value="semua">Seluruh periode</option><option value="hari">Hari ini</option><option value="minggu">Minggu ini</option><option value="bulan">Bulan ini</option>'+
+      '<option value="kustom" hidden>Rentang manual</option></select>' : '';
+  return '<div class="flex items-center gap-2 flex-wrap justify-end">'+picker+
+    '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button>'+
+    '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button></div>';
 }
 function bindExportBtns(filename, title, sub, headers, rowsFn, statusCols){
   var sc = statusCols==null ? [] : (Array.isArray(statusCols) ? statusCols : [statusCols]);
@@ -1085,7 +1114,7 @@ PAGES.dashboard = function(c){
   var dateInput = 'px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100';
   c.innerHTML = pageHead('Dashboard',
       'Kondisi material seluruh proyek hari ini — deteksi dini untuk pengambilan keputusan. Klik angka atau status untuk melihat detailnya.',
-      exportBtnsHtml()) +
+      exportBtnsHtml('dPeriod')) +
     '<div class="flex flex-wrap items-center gap-2.5 mb-2">'+
       '<input type="date" id="dashFrom" title="Dari tanggal (pemakaian vs RAP)" class="'+dateInput+'">'+
       '<span class="text-slate-300 text-sm">–</span>'+
@@ -1185,7 +1214,7 @@ PAGES.dashboard = function(c){
   }
   document.getElementById('dSumQ').addEventListener('input', function(){ renderSummary(); bindSummaryExport(); });
   function bindSummaryExport(){
-    bindExportBtns('Dashboard_Ringkasan', 'Ringkasan Dashboard Material & Stok', exportSub, ['No','Nama Proyek','Status Stok','Status RAP'],
+    bindExportBtns('Dashboard_Ringkasan'+periodSuffix(fv('dashFrom'), fv('dashTo')), 'Ringkasan Dashboard Material & Stok', exportSub+' · '+periodLabel(fv('dashFrom'), fv('dashTo')), ['No','Nama Proyek','Status Stok','Status RAP'],
       function(){ return summaryView().map(function(r, i){
         return [i+1, r.nama, r.stock?r.stock.status:'DATA_TIDAK_LENGKAP', r.rap?r.rap.status:'DATA_TIDAK_LENGKAP'];
       }); }, [2,3]);
@@ -1313,10 +1342,18 @@ PAGES.dashboard = function(c){
     stockAll = stockData;
     loadRapReport();
     document.getElementById('dashProj').addEventListener('change', render);
-    document.getElementById('dashFrom').addEventListener('change', loadRapReport);
-    document.getElementById('dashTo').addEventListener('change', loadRapReport);
+    var setDashPeriod = function(v){ document.getElementById('dPeriod').value = v; };
+    document.getElementById('dashFrom').addEventListener('change', function(){ setDashPeriod('kustom'); loadRapReport(); });
+    document.getElementById('dashTo').addEventListener('change', function(){ setDashPeriod('kustom'); loadRapReport(); });
+    document.getElementById('dPeriod').onchange = function(){
+      var r = periodRange(this.value);
+      document.getElementById('dashFrom').value = r.from;
+      document.getElementById('dashTo').value = r.to;
+      loadRapReport();
+    };
     document.getElementById('dashDateReset').onclick = function(){
       document.getElementById('dashFrom').value=''; document.getElementById('dashTo').value='';
+      setDashPeriod('semua');
       loadRapReport();
     };
   }).catch(function(e){ document.getElementById('dKpi').innerHTML='<div class="col-span-full text-center text-sm text-red-500 py-8">Gagal memuat: '+esc(e.message)+'</div>'; });
@@ -1475,7 +1512,7 @@ function reportPage(cfg){
       '<div class="grid md:grid-cols-2 gap-x-6 gap-y-3 mt-4">'+
         cfg.guide.map(function(g){ return '<div><div class="text-xs font-bold text-slate-700">'+esc(g.t)+'</div><div class="text-xs text-slate-500 leading-relaxed mt-0.5">'+esc(g.d)+'</div></div>'; }).join('')+
       '</div></details>' : '';
-    c.innerHTML = pageHead(cfg.title, cfg.sub, exportBtnsHtml()) + cardsHtml + guideHtml +
+    c.innerHTML = pageHead(cfg.title, cfg.sub, exportBtnsHtml(cfg.dateFilter ? 'exPeriod' : null)) + cardsHtml + guideHtml +
       panel(
         '<div class="mb-4">'+rowWhat+rowWhen+'</div>'+
         (cfg.dateFilter && cfg.dateFilter.hint ? '<div class="text-xs text-slate-400 -mt-2 mb-4">'+esc(cfg.dateFilter.hint)+'</div>' : '')+
@@ -1537,7 +1574,9 @@ function reportPage(cfg){
       document.getElementById('tbl').innerHTML='<thead><tr class="border-b border-slate-200">'+visCols.map(function(cl){ return '<th class="text-left text-xs font-semibold text-slate-500 py-3.5 pr-4 leading-snug">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
         '<tbody>'+(list.length?list.map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-slate-50">'+visCols.map(function(cl){ return '<td class="py-3 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
         '<tr><td colspan="'+visCols.length+'" class="text-center text-slate-400 text-sm py-10">'+esc(cfg.emptyMsg)+'</td></tr>')+'</tbody>';
-      bindExportBtns(cfg.filename, cfg.title, cfg.sub, expCols.map(function(cl){ return cl.label; }),
+      var fromNow = fv('rpFrom'), toNow = fv('rpTo');
+      bindExportBtns(cfg.filename+(cfg.dateFilter?periodSuffix(fromNow, toNow):''), cfg.title,
+        cfg.dateFilter ? cfg.sub+' · '+periodLabel(fromNow, toNow) : cfg.sub, expCols.map(function(cl){ return cl.label; }),
         function(){ return filteredList.map(function(r){
           var row = cfg.exportRow(r);
           return dropIdx.length ? row.filter(function(_,i){ return dropIdx.indexOf(i)===-1; }) : row;
@@ -1570,11 +1609,19 @@ function reportPage(cfg){
       document.getElementById('fProj').addEventListener('change',draw);
       if(cfg.statusFilter) document.getElementById('fStatus').addEventListener('change',draw);
       if(cfg.dateFilter){
-        if(!cfg.dateFilter.single) document.getElementById('rpFrom').addEventListener('change', load);
-        document.getElementById('rpTo').addEventListener('change', load);
+        var setPeriod = function(v){ document.getElementById('exPeriod').value = v; };
+        document.getElementById('rpFrom').addEventListener('change', function(){ setPeriod('kustom'); load(); });
+        document.getElementById('rpTo').addEventListener('change', function(){ setPeriod('kustom'); load(); });
+        document.getElementById('exPeriod').onchange = function(){
+          var r = periodRange(this.value);
+          document.getElementById('rpFrom').value = r.from;
+          document.getElementById('rpTo').value = r.to;
+          load();
+        };
         document.getElementById('rpDateReset').onclick = function(){
-          if(!cfg.dateFilter.single) document.getElementById('rpFrom').value='';
+          document.getElementById('rpFrom').value='';
           document.getElementById('rpTo').value='';
+          setPeriod('semua');
           load();
         };
       }
