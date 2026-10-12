@@ -92,13 +92,53 @@ $stmt = db()->prepare(
      $scopeSql
      ORDER BY p.nama, m.nama"
 );
+// Physical counts: the last two per project+material, as of tgl_to.
+$countWhere = [];
+$countParams = [];
+if ($tglTo) { $countWhere[] = 'tgl <= ?'; $countParams[] = $tglTo; }
+if ($scope !== null) {
+    $countWhere[] = 'project_id IN (' . implode(',', array_fill(0, count($scope), '?')) . ')';
+    $countParams = array_merge($countParams, $scope);
+}
+$countSql = 'SELECT project_id, material_id, tgl, qty FROM stock_counts' . ($countWhere ? ' WHERE ' . implode(' AND ', $countWhere) : '') . ' ORDER BY tgl';
+$countStmt = db()->prepare($countSql);
+$countStmt->execute($countParams);
+$countsByPm = [];
+foreach ($countStmt->fetchAll() as $c) {
+    $list = &$countsByPm[$c['project_id'].'|'.$c['material_id']];
+    $list[] = ['tgl' => $c['tgl'], 'qty' => (float)$c['qty']];
+    if (count($list) > 2) array_shift($list);
+    unset($list);
+}
+
 // Bind order must match placeholder order left-to-right in the SQL above.
 $bindParams = [];
 if ($tglTo) $bindParams[] = $tglTo;     // masuk subquery
 if ($tglTo) $bindParams[] = $tglTo;     // keluar subquery
 $bindParams = array_merge($bindParams, $periodParams, $periodParams); // masuk_p, keluar_p
 $stmt->execute(array_merge($bindParams, $params));
-$out = array_map(function ($r) use ($tglTo) {
+/* Physical usage between two counts: what was there at the earlier count,
+   plus what arrived since, minus what is there now. Compared with what was
+   recorded as Pemakaian in the same window, the gap is material that left the
+   site without being recorded (loss, theft, or simply unlogged use). */
+function count_window(string $pid, string $mid, array $c1, array $c2): array {
+    $sum = function (string $table) use ($pid, $mid, $c1, $c2): float {
+        $st = db()->prepare("SELECT COALESCE(SUM(qty),0) FROM $table WHERE project_id = ? AND material_id = ? AND tgl > ? AND tgl <= ?");
+        $st->execute([$pid, $mid, $c1['tgl'], $c2['tgl']]);
+        return (float)$st->fetchColumn();
+    };
+    $masuk = $sum('material_receipts');
+    $tercatat = $sum('material_usage');
+    $fisik = $c1['qty'] + $masuk - $c2['qty'];
+    $days = max(1, (strtotime($c2['tgl']) - strtotime($c1['tgl'])) / 86400);
+    return [
+        'rate' => max(0, $fisik) / $days,
+        'tidak_tercatat' => $fisik - $tercatat,
+        'days' => $days,
+    ];
+}
+
+$out = array_map(function ($r) use ($tglTo, $countsByPm) {
     $stok = (float)$r['stok'];
     $pemakaian = (float)$r['total_keluar'];
     $hasRap = $r['rap_qty'] !== null;
@@ -136,21 +176,40 @@ $out = array_map(function ($r) use ($tglTo) {
     // current stock. Deliberately not shown when usage is stale/absent
     // — a rate computed from almost no data, or data that stopped
     // updating, would just be a confident-looking wrong number.
-    $forecastDays = null;
+    $anchor = $tglTo ?: date('Y-m-d');
     $dailyRate = null;
+    $rateSource = null;
     if (!$usageStale && $pemakaian > 0 && $r['last_keluar_tgl'] !== null && $r['first_keluar_tgl'] !== null) {
-        $spanDays = (strtotime($r['last_keluar_tgl']) - strtotime($r['first_keluar_tgl'])) / 86400 + 1;
+        // Measured up to the snapshot date, not to the last entry: one
+        // Pemakaian logged 9 days ago must not look like a whole day's rate.
+        $spanDays = (strtotime($anchor) - strtotime($r['first_keluar_tgl'])) / 86400 + 1;
         $dailyRate = $pemakaian / max(1, $spanDays);
-        if ($dailyRate > 0 && $stok > 0) {
-            $forecastDays = (int)floor($stok / $dailyRate);
+        $rateSource = 'TERCATAT';
+    }
+    // A physical count pair beats recorded usage when it is recent: it is what
+    // was really consumed, so it still works when Pemakaian is never logged.
+    $counts = $countsByPm[$r['project_id'].'|'.$r['material_id']] ?? [];
+    $window = null;
+    if (count($counts) === 2) {
+        $window = count_window($r['project_id'], $r['material_id'], $counts[0], $counts[1]);
+        $age = (strtotime($anchor) - strtotime($counts[1]['tgl'])) / 86400;
+        if ($window['rate'] > 0 && $age <= 14) {
+            $dailyRate = $window['rate'];
+            $rateSource = 'FISIK';
         }
     }
+    $forecastDays = ($dailyRate !== null && $dailyRate > 0 && $stok > 0) ? (int)floor($stok / $dailyRate) : null;
     $r['daily_usage_rate'] = $dailyRate;
+    $r['rate_source'] = $rateSource;
     $r['forecast_days'] = $forecastDays;
+    $last = $counts ? end($counts) : null;
+    $r['stok_fisik'] = $last ? $last['qty'] : null;
+    $r['stok_fisik_tgl'] = $last ? $last['tgl'] : null;
+    $r['tidak_tercatat'] = $window ? round($window['tidak_tercatat'], 3) : null;
     // Anchor the projection to the stock snapshot date (tgl_to), not
     // always "today" — if viewing stock as of a past date, the forecast
     // is "from that date forward", not from right now.
-    $forecastAnchor = $tglTo ?: date('Y-m-d');
+    $forecastAnchor = $anchor;
     $r['forecast_date'] = $forecastDays !== null ? date('Y-m-d', strtotime("$forecastAnchor +$forecastDays days")) : null;
     unset($r['first_keluar_tgl']);
     // Reorder point: order again when stock falls to the cover needed to

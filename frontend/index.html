@@ -963,15 +963,18 @@ var PAGES={};
 
 /* ---------------- dashboard (Power-BI style: KPI + charts + drilldown, filterable per proyek) ---------------- */
 function statCard(icon, colorCls, label, value, sub, gotoPage){
-  var clickable = gotoPage ? ' cursor-pointer hover:shadow-md hover:border-slate-300 transition-shadow' : '';
+  var iconTxt = (colorCls||'').split(' ').filter(function(c){ return c.indexOf('text-')===0; }).join(' ') || 'text-slate-500';
+  var clickable = gotoPage ? ' cursor-pointer hover:shadow-md hover:border-slate-300' : '';
   var onclick = gotoPage ? ' onclick="go(\''+gotoPage+'\')"' : '';
-  return '<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-start gap-4'+clickable+'"'+onclick+'>'+
-    '<div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 '+colorCls+'"><i data-lucide="'+icon+'" class="w-5 h-5"></i></div>'+
-    '<div><div class="text-2xl font-extrabold text-slate-800 leading-tight">'+value+'</div>'+
-    '<div class="text-sm text-slate-500 mt-0.5">'+esc(label)+'</div>'+
-    (sub?'<div class="text-xs text-slate-400 mt-1">'+sub+'</div>':'')+
-    (gotoPage?'<div class="text-[11px] font-semibold text-indigo-600 mt-1.5 flex items-center gap-1">Lihat detail <i data-lucide="arrow-right" class="w-3 h-3"></i></div>':'')+
-    '</div></div>';
+  return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col transition-all'+clickable+'"'+onclick+'>'+
+    '<div class="flex items-start justify-between gap-3">'+
+      '<div class="text-sm font-semibold text-slate-600 leading-snug">'+esc(label)+'</div>'+
+      '<i data-lucide="'+icon+'" class="w-4 h-4 shrink-0 '+iconTxt+'"></i>'+
+    '</div>'+
+    '<div class="text-3xl font-extrabold text-slate-900 tabular-nums leading-none mt-4">'+value+'</div>'+
+    (sub?'<div class="text-xs text-slate-500 mt-2 leading-relaxed">'+sub+'</div>':'')+
+    (gotoPage?'<div class="text-xs font-semibold text-indigo-600 mt-3 flex items-center gap-1">Lihat detail <i data-lucide="arrow-right" class="w-3 h-3"></i></div>':'')+
+  '</div>';
 }
 function panelTitle(icon, label, sub){
   return '<h2 class="text-sm font-bold text-slate-600 mb-0.5 flex items-center gap-2"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+esc(label)+'</h2>'+
@@ -1497,10 +1500,10 @@ function reportPage(cfg){
       pool.forEach(function(r){ counts[r.status] = (counts[r.status]||0)+1; });
       el.innerHTML = cfg.statusFilter.options.map(function(o){
         var on = cur===o.value;
-        return '<button type="button" data-card="'+esc(o.value)+'" title="Klik untuk menyaring, klik lagi untuk menghapus filter" class="flex flex-col items-center justify-center text-center bg-white rounded-2xl border px-3 py-4 shadow-sm transition-all hover:shadow-md '+
+        return '<button type="button" data-card="'+esc(o.value)+'" title="Klik untuk menyaring, klik lagi untuk menghapus filter" class="flex flex-col items-start text-left bg-white rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md '+
           (on ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200')+'">'+
-          '<div class="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 leading-tight"><span class="w-2 h-2 rounded-full shrink-0" style="background:'+(STATUS_BAR_COLOR[o.value]||'#94a3b8')+'"></span>'+esc(o.label)+'</div>'+
-          '<div class="text-2xl font-extrabold text-slate-800 mt-1.5 leading-none tabular-nums">'+(counts[o.value]||0)+'</div>'+
+          '<div class="flex items-center gap-2 text-sm font-semibold text-slate-600 leading-snug"><span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:'+(STATUS_BAR_COLOR[o.value]||'#94a3b8')+'"></span>'+esc(o.label)+'</div>'+
+          '<div class="text-3xl font-extrabold text-slate-900 mt-4 leading-none tabular-nums">'+(counts[o.value]||0)+'</div>'+
         '</button>';
       }).join('');
       el.querySelectorAll('[data-card]').forEach(function(b){
@@ -1792,7 +1795,8 @@ PAGES.stock = reportPage({
   statusCol:10, periodExportIdx:[7,8],
   guide:[
     {t:'Total Masuk, Pemakaian, Sisa Stok', d:'Saldo fisik di lapangan: barang yang sudah datang, sudah terpakai, dan yang masih ada sekarang.'},
-    {t:'Pesan Ulang Saat', d:'Begitu sisa stok sama atau di bawah angka ini, pesan lagi. Dihitung dari pemakaian harian × 10 hari (waktu kirim + cadangan), sama untuk semua bahan.'},
+    {t:'Pesan Ulang Saat', d:'Begitu sisa stok sama atau di bawah angka ini, pesan lagi. Laju harian × 10 hari (waktu kirim + cadangan). Laju diambil dari hitungan fisik bila ada, kalau tidak dari pemakaian yang tercatat.'},
+    {t:'Fisik & tidak tercatat', d:'Angka fisik adalah hitungan terakhir di lapangan. ⚠ berarti material keluar dari lapangan lebih banyak daripada yang tercatat sebagai pemakaian di antara dua hitungan.'},
     {t:'Perkiraan Habis', d:'Perkiraan tanggal stok habis jika pemakaian tetap seperti biasa. Tidak tampil jika pemakaian belum cukup dicatat.'},
     {t:'Status', d:'Perlu Dikirim = stok di bawah titik pesan ulang. Belum Ada Hitungan = belum ada pemakaian terbaru untuk menghitung laju, jadi tidak ada peringatan palsu. Stok Habis = stok nol.'},
     {t:'Tanda ⚠', d:'Bahan sudah masuk tapi pemakaiannya lama tidak diupdate, jadi sisa stok kemungkinan lebih kecil dari yang tercatat.'},
@@ -1819,10 +1823,19 @@ PAGES.stock = reportPage({
       return num0(r.total_keluar)+
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
-    {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':''); }},
+    {label:'Sisa Stok', get:function(r){
+      var fisik = r.stok_fisik!=null
+        ? '<div class="text-xs text-slate-400 mt-0.5">fisik '+num0(r.stok_fisik)+' · '+esc(r.stok_fisik_tgl)+'</div>'
+        : '';
+      var hilang = (r.tidak_tercatat!=null && r.tidak_tercatat>0.001)
+        ? '<div class="text-xs font-semibold text-red-600 mt-0.5" title="Material keluar dari lapangan tetapi tidak tercatat sebagai pemakaian">⚠ '+num0(r.tidak_tercatat)+' tidak tercatat</div>'
+        : '';
+      return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':'')+fisik+hilang;
+    }},
     {label:'Pesan Ulang Saat', get:function(r){
       if(r.reorder_point==null) return '<span class="text-slate-300 italic" title="Butuh pemakaian terbaru atau hitungan sisa stok untuk menghitung">belum ada hitungan</span>';
-      return '<b class="text-slate-800">'+num0(r.reorder_point)+'</b> <span class="text-xs text-slate-400" title="pemakaian '+num0(r.daily_usage_rate)+'/hari × '+r.reorder_cover_hari+' hari">dari pemakaian</span>';
+      var src = r.rate_source==='FISIK' ? 'dari hitungan fisik' : 'dari pemakaian';
+      return '<b class="text-slate-800">'+num0(r.reorder_point)+'</b> <span class="text-xs text-slate-400" title="laju '+num0(r.daily_usage_rate)+'/hari × '+r.reorder_cover_hari+' hari">'+src+'</span>';
     }},
     {label:'Masuk Periode Ini', periodOnly:true, get:function(r){
       if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
@@ -2126,6 +2139,8 @@ function renderInputForm(c, mode){
     fieldWrap('Material', '<select id="f_material" class="'+inputCls+'">'+materialOptions()+'</select>')+
     (isMasuk ? '' : fieldWrap('Pekerjaan (untuk analisis RAP)', '<select id="f_pekerjaan" class="'+inputCls+'">'+pekerjaanOptions()+'</select>'))+
     fieldWrap('Jumlah (Qty)', numInputHtml('f_qty', '', inputCls, ' placeholder="0"'))+
+    fieldWrap('Sisa fisik sekarang (opsional)', numInputHtml('f_fisik', '', inputCls, ' placeholder="kosongkan jika tidak dihitung"'))+
+    '<p class="-mt-3 mb-4 text-xs text-slate-400 leading-relaxed">Isi bila hari ini sempat dihitung. Sistem memakai hitungan ini untuk mengetahui pemakaian yang sebenarnya, termasuk yang belum dicatat.</p>'+
     (isMasuk ? fieldWrap('No. Surat Jalan / Nota', '<input type="text" id="f_ref" placeholder="Opsional" class="'+inputCls+'">') : '')+
     fieldWrap('Keterangan', '<input type="text" id="f_ket" placeholder="Opsional" class="'+inputCls+'">')+
     '<div class="flex gap-2.5 mt-1">'+
@@ -2143,6 +2158,7 @@ function renderInputForm(c, mode){
   enhanceSelect(document.getElementById('f_material'));
   if(!isMasuk) enhanceSelect(document.getElementById('f_pekerjaan'));
   enhanceClearable(document.getElementById('f_qty'));
+  enhanceClearable(document.getElementById('f_fisik'));
   if(isMasuk) enhanceClearable(document.getElementById('f_ref'));
   enhanceClearable(document.getElementById('f_ket'));
 }
@@ -2178,15 +2194,27 @@ function submitInput(mode){
 
   var matLabel = (STATE.materials.find(function(m){ return m.id===materialId; })||{}).nama || materialId;
   var label = (mode==='masuk'?'Bahan Masuk':'Pemakaian')+' · '+matLabel+' · '+fmtNum(qty);
+  var fisikRaw = document.getElementById('f_fisik').value;
+  var fisik = fisikRaw.trim() ? parseIdNum(fisikRaw) : NaN;
+  var countItem = Number.isNaN(fisik) || fisik < 0 ? null : {
+    endpoint:'/stock_counts.php',
+    payload:{id:'sc_'+STATE.projectId+'_'+materialId+'_'+payload.tgl, project_id:STATE.projectId, material_id:materialId, tgl:payload.tgl, qty:fisik, ket:''},
+    label:'Hitung fisik · '+matLabel+' · '+fmtNum(fisik)
+  };
   apiFetch(endpoint, {method:'POST', body:JSON.stringify(payload)})
     .then(function(){
       toast('Tersimpan.');
-      renderTab();
-      flushOutbox();
+      if(countItem){
+        return apiFetch(countItem.endpoint, {method:'POST', body:JSON.stringify(countItem.payload)}).catch(function(e){
+          toast(e.status===403 ? 'Hitungan fisik hari ini sudah tercatat. Koreksi lewat Admin Pusat.' : 'Hitungan fisik belum tersimpan: '+e.message, true);
+        });
+      }
     })
+    .then(function(){ renderTab(); flushOutbox(); })
     .catch(function(e){
       if(e.network){
         outboxAdd({endpoint:endpoint, payload:payload, label:label, queuedAt:Date.now()});
+        if(countItem) outboxAdd({endpoint:countItem.endpoint, payload:countItem.payload, label:countItem.label, queuedAt:Date.now()});
         toast('Tidak ada sinyal. Data disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
         renderTab();
       } else {
