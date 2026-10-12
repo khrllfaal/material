@@ -2113,7 +2113,7 @@ function materialOptions(selected){
   // notice could submit real data against the wrong bahan.
   return '<option value="">— Pilih Bahan —</option>' + list.map(function(m){
     return '<option value="'+esc(m.id)+'"'+(m.id===selected?' selected':'')+'>'+esc(m.nama)+' ('+esc(m.satuan)+')</option>';
-  }).join('');
+  }).join('') + '<option value="__new__">+ Bahan belum ada, tambah baru</option>';
 }
 function pekerjaanOptions(selected){
   var list = pekerjaanForProject();
@@ -2136,11 +2136,9 @@ function renderInputForm(c, mode){
       '<h3 class="font-bold text-[15px]">'+(isMasuk?'Catat Bahan Masuk':'Catat Pemakaian Bahan')+'</h3>'+
     '</div>'+
     fieldWrap('Tanggal', '<input type="date" id="f_tgl" value="'+today()+'" class="'+inputCls+'">')+
-    fieldWrap('Material', '<select id="f_material" class="'+inputCls+'">'+materialOptions()+'</select>')+
+    fieldWrap('Material', '<select id="f_material" class="'+inputCls+'">'+materialOptions(STATE.pendingMaterial)+'</select>')+
     (isMasuk ? '' : fieldWrap('Pekerjaan (untuk analisis RAP)', '<select id="f_pekerjaan" class="'+inputCls+'">'+pekerjaanOptions()+'</select>'))+
     fieldWrap('Jumlah (Qty)', numInputHtml('f_qty', '', inputCls, ' placeholder="0"'))+
-    fieldWrap('Sisa fisik sekarang (opsional)', numInputHtml('f_fisik', '', inputCls, ' placeholder="kosongkan jika tidak dihitung"'))+
-    '<p class="-mt-3 mb-4 text-xs text-slate-400 leading-relaxed">Isi bila hari ini sempat dihitung. Sistem memakai hitungan ini untuk mengetahui pemakaian yang sebenarnya, termasuk yang belum dicatat.</p>'+
     (isMasuk ? fieldWrap('No. Surat Jalan / Nota', '<input type="text" id="f_ref" placeholder="Opsional" class="'+inputCls+'">') : '')+
     fieldWrap('Keterangan', '<input type="text" id="f_ket" placeholder="Opsional" class="'+inputCls+'">')+
     '<div class="flex gap-2.5 mt-1">'+
@@ -2155,10 +2153,13 @@ function renderInputForm(c, mode){
   // over, needs an explicit way out that doesn't require touching every
   // field — mirrors the "Batal" button every desktop modal already has.
   document.getElementById('f_cancel').onclick = function(){ renderInputForm(c, mode); };
+  STATE.pendingMaterial = null;
   enhanceSelect(document.getElementById('f_material'));
+  document.getElementById('f_material').addEventListener('change', function(){
+    if(this.value === '__new__'){ this.value = ''; this.dispatchEvent(new Event('ss-refresh')); openNewMaterial(mode); }
+  });
   if(!isMasuk) enhanceSelect(document.getElementById('f_pekerjaan'));
   enhanceClearable(document.getElementById('f_qty'));
-  enhanceClearable(document.getElementById('f_fisik'));
   if(isMasuk) enhanceClearable(document.getElementById('f_ref'));
   enhanceClearable(document.getElementById('f_ket'));
 }
@@ -2194,27 +2195,15 @@ function submitInput(mode){
 
   var matLabel = (STATE.materials.find(function(m){ return m.id===materialId; })||{}).nama || materialId;
   var label = (mode==='masuk'?'Bahan Masuk':'Pemakaian')+' · '+matLabel+' · '+fmtNum(qty);
-  var fisikRaw = document.getElementById('f_fisik').value;
-  var fisik = fisikRaw.trim() ? parseIdNum(fisikRaw) : NaN;
-  var countItem = Number.isNaN(fisik) || fisik < 0 ? null : {
-    endpoint:'/stock_counts.php',
-    payload:{id:'sc_'+STATE.projectId+'_'+materialId+'_'+payload.tgl, project_id:STATE.projectId, material_id:materialId, tgl:payload.tgl, qty:fisik, ket:''},
-    label:'Hitung fisik · '+matLabel+' · '+fmtNum(fisik)
-  };
   apiFetch(endpoint, {method:'POST', body:JSON.stringify(payload)})
     .then(function(){
       toast('Tersimpan.');
-      if(countItem){
-        return apiFetch(countItem.endpoint, {method:'POST', body:JSON.stringify(countItem.payload)}).catch(function(e){
-          toast(e.status===403 ? 'Hitungan fisik hari ini sudah tercatat. Koreksi lewat Admin Pusat.' : 'Hitungan fisik belum tersimpan: '+e.message, true);
-        });
-      }
+      renderTab();
+      flushOutbox();
     })
-    .then(function(){ renderTab(); flushOutbox(); })
     .catch(function(e){
       if(e.network){
         outboxAdd({endpoint:endpoint, payload:payload, label:label, queuedAt:Date.now()});
-        if(countItem) outboxAdd({endpoint:countItem.endpoint, payload:countItem.payload, label:countItem.label, queuedAt:Date.now()});
         toast('Tidak ada sinyal. Data disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
         renderTab();
       } else {
@@ -2222,6 +2211,36 @@ function submitInput(mode){
       }
     })
     .finally(function(){ if(btn){ btn.disabled=false; btn.textContent = mode==='masuk'?'Simpan Bahan Masuk':'Simpan Pemakaian'; } });
+}
+
+/* Admin Lapangan adds a bahan that Master Bahan does not have yet. Only the
+   nama and satuan are typed; the kode is assigned by the server. The new bahan
+   is selected straight away in the form that was open. */
+function openNewMaterial(mode){
+  openModal('Tambah Bahan Baru',
+    '<div class="space-y-4">'+
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-500">Kode bahan dibuat otomatis oleh sistem.</div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Nama bahan *</label><input id="nb_nama" type="text" autocomplete="off" class="'+inputCls+'" placeholder="mis. Semen Tiga Roda"></div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Satuan *</label><input id="nb_satuan" type="text" autocomplete="off" class="'+inputCls+'" placeholder="mis. sak, btg, m3, kg"></div>'+
+    '</div>',
+    function(){
+      var nama = fv('nb_nama'), satuan = fv('nb_satuan');
+      if(!nama || !satuan){ toast('Nama dan satuan wajib diisi.', true); return; }
+      apiFetch('/materials_quick.php', {method:'POST', body:JSON.stringify({nama:nama, satuan:satuan})})
+        .then(function(m){
+          STATE.materials.push(m);
+          STATE.materials.sort(function(a,b){ return a.nama.localeCompare(b.nama); });
+          STATE.pendingMaterial = m.id;
+          closeModal();
+          toast('Bahan "'+m.nama+'" ditambahkan.');
+          renderTab();
+        })
+        .catch(function(e){
+          toast(e.network ? 'Tambah bahan baru butuh sinyal. Coba lagi saat ada sinyal.' : e.message, true);
+        });
+    });
+  enhanceClearable(document.getElementById('nb_nama'));
+  enhanceClearable(document.getElementById('nb_satuan'));
 }
 
 function statusBadge(status){
