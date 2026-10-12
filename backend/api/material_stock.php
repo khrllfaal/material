@@ -2,19 +2,21 @@
 declare(strict_types=1);
 require_once __DIR__ . '/helpers.php';
 
+// Days of stock to keep on hand before reordering: delivery time plus a
+// safety buffer, one company-wide value so nobody has to fill it per bahan.
+const REORDER_COVER_DAYS = 10;
+
 /**
  * Read-only "minimarket inventory" view: current stock per project +
  * material (masuk - keluar) against a reorder point, so pusat can see
  * at a glance which projects need a resupply without opening every
  * project one by one.
  *
- * The reorder point is derived entirely from RAP, never typed in: when
- * the project has a RAP Bahan budget for this material, the threshold
- * is "remaining need" (rap_qty - total pemakaian so far) — stock below
- * that means there isn't enough on site to finish the budgeted work.
- * When no RAP entry exists yet, there is no basis to call stock
- * low/sufficient, so the row is flagged DATA_TIDAK_LENGKAP instead of
- * guessing — the fix is to fill in RAP per Proyek, not a manual number.
+ * Reorder point (titik pesan ulang) = pemakaian harian x (lead time + safety
+ * hari), both set per bahan in Master Bahan. Stock at or below it means
+ * "order now". Without usable usage history the point falls back to the
+ * remaining RAP need, and the response says which basis was used. When there
+ * is no RAP either, the row is flagged DATA_TIDAK_LENGKAP instead of guessed.
  *
  * Date filtering here is deliberately not a simple [from, to] window on
  * everything: "Sisa Stok" is a running balance, so bounding it with a
@@ -151,6 +153,21 @@ $out = array_map(function ($r) use ($tglTo) {
     $forecastAnchor = $tglTo ?: date('Y-m-d');
     $r['forecast_date'] = $forecastDays !== null ? date('Y-m-d', strtotime("$forecastAnchor +$forecastDays days")) : null;
     unset($r['first_keluar_tgl']);
+    // Reorder point: order again when stock falls to the cover needed to
+    // survive delivery time plus a safety buffer, at the observed daily usage.
+    // With no usable usage history, fall back to remaining RAP need and say so.
+    $reorderPoint = null;
+    $reorderBasis = null;
+    if ($dailyRate !== null && $dailyRate > 0) {
+        $reorderPoint = $dailyRate * REORDER_COVER_DAYS;
+        $reorderBasis = 'PEMAKAIAN';
+    } elseif ($hasRap) {
+        $reorderPoint = $sisaKebutuhan;
+        $reorderBasis = 'RAP';
+    }
+    $r['reorder_point'] = $reorderPoint;
+    $r['reorder_basis'] = $reorderBasis;
+    $r['reorder_cover_hari'] = REORDER_COVER_DAYS;
     // A row with Pagu RAP but zero Bahan Masuk and zero Pemakaian (e.g.
     // right after the one receipt that created it gets corrected/deleted,
     // or a proyek whose material simply hasn't arrived yet) is not the
@@ -161,7 +178,7 @@ $out = array_map(function ($r) use ($tglTo) {
     if ($totalMasuk <= 0 && $pemakaian <= 0) $status = 'BELUM_ADA_TRANSAKSI';
     elseif ($stok <= 0) $status = 'HABIS';
     elseif (!$hasRap) $status = 'DATA_TIDAK_LENGKAP';
-    elseif ($stok <= $sisaKebutuhan) $status = 'MENIPIS';
+    elseif ($reorderPoint !== null && $stok <= $reorderPoint) $status = 'MENIPIS';
     else $status = 'AMAN';
     $r['status'] = $status;
     return $r;
