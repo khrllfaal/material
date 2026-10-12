@@ -155,18 +155,10 @@ $out = array_map(function ($r) use ($tglTo) {
     unset($r['first_keluar_tgl']);
     // Reorder point: order again when stock falls to the cover needed to
     // survive delivery time plus a safety buffer, at the observed daily usage.
-    // With no usable usage history, fall back to remaining RAP need and say so.
-    $reorderPoint = null;
-    $reorderBasis = null;
-    if ($dailyRate !== null && $dailyRate > 0) {
-        $reorderPoint = $dailyRate * REORDER_COVER_DAYS;
-        $reorderBasis = 'PEMAKAIAN';
-    } elseif ($hasRap) {
-        $reorderPoint = $sisaKebutuhan;
-        $reorderBasis = 'RAP';
-    }
+    // Without a current usage rate there is no honest reorder point: pagu is a
+    // budget, not a consumption rate, so it is never used as a stand-in.
+    $reorderPoint = ($dailyRate !== null && $dailyRate > 0) ? $dailyRate * REORDER_COVER_DAYS : null;
     $r['reorder_point'] = $reorderPoint;
-    $r['reorder_basis'] = $reorderBasis;
     $r['reorder_cover_hari'] = REORDER_COVER_DAYS;
     // A row with Pagu RAP but zero Bahan Masuk and zero Pemakaian (e.g.
     // right after the one receipt that created it gets corrected/deleted,
@@ -178,7 +170,8 @@ $out = array_map(function ($r) use ($tglTo) {
     if ($totalMasuk <= 0 && $pemakaian <= 0) $status = 'BELUM_ADA_TRANSAKSI';
     elseif ($stok <= 0) $status = 'HABIS';
     elseif (!$hasRap) $status = 'DATA_TIDAK_LENGKAP';
-    elseif ($reorderPoint !== null && $stok <= $reorderPoint) $status = 'MENIPIS';
+    elseif ($reorderPoint === null) $status = 'BELUM_ADA_HITUNGAN';
+    elseif ($stok <= $reorderPoint) $status = 'MENIPIS';
     else $status = 'AMAN';
     $r['status'] = $status;
     return $r;

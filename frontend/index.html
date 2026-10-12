@@ -657,6 +657,7 @@ var STATUS_STYLE = {
   MELEBIHI:           {xlsxFill:'FFFFC7CE', xlsxFont:'FF9C0006', bg:'#FFC7CE', fg:'#9C0006', label:'Melebihi RAP'},
   DATA_TIDAK_LENGKAP: {xlsxFill:'FFF2F2F2', xlsxFont:'FF7F7F7F', bg:'#F2F2F2', fg:'#7F7F7F', label:'Data Tidak Lengkap'},
   BELUM_ADA_TRANSAKSI: {xlsxFill:'FFF2F2F2', xlsxFont:'FF7F7F7F', bg:'#F2F2F2', fg:'#7F7F7F', label:'Belum Ada Transaksi'},
+  BELUM_ADA_HITUNGAN: {xlsxFill:'FFEDE9FE', xlsxFont:'FF5B21B6', bg:'#EDE9FE', fg:'#5B21B6', label:'Belum Ada Hitungan'},
 };
 
 var _exceljsLoading=null;
@@ -979,8 +980,8 @@ function panelTitle(icon, label, sub){
 /* Status colors are fixed/reserved across the whole app (same as badge()) —
    a chart segment's color always means the same status everywhere, and is
    always paired with a text label/legend, never color alone. */
-var STATUS_BAR_COLOR = {AMAN:'#10b981', MENIPIS:'#f59e0b', HABIS:'#ef4444', HAMPIR_HABIS:'#f59e0b', MELEBIHI:'#ef4444', DATA_TIDAK_LENGKAP:'#cbd5e1', BELUM_ADA_TRANSAKSI:'#cbd5e1'};
-var STATUS_BAR_LABEL = {AMAN:'Aman', MENIPIS:'Perlu Dikirim', HABIS:'Stok Habis', HAMPIR_HABIS:'Hampir Habis RAP', MELEBIHI:'Melebihi RAP', DATA_TIDAK_LENGKAP:'Data Tidak Lengkap', BELUM_ADA_TRANSAKSI:'Belum Ada Transaksi'};
+var STATUS_BAR_COLOR = {AMAN:'#10b981', MENIPIS:'#f59e0b', HABIS:'#ef4444', HAMPIR_HABIS:'#f59e0b', MELEBIHI:'#ef4444', DATA_TIDAK_LENGKAP:'#cbd5e1', BELUM_ADA_TRANSAKSI:'#cbd5e1', BELUM_ADA_HITUNGAN:'#8b5cf6'};
+var STATUS_BAR_LABEL = {AMAN:'Aman', MENIPIS:'Perlu Dikirim', HABIS:'Stok Habis', HAMPIR_HABIS:'Hampir Habis RAP', MELEBIHI:'Melebihi RAP', DATA_TIDAK_LENGKAP:'Data Tidak Lengkap', BELUM_ADA_TRANSAKSI:'Belum Ada Transaksi', BELUM_ADA_HITUNGAN:'Belum Ada Hitungan'};
 /* Horizontal bar row: label left, filled track right, value as a direct
    label (never color-only) so the number reads even in grayscale/print. */
 function navAttrsHtml(nav){
@@ -1044,10 +1045,10 @@ function overGroupChart(groups, emptyMsg, sublabelFn, limit, navFn){
    Every number/status is clickable and routes to the detail report already
    filtered to that proyek/bahan. Status priority decides a project's
    headline status: the worst material wins. */
-var STOCK_PRIORITY = {HABIS:0, MENIPIS:1, DATA_TIDAK_LENGKAP:2, BELUM_ADA_TRANSAKSI:3, AMAN:4};
+var STOCK_PRIORITY = {HABIS:0, MENIPIS:1, BELUM_ADA_HITUNGAN:2, DATA_TIDAK_LENGKAP:3, BELUM_ADA_TRANSAKSI:4, AMAN:5};
 var RAP_PRIORITY = {MELEBIHI:0, HAMPIR_HABIS:1, DATA_TIDAK_LENGKAP:2, AMAN:3};
 var ATTENTION_RANK = {HABIS:0, MELEBIHI:1, MENIPIS:2};
-var STATUS_KIND = {AMAN:'aman', MENIPIS:'warn', HABIS:'danger', HAMPIR_HABIS:'warn', MELEBIHI:'danger', DATA_TIDAK_LENGKAP:'neutral', BELUM_ADA_TRANSAKSI:'neutral'};
+var STATUS_KIND = {AMAN:'aman', MENIPIS:'warn', HABIS:'danger', BELUM_ADA_HITUNGAN:'neutral', HAMPIR_HABIS:'warn', MELEBIHI:'danger', DATA_TIDAK_LENGKAP:'neutral', BELUM_ADA_TRANSAKSI:'neutral'};
 
 function statusPill(code){
   return badge(STATUS_KIND[code]||'neutral', STATUS_BAR_LABEL[code]||code);
@@ -1149,7 +1150,7 @@ PAGES.dashboard = function(c){
     };
     var sc = countBy(stockRows), rc = countBy(rapRows);
     el.innerHTML =
-      mk('Status stok (per bahan)', 'Dibandingkan dengan titik pesan ulang. <b>Perlu Dikirim</b> = stok sudah di bawah titik pesan ulang, segera pesan.', ['AMAN','MENIPIS','HABIS','BELUM_ADA_TRANSAKSI','DATA_TIDAK_LENGKAP'], sc) +
+      mk('Status stok (per bahan)', 'Dibandingkan dengan titik pesan ulang. <b>Perlu Dikirim</b> = stok sudah di bawah titik pesan ulang, segera pesan.', ['AMAN','MENIPIS','HABIS','BELUM_ADA_HITUNGAN','BELUM_ADA_TRANSAKSI','DATA_TIDAK_LENGKAP'], sc) +
       mk('Status RAP (pemakaian vs pagu)', 'Pemakaian dibandingkan dengan pagu. <b>Hampir Habis</b> = sudah 90% pagu; <b>Melebihi</b> = sudah lewat pagu.', ['AMAN','HAMPIR_HABIS','MELEBIHI','DATA_TIDAK_LENGKAP'], rc);
   }
   function renderSummary(){
@@ -1172,7 +1173,7 @@ PAGES.dashboard = function(c){
         return '<tr class="border-b border-slate-100 hover:bg-slate-50/70 transition-colors align-top">'+
           '<td class="py-3 pr-4 text-slate-400 tabular-nums w-12">'+no+'</td>'+
           '<td class="py-3 pr-4 font-semibold text-slate-800 cursor-pointer hover:text-indigo-600" title="Buka Monitor Stok proyek ini"'+navAttrsHtml({page:'stock', projId:r.id})+'>'+esc(r.nama)+'</td>'+
-          '<td class="py-3 pr-4">'+statusCell(r.stock,'stock',r.id,r.sCounts,['AMAN','MENIPIS','HABIS','BELUM_ADA_TRANSAKSI','DATA_TIDAK_LENGKAP'])+'</td>'+
+          '<td class="py-3 pr-4">'+statusCell(r.stock,'stock',r.id,r.sCounts,['AMAN','MENIPIS','HABIS','BELUM_ADA_HITUNGAN','BELUM_ADA_TRANSAKSI','DATA_TIDAK_LENGKAP'])+'</td>'+
           '<td class="py-3 pr-4">'+statusCell(r.rap,'rap',r.id,r.rCounts,['AMAN','HAMPIR_HABIS','MELEBIHI','DATA_TIDAK_LENGKAP'])+'</td>'+
         '</tr>';
       }).join('') : '<tr><td colspan="4" class="text-center text-slate-400 text-sm py-10">Tidak ada proyek yang cocok.</td></tr>')+
@@ -1216,10 +1217,10 @@ PAGES.dashboard = function(c){
       statCard('history','bg-orange-50 text-orange-600','Pemakaian belum diupdate', uniq(stale),
         stale.length ? 'dari '+stale.length+' bahan' : 'Semua proyek rutin update ✓', 'stock');
 
-    var stockCounts = {HABIS:0, MENIPIS:0, DATA_TIDAK_LENGKAP:0, BELUM_ADA_TRANSAKSI:0, AMAN:0};
+    var stockCounts = {HABIS:0, MENIPIS:0, BELUM_ADA_HITUNGAN:0, DATA_TIDAK_LENGKAP:0, BELUM_ADA_TRANSAKSI:0, AMAN:0};
     stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
     document.getElementById('dStockHealth').innerHTML = panelTitle('layers','Kesehatan Stok','Sebaran status bahan di seluruh proyek terpilih')+
-      statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS','DATA_TIDAK_LENGKAP','BELUM_ADA_TRANSAKSI'], stock.length);
+      statusStackChart(stockCounts, ['AMAN','MENIPIS','HABIS','BELUM_ADA_HITUNGAN','DATA_TIDAK_LENGKAP','BELUM_ADA_TRANSAKSI'], stock.length);
 
     var rapCounts = {AMAN:0, HAMPIR_HABIS:0, MELEBIHI:0, DATA_TIDAK_LENGKAP:0};
     rapR.forEach(function(s){ if(rapCounts[s.status]!=null) rapCounts[s.status]++; });
@@ -1793,12 +1794,13 @@ PAGES.stock = reportPage({
     {t:'Total Masuk, Pemakaian, Sisa Stok', d:'Saldo fisik di lapangan: barang yang sudah datang, sudah terpakai, dan yang masih ada sekarang.'},
     {t:'Pesan Ulang Saat', d:'Begitu sisa stok sama atau di bawah angka ini, pesan lagi. Dihitung dari pemakaian harian × 10 hari (waktu kirim + cadangan), sama untuk semua bahan.'},
     {t:'Perkiraan Habis', d:'Perkiraan tanggal stok habis jika pemakaian tetap seperti biasa. Tidak tampil jika pemakaian belum cukup dicatat.'},
-    {t:'Status', d:'Perlu Dikirim = stok sudah di bawah titik pesan ulang. Stok Habis = stok nol. Belum Ada Transaksi = pagu ada tapi belum ada barang masuk.'},
+    {t:'Status', d:'Perlu Dikirim = stok di bawah titik pesan ulang. Belum Ada Hitungan = belum ada pemakaian terbaru untuk menghitung laju, jadi tidak ada peringatan palsu. Stok Habis = stok nol.'},
     {t:'Tanda ⚠', d:'Bahan sudah masuk tapi pemakaiannya lama tidak diupdate, jadi sisa stok kemungkinan lebih kecil dari yang tercatat.'},
   ],
   statusFilter:{options:[
     {value:'AMAN', label:'Aman'}, {value:'MENIPIS', label:'Perlu Dikirim'},
     {value:'HABIS', label:'Stok Habis'}, {value:'DATA_TIDAK_LENGKAP', label:'RAP Belum Diisi'},
+    {value:'BELUM_ADA_HITUNGAN', label:'Belum Ada Hitungan'},
     {value:'BELUM_ADA_TRANSAKSI', label:'Belum Ada Transaksi'},
   ]},
   // Same Dari/Sampai layout as Analisis RAP per Proyek. "Sampai" still
@@ -1819,11 +1821,8 @@ PAGES.stock = reportPage({
     }},
     {label:'Sisa Stok', get:function(r){ return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':''); }},
     {label:'Pesan Ulang Saat', get:function(r){
-      if(r.reorder_point==null) return '<span class="text-slate-300 italic" title="Belum ada pagu RAP atau pemakaian untuk menghitung">—</span>';
-      var basis = r.reorder_basis==='PEMAKAIAN'
-        ? 'pemakaian '+num0(r.daily_usage_rate)+'/hari × '+r.reorder_cover_hari+' hari'
-        : 'sisa kebutuhan pagu (belum ada pemakaian)';
-      return '<b class="text-slate-800">'+num0(r.reorder_point)+'</b> <span class="text-xs text-slate-400" title="'+esc(basis)+'">'+(r.reorder_basis==='PEMAKAIAN'?'dari pemakaian':'dari sisa pagu')+'</span>';
+      if(r.reorder_point==null) return '<span class="text-slate-300 italic" title="Butuh pemakaian terbaru atau hitungan sisa stok untuk menghitung">belum ada hitungan</span>';
+      return '<b class="text-slate-800">'+num0(r.reorder_point)+'</b> <span class="text-xs text-slate-400" title="pemakaian '+num0(r.daily_usage_rate)+'/hari × '+r.reorder_cover_hari+' hari">dari pemakaian</span>';
     }},
     {label:'Masuk Periode Ini', periodOnly:true, get:function(r){
       if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
@@ -1843,7 +1842,7 @@ PAGES.stock = reportPage({
       return '<span class="'+(soon?'text-red-600 font-bold':'text-slate-600')+'">'+esc(r.forecast_date)+'</span> <span class="text-xs text-slate-400">('+r.forecast_days+' hari lagi)</span>';
     }},
     {label:'Status', get:function(r){
-      var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi'],BELUM_ADA_TRANSAKSI:['neutral','Belum Ada Transaksi']};
+      var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi'],BELUM_ADA_HITUNGAN:['neutral','Belum Ada Hitungan'],BELUM_ADA_TRANSAKSI:['neutral','Belum Ada Transaksi']};
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
@@ -2206,6 +2205,7 @@ function statusBadge(status){
     HAMPIR_HABIS:['bg-amber-50 text-amber-700','Hampir Habis RAP'],
     DATA_TIDAK_LENGKAP:['bg-slate-100 text-slate-500','Data Tidak Lengkap'],
     BELUM_ADA_TRANSAKSI:['bg-slate-100 text-slate-500','Belum Ada Transaksi'],
+    BELUM_ADA_HITUNGAN:['bg-violet-50 text-violet-700','Belum Ada Hitungan'],
   };
   var m = map[status] || ['bg-slate-100 text-slate-500', status];
   return '<span class="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap '+m[0]+'">'+esc(m[1])+'</span>';
