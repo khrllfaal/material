@@ -695,6 +695,16 @@ async function exportExcel(filename, title, headers, rows, opts){
   var subRow=ws.addRow([(opts.sub?opts.sub+' · ':'')+'Diekspor '+new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})+' dari Material & Stok']);
   subRow.font={italic:true, size:9.5, name:'Calibri', color:{argb:'FF888888'}};
   ws.mergeCells(subRow.number,1,subRow.number,Math.max(headers.length,1));
+  if(opts.summary && opts.summary.length){
+    var sumRow = ws.addRow(opts.summary.map(function(x){ return x.label+': '+x.count; }));
+    sumRow.height = 22;
+    sumRow.eachCell(function(cell, ci){
+      var st = STATUS_STYLE[opts.summary[ci-1].status];
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: st ? st.xlsxFill : 'FFF2F2F2'}};
+      cell.font = {name:'Calibri', size:10.5, bold:true, color:{argb: st ? st.xlsxFont : 'FF334155'}};
+      cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+    });
+  }
   ws.addRow([]);
 
   var headerRow=ws.addRow(headers);
@@ -815,10 +825,29 @@ async function exportPdf(title, sub, headers, rows, opts){
     });
   });
 
+  var top = sub ? 64 : 48;
+  if(opts.summary && opts.summary.length){
+    var n = opts.summary.length, gap = 8, boxH = 40, pageW = doc.internal.pageSize.getWidth();
+    var boxW = (pageW - 80 - gap*(n-1)) / n;
+    opts.summary.forEach(function(x, i){
+      var st = STATUS_STYLE[x.status];
+      var bx = 40 + i*(boxW+gap), by = top;
+      var bg = st ? hexToRgb(st.bg) : [241,245,249], fg = st ? hexToRgb(st.fg) : [51,65,85];
+      doc.setFillColor(bg[0],bg[1],bg[2]);
+      doc.roundedRect(bx, by, boxW, boxH, 6, 6, 'F');
+      doc.setTextColor(fg[0],fg[1],fg[2]);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8);
+      doc.text(String(x.label), bx+9, by+14);
+      doc.setFontSize(15);
+      doc.text(String(x.count), bx+9, by+33);
+    });
+    top += boxH + 14;
+  }
+
   doc.autoTable({
     head: [headers],
     body: body,
-    startY: sub ? 64 : 48,
+    startY: top,
     margin: {left:40, right:40},
     styles: {font:'helvetica', fontSize:8.5, cellPadding:5, textColor:[15,23,42], lineColor:[227,231,238], lineWidth:0.5, overflow:'linebreak'},
     headStyles: {fillColor:[30,58,138], textColor:255, fontStyle:'bold', fontSize:8},
@@ -875,6 +904,16 @@ function periodSuffix(from, to){
   if(to) return '_per_'+to;
   return '';
 }
+/* One source for the status cards on screen and the summary in downloads, so
+   the two can never disagree. */
+function statusSummary(rows, options){
+  var total = rows.length, counts = {};
+  rows.forEach(function(r){ counts[r.status] = (counts[r.status]||0)+1; });
+  return options.map(function(o){
+    var n = counts[o.value]||0;
+    return {status:o.value, label:o.label, count:n, pct: total ? n/total : null};
+  });
+}
 function exportBtnsHtml(periodId){
   var picker = periodId ? '<select id="'+periodId+'" title="Pilih periode data yang diunduh" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
       '<option value="semua">Seluruh periode</option><option value="hari">Hari ini</option><option value="minggu">Minggu ini</option><option value="bulan">Bulan ini</option>'+
@@ -883,11 +922,11 @@ function exportBtnsHtml(periodId){
     '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button>'+
     '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button></div>';
 }
-function bindExportBtns(filename, title, sub, headers, rowsFn, statusCols){
+function bindExportBtns(filename, title, sub, headers, rowsFn, statusCols, summary){
   var sc = statusCols==null ? [] : (Array.isArray(statusCols) ? statusCols : [statusCols]);
   var bx=document.getElementById('btnExportExcel'), bp=document.getElementById('btnExportPdf');
-  if(bx) bx.onclick=function(){ exportExcel(filename, title, headers, rowsFn(), {statusCols:sc, sub:sub}); };
-  if(bp) bp.onclick=function(){ exportPdf(title, sub, headers, rowsFn(), {statusCols:sc}); };
+  if(bx) bx.onclick=function(){ exportExcel(filename, title, headers, rowsFn(), {statusCols:sc, sub:sub, summary:summary}); };
+  if(bp) bp.onclick=function(){ exportPdf(title, sub, headers, rowsFn(), {statusCols:sc, summary:summary}); };
 }
 
 /* ---------------- generic master-data CRUD page ---------------- */
@@ -1169,6 +1208,7 @@ PAGES.dashboard = function(c){
       }).join('')+'</div>';
   }
   var exportSub = '';
+  var dashCards = [];
   function renderDashLegend(stockRows, rapRows){
     var el = document.getElementById('dLegend');
     var mk = function(title, text, order, counts){
@@ -1217,7 +1257,7 @@ PAGES.dashboard = function(c){
     bindExportBtns('Dashboard_Ringkasan'+periodSuffix(fv('dashFrom'), fv('dashTo')), 'Ringkasan Dashboard Material & Stok', exportSub+' · '+periodLabel(fv('dashFrom'), fv('dashTo')), ['No','Nama Proyek','Status Stok','Status RAP'],
       function(){ return summaryView().map(function(r, i){
         return [i+1, r.nama, r.stock?r.stock.status:'DATA_TIDAK_LENGKAP', r.rap?r.rap.status:'DATA_TIDAK_LENGKAP'];
-      }); }, [2,3]);
+      }); }, [2,3], dashCards);
   }
 
   function loadRapReport(){
@@ -1249,6 +1289,7 @@ PAGES.dashboard = function(c){
       statCard('history','bg-orange-50 text-orange-600','Pemakaian belum diupdate', uniq(stale),
         stale.length ? 'dari '+stale.length+' bahan' : 'Semua proyek rutin update ✓', 'stock');
 
+    dashCards = statusSummary(stock, ['AMAN','MENIPIS','HABIS','BELUM_ADA_HITUNGAN','BELUM_ADA_TRANSAKSI','DATA_TIDAK_LENGKAP'].map(function(k){ return {value:k, label:STATUS_BAR_LABEL[k]}; }));
     var stockCounts = {HABIS:0, MENIPIS:0, BELUM_ADA_HITUNGAN:0, DATA_TIDAK_LENGKAP:0, BELUM_ADA_TRANSAKSI:0, AMAN:0};
     stock.forEach(function(s){ if(stockCounts[s.status]!=null) stockCounts[s.status]++; });
     document.getElementById('dStockHealth').innerHTML = panelTitle('layers','Kesehatan Stok','Sebaran status bahan di seluruh proyek terpilih')+
@@ -1503,9 +1544,9 @@ function reportPage(cfg){
         '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span>'+
       '</div>'
     ) : '';
-    var CARD_COLS = {2:'lg:grid-cols-2', 3:'lg:grid-cols-3', 4:'lg:grid-cols-4', 5:'lg:grid-cols-5'};
+    var CARD_GRID = {4:'md:grid-cols-4', 6:'md:grid-cols-3'};
     var cardsHtml = cfg.statusFilter
-      ? '<div id="stCards" class="grid grid-cols-2 sm:grid-cols-3 '+(CARD_COLS[cfg.statusFilter.options.length]||'')+' gap-3 mb-5"></div>'
+      ? '<div id="stCards" class="grid grid-cols-2 gap-3 mb-5 '+(CARD_GRID[cfg.statusFilter.options.length]||'')+'"></div>'
       : '';
     var guideHtml = cfg.guide ? '<details open class="mb-5 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-5 py-4">'+
       '<summary class="cursor-pointer text-sm font-bold text-indigo-900 select-none">Cara membaca halaman ini</summary>'+
@@ -1528,19 +1569,21 @@ function reportPage(cfg){
     // on first load so it doesn't stick around on later visits.
     var pending = STATE.pendingFilter; STATE.pendingFilter = null;
     if(pending && pending.q!=null) document.getElementById('q').value = pending.q;
+    function cardPool(){
+      var projId = fv('fProj');
+      return projId ? rows.filter(function(r){ return r.project_id===projId; }) : rows;
+    }
     function renderCards(){
       var el = document.getElementById('stCards');
       if(!el) return;
-      var projId = fv('fProj'), cur = fv('fStatus');
-      var pool = projId ? rows.filter(function(r){ return r.project_id===projId; }) : rows;
-      var counts = {};
-      pool.forEach(function(r){ counts[r.status] = (counts[r.status]||0)+1; });
-      el.innerHTML = cfg.statusFilter.options.map(function(o){
-        var on = cur===o.value;
-        return '<button type="button" data-card="'+esc(o.value)+'" title="Klik untuk menyaring, klik lagi untuk menghapus filter" class="flex flex-col items-start text-left bg-white rounded-2xl border p-5 shadow-sm transition-all hover:shadow-md '+
+      var cur = fv('fStatus');
+      el.innerHTML = statusSummary(cardPool(), cfg.statusFilter.options).map(function(x){
+        var on = cur===x.status;
+        return '<button type="button" data-card="'+esc(x.status)+'" title="Klik untuk menyaring, klik lagi untuk menghapus filter" class="flex flex-col items-start text-left bg-white rounded-2xl border p-4 shadow-sm transition-all hover:shadow-md '+
           (on ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200')+'">'+
-          '<div class="flex items-center gap-2 text-sm font-semibold text-slate-600 leading-snug"><span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:'+(STATUS_BAR_COLOR[o.value]||'#94a3b8')+'"></span>'+esc(o.label)+'</div>'+
-          '<div class="text-3xl font-extrabold text-slate-900 mt-4 leading-none tabular-nums">'+(counts[o.value]||0)+'</div>'+
+          '<div class="flex items-center gap-2 text-sm font-semibold text-slate-600 leading-snug"><span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:'+(STATUS_BAR_COLOR[x.status]||'#94a3b8')+'"></span>'+esc(x.label)+'</div>'+
+          '<div class="text-3xl font-extrabold text-slate-900 mt-3 leading-none tabular-nums">'+x.count+'</div>'+
+          '<div class="text-xs text-slate-400 mt-2">'+(x.pct==null ? 'belum ada bahan' : Math.round(x.pct*100)+'% dari '+cardPool().length+' bahan')+'</div>'+
         '</button>';
       }).join('');
       el.querySelectorAll('[data-card]').forEach(function(b){
@@ -1580,7 +1623,7 @@ function reportPage(cfg){
         function(){ return filteredList.map(function(r){
           var row = cfg.exportRow(r);
           return dropIdx.length ? row.filter(function(_,i){ return dropIdx.indexOf(i)===-1; }) : row;
-        }); }, exportStatus);
+        }); }, exportStatus, cfg.statusFilter ? statusSummary(cardPool(), cfg.statusFilter.options) : null);
     }
     function load(){
       var qs = [];
