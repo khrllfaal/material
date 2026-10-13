@@ -59,8 +59,8 @@ scripts/
 4. Isi `frontend/backend-config.js` — `window.API_BASE_URL` diarahkan
    ke folder `backend/api` (default `../backend/api`, sudah pas kalau
    `frontend/` dan `backend/` diupload sejajar di domain yang sama).
-5. Upload semua isi `frontend/` dan `backend/` ke hosting, buka
-   `frontend/index.html`. Semua role login di halaman yang sama.
+5. Upload `index.html`, `.htaccess`, folder `frontend/` dan `backend/` ke
+   `public_html` (lihat `docs/DEPLOY_HOSTINGER.md`), lalu buka domain Anda. Semua role login di halaman yang sama.
 
 ## Role (ditegakkan di backend, bukan cuma disembunyikan di UI)
 

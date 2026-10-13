@@ -1,0 +1,13 @@
+# Root of the site: open the app when someone visits the bare domain
+# (otherwise the server shows 403 Forbidden because no index file exists
+# here), and keep non-app files private.
+DirectoryIndex index.html frontend/index.html
+Options -Indexes
+
+# Project files that must never be downloadable.
+RedirectMatch 403 ^/(docs|scripts|\.git)(/|$)
+<FilesMatch "\.(sql|md|sample|sh)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
