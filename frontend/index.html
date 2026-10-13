@@ -1030,7 +1030,10 @@ function masterPage(cfg){
         .catch(function(e){ document.getElementById('tbl').innerHTML=''; toast('Gagal memuat: '+e.message, true); });
     }
     function del(id){
-      confirmModal('Hapus Data','Yakin mau menghapus data ini? Tindakan ini tidak bisa dibatalkan.', function(){
+      var cascade = /\/(projects|materials)\.php/.test(cfg.endpoint);
+      confirmModal('Hapus Data', cascade
+        ? 'Yakin menghapus data ini? SEMUA riwayat transaksi (Bahan Masuk, Pemakaian) dan pagu RAP yang terkait juga akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.'
+        : 'Yakin mau menghapus data ini? Tindakan ini tidak bisa dibatalkan.', function(){
         apiFetch(cfg.endpoint+'?id='+encodeURIComponent(id), {method:'DELETE'})
           .then(function(){ toast('Data dihapus.'); refresh(); })
           .catch(function(e){ toast('Gagal menghapus: '+e.message, true); });

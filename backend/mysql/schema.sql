@@ -46,9 +46,6 @@ CREATE TABLE IF NOT EXISTS user_projects (
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- NOTE: transaction tables (receipts, usage, stock_counts) use ON DELETE RESTRICT
--- on project_id/material_id so deleting a master row can never erase history.
-
 -- Master bahan (material catalogue) — shared across all projects.
 CREATE TABLE IF NOT EXISTS materials (
   id                  VARCHAR(40) PRIMARY KEY,
@@ -73,8 +70,8 @@ CREATE TABLE IF NOT EXISTS stock_counts (
   created_by  VARCHAR(40) NULL,
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_count_day (project_id, material_id, tgl),
-  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE RESTRICT,
-  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE RESTRICT,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -151,8 +148,8 @@ CREATE TABLE IF NOT EXISTS material_receipts (
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_receipts_project_material (project_id, material_id),
   INDEX idx_receipts_tgl (tgl),
-  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE RESTRICT,
-  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE RESTRICT,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -172,9 +169,9 @@ CREATE TABLE IF NOT EXISTS material_usage (
   INDEX idx_usage_project_material (project_id, material_id),
   INDEX idx_usage_pekerjaan (pekerjaan_id),
   INDEX idx_usage_tgl (tgl),
-  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE RESTRICT,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   FOREIGN KEY (pekerjaan_id) REFERENCES pekerjaan(id) ON DELETE SET NULL,
-  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE RESTRICT,
+  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
