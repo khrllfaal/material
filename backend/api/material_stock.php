@@ -101,10 +101,22 @@ if ($scope !== null) {
     $countParams = array_merge($countParams, $scope);
 }
 $countSql = 'SELECT project_id, material_id, tgl, qty FROM stock_counts' . ($countWhere ? ' WHERE ' . implode(' AND ', $countWhere) : '') . ' ORDER BY tgl';
-$countStmt = db()->prepare($countSql);
-$countStmt->execute($countParams);
+$countRows = [];
+try {
+    $countStmt = db()->prepare($countSql);
+    $countStmt->execute($countParams);
+    $countRows = $countStmt->fetchAll();
+} catch (PDOException $e) {
+    // Table missing on a database that skipped the migration: create it
+    // once and retry; if that's not allowed, carry on without physical
+    // counts (stock still works from receipts/usage) rather than 500.
+    if (ensure_stock_counts_table()) {
+        try { $countStmt = db()->prepare($countSql); $countStmt->execute($countParams); $countRows = $countStmt->fetchAll(); }
+        catch (PDOException $e2) { error_log('[material] stock_counts: ' . $e2->getMessage()); }
+    }
+}
 $countsByPm = [];
-foreach ($countStmt->fetchAll() as $c) {
+foreach ($countRows as $c) {
     $list = &$countsByPm[$c['project_id'].'|'.$c['material_id']];
     $list[] = ['tgl' => $c['tgl'], 'qty' => (float)$c['qty']];
     if (count($list) > 2) array_shift($list);

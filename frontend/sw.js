@@ -2,12 +2,12 @@
    new frontend files. API responses are deliberately not cached here: stock
    and transaction data stay out of the browser cache, and offline writes go
    through the app's own outbox instead. */
-const VERSION = 'v1-2026-10-12';
+const VERSION = 'v2-2026-10-13';
 const SHELL = 'ms-shell-' + VERSION;
 const SHELL_FILES = [
   './', './index.html', './backend-config.js',
   './vendor/tailwind.css', './vendor/icons.js',
-  './manifest.webmanifest', './icon.svg'
+  './manifest.webmanifest', './logo.png', './icon-192.png'
 ];
 
 self.addEventListener('install', function (e) {

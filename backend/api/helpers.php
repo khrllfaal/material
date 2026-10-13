@@ -168,3 +168,29 @@ function audit(string $action, string $entity, string $entityId, string $detail 
         substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255) ?: null,
     ]);
 }
+
+/** Creates stock_counts if a deployment never ran the migration, so a
+ *  forgotten SQL step can't take Monitor Stok / Dashboard down. Returns
+ *  false if the DB user may not create tables (caller then degrades). */
+function ensure_stock_counts_table(): bool {
+    try {
+        db()->exec('CREATE TABLE IF NOT EXISTS stock_counts (
+          id VARCHAR(120) PRIMARY KEY,
+          project_id VARCHAR(40) NOT NULL,
+          material_id VARCHAR(40) NOT NULL,
+          tgl DATE NOT NULL,
+          qty DECIMAL(18,3) NOT NULL DEFAULT 0,
+          ket TEXT NULL,
+          created_by VARCHAR(40) NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_count_day (project_id, material_id, tgl),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+          FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        return true;
+    } catch (Throwable $e) {
+        error_log('[material] ensure_stock_counts_table: ' . $e->getMessage());
+        return false;
+    }
+}
