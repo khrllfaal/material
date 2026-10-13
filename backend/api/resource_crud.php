@@ -38,6 +38,19 @@ function handle_resource_crud(string $table, array $columns, string $idColumn = 
     }
 
     if ($method === 'GET') {
+        // Field admins only need their own projects' names, not the
+        // company's whole project list.
+        if ($table === 'projects') {
+            $scope = user_project_ids(current_user());
+            if ($scope !== null) {
+                if (!$scope) { json_response([]); return; }
+                $in = implode(',', array_fill(0, count($scope), '?'));
+                $st = db()->prepare("SELECT * FROM projects WHERE id IN ($in) ORDER BY id");
+                $st->execute($scope);
+                json_response($st->fetchAll());
+                return;
+            }
+        }
         $rows = db()->query("SELECT * FROM `$table` ORDER BY `$idColumn`")->fetchAll();
         json_response($rows);
         return;
@@ -69,6 +82,22 @@ function handle_resource_crud(string $table, array $columns, string $idColumn = 
     if ($method === 'DELETE') {
         $id = $_GET['id'] ?? '';
         if ($id === '') json_error('id wajib diisi', 422);
+        // The schema cascades deletes (project/bahan -> every receipt and
+        // usage row), so one mis-click on a master record would silently
+        // erase transaction history. Refuse instead; history is never
+        // removed as a side effect of tidying the master list.
+        if ($table === 'projects' || $table === 'materials') {
+            $col = $table === 'projects' ? 'project_id' : 'material_id';
+            $n = 0;
+            foreach (['material_receipts', 'material_usage'] as $t) {
+                $c = db()->prepare("SELECT COUNT(*) FROM `$t` WHERE `$col` = ?");
+                $c->execute([$id]);
+                $n += (int)$c->fetchColumn();
+            }
+            if ($n > 0) {
+                json_error('Tidak bisa dihapus: sudah dipakai di ' . $n . ' transaksi (Bahan Masuk/Pemakaian). Hapus transaksinya lebih dulu di Riwayat Transaksi bila memang salah input.', 409);
+            }
+        }
         $stmt = db()->prepare("DELETE FROM `$table` WHERE `$idColumn` = ?");
         $stmt->execute([$id]);
         audit('delete', $table, (string)$id);

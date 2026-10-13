@@ -52,6 +52,24 @@ function handle_project_scoped_resource(string $table, array $columns, string $p
         $data['created_by'] = $user['id'];
         if (empty($data['id'])) json_error('id wajib diisi', 422);
 
+        // Validate before touching the DB so a bad value is a clear 422,
+        // not a generic 500 from a constraint or a silently-stored typo.
+        if (array_key_exists('tgl', $data)) $data['tgl'] = require_valid_date($data['tgl']);
+        foreach (['qty', 'harga_satuan'] as $numCol) {
+            if (!array_key_exists($numCol, $data)) continue;
+            if (!is_numeric($data[$numCol]) || (float)$data[$numCol] < 0 || (float)$data[$numCol] > 1e12) {
+                json_error(($numCol === 'qty' ? 'Jumlah' : 'Harga') . ' harus berupa angka nol atau lebih.', 422);
+            }
+        }
+        if (isset($data['qty']) && (float)$data['qty'] <= 0 && $table !== 'stock_counts') {
+            json_error('Jumlah harus lebih dari 0.', 422);
+        }
+        if (!empty($data['material_id'])) {
+            $chk = db()->prepare('SELECT 1 FROM materials WHERE id = ?');
+            $chk->execute([$data['material_id']]);
+            if (!$chk->fetchColumn()) json_error('Bahan tidak ditemukan. Muat ulang halaman lalu pilih bahan dari daftar.', 422);
+        }
+
         // A 'lapangan' user editing an existing row must still own its
         // (possibly unchanged) project — re-check against the stored row
         // so they can't move it into scope by relabelling on the way in.

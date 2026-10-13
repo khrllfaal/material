@@ -54,7 +54,32 @@ function start_session(): void {
     session_start();
 }
 
+/** Baseline browser-hardening headers for every API response. */
+function send_security_headers(): void {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: same-origin');
+    header('Cross-Origin-Resource-Policy: same-origin');
+    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+    if (!empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')) {
+        header('Strict-Transport-Security: max-age=31536000');
+    }
+    header('Cache-Control: no-store');
+}
+
+/** 422s unless $v is a real calendar date (YYYY-MM-DD) that is not in
+ *  the future — one day of slack covers a phone clock a little ahead. */
+function require_valid_date($v, string $label = 'Tanggal'): string {
+    $v = (string)$v;
+    $d = DateTime::createFromFormat('Y-m-d', $v);
+    if (!$d || $d->format('Y-m-d') !== $v) json_error("$label tidak valid.", 422);
+    if ($v > date('Y-m-d', time() + 86400)) json_error("$label tidak boleh di masa depan.", 422);
+    if ($v < '2000-01-01') json_error("$label tidak valid.", 422);
+    return $v;
+}
+
 function send_cors_headers(): void {
+    send_security_headers();
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     if ($origin && in_array($origin, cfg()['cors_origins'], true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
