@@ -47,6 +47,7 @@
   #mobileShell label{font-size:.8125rem}
   #mobileShell input[type=date]{font-size:14px;padding-left:.75rem;padding-right:.5rem}
   #mobileShell button{min-height:2.75rem}
+  body.is-mobile #toastWrap > div{bottom:5.5rem!important}
   
   @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
 </style>
@@ -144,8 +145,9 @@
     </div>
   </div>
   <div id="mProjSel" class="px-5 pt-4"></div>
-  <div id="mTabs" class="flex gap-2 px-5 pt-4 pb-1 overflow-x-auto tab-scroll" style="-webkit-mask-image:linear-gradient(to right, black 92%, transparent 100%); mask-image:linear-gradient(to right, black 92%, transparent 100%);"></div>
-  <div id="mContent" class="flex-1 px-5 pb-10 pt-2"></div>
+  <div id="mTabs" class="px-5 pt-3 pb-1"></div>
+  <div id="mContent" class="flex-1 px-5 pb-32 pt-2"></div>
+  <nav id="mNav" class="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200" style="padding-bottom:env(safe-area-inset-bottom)"></nav>
 </div>
 
 <div id="modalBack" class="hidden fixed inset-0 bg-slate-900/50 z-30 items-center justify-center p-5">
@@ -162,7 +164,7 @@
    there is exactly one HTML file to redeploy on every revision.
    Plain fetch, no build step, no framework.
    ============================================================ */
-var STATE = { user:null, page:'dashboard', cache:{}, projects:[], materials:[], pekerjaanAll:[], projectId:null, tab:'masuk', pendingFilter:null };
+var STATE = { user:null, page:'dashboard', cache:{}, projects:[], materials:[], pekerjaanAll:[], projectId:null, tab:'masuk', section:'bahan', pendingFilter:null };
 /* Lets a dashboard panel row ("Besi — RS Cirebon perlu dikirim") jump
    straight to the detail page already filtered to that row, instead of
    landing on an unfiltered list the user has to re-search by hand. The
@@ -2816,7 +2818,6 @@ PAGES.users = function(c){
 /* ============================================================
    MOBILE SHELL — Admin Lapangan
    ============================================================ */
-var TAB_ICONS = {masuk:'truck', pakai:'hammer', absen:'hard-hat', stok:'layers', riwayat:'history'};
 
 function bootMobile(user){
   document.getElementById('mWhoName').textContent = user.nama;
@@ -2856,7 +2857,10 @@ function startMobile(user, allProjects, materials, pekerjaan){
     return;
   }
   STATE.projectId = STATE.projects[0].id;
+  STATE.section = lsGet('ms_section', 'bahan') === 'absen' ? 'absen' : 'bahan';
+  document.body.classList.add('is-mobile');
   renderProjSel();
+  renderNavBar();
   renderTabs();
   renderTab();
 }
@@ -2884,31 +2888,50 @@ function pekerjaanForProject(){
   return (STATE.pekerjaanAll||[]).filter(function(pk){ return pk.project_id === STATE.projectId; });
 }
 
+/* Two big sections on the bottom bar (thumb reach): Bahan and Absen.
+   Inside Bahan, four short sub-tabs fit the screen width — nothing scrolls
+   sideways and nothing is hidden off-screen. */
 var TABS = [
-  {id:'masuk', label:'Bahan Masuk'},
-  {id:'pakai', label:'Pemakaian'},
-  {id:'absen', label:'Absen'},
+  {id:'masuk', label:'Masuk'},
+  {id:'pakai', label:'Pakai'},
   {id:'stok', label:'Stok'},
   {id:'riwayat', label:'Riwayat'},
 ];
+var SECTIONS = [{id:'bahan', label:'Bahan', icon:'truck'}, {id:'absen', label:'Absen', icon:'hard-hat'}];
+function setSection(id){
+  STATE.section = id; lsSet('ms_section', id);
+  renderNavBar(); renderTabs(); renderTab();
+  window.scrollTo(0, 0);
+}
+function renderNavBar(){
+  var nav = document.getElementById('mNav'); if(!nav) return;
+  nav.innerHTML = '<div class="max-w-[560px] mx-auto grid grid-cols-2">'+SECTIONS.map(function(x){
+    var on = x.id===STATE.section;
+    return '<button type="button" data-sec="'+x.id+'" class="relative h-16 flex flex-col items-center justify-center gap-1 text-[12px] font-bold '+(on?'text-emerald-700':'text-slate-400')+'">'+
+      (on?'<span class="absolute top-0 inset-x-8 h-1 rounded-b-full bg-emerald-600"></span>':'')+
+      '<i data-lucide="'+x.icon+'" class="w-6 h-6"></i>'+x.label+'</button>';
+  }).join('')+'</div>';
+  nav.querySelectorAll('[data-sec]').forEach(function(b){ b.onclick = function(){ if(STATE.section!==b.getAttribute('data-sec')) setSection(b.getAttribute('data-sec')); }; });
+  icons();
+}
 function renderTabs(){
-  document.getElementById('mTabs').innerHTML = TABS.map(function(t){
+  var el = document.getElementById('mTabs');
+  if(STATE.section === 'absen'){ el.innerHTML = ''; el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML = '<div class="grid grid-cols-4 gap-1 bg-slate-200/70 rounded-2xl p-1">'+TABS.map(function(t){
     var on = t.id===STATE.tab;
-    return '<button data-tab="'+t.id+'" class="flex-none flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors '+
-      (on ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-200' : 'bg-white text-slate-500 border border-slate-200') + '">'+
-      '<i data-lucide="'+TAB_ICONS[t.id]+'" class="w-3.5 h-3.5"></i>'+esc(t.label)+'</button>';
-  }).join('');
-  document.querySelectorAll('#mTabs [data-tab]').forEach(function(b){
+    return '<button data-tab="'+t.id+'" class="h-11 rounded-xl text-[13.5px] font-bold transition-colors '+(on ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500')+'">'+esc(t.label)+'</button>';
+  }).join('')+'</div>';
+  el.querySelectorAll('[data-tab]').forEach(function(b){
     b.onclick = function(){ STATE.tab = b.getAttribute('data-tab'); renderTabs(); renderTab(); };
   });
-  icons();
 }
 
 function renderTab(){
   var c = document.getElementById('mContent');
+  if(STATE.section === 'absen') return renderAbsen(c);
   if(STATE.tab === 'masuk') return renderInputForm(c, 'masuk');
   if(STATE.tab === 'pakai') return renderInputForm(c, 'pakai');
-  if(STATE.tab === 'absen') return renderAbsen(c);
   if(STATE.tab === 'stok') return renderStok(c);
   if(STATE.tab === 'riwayat') return renderRiwayat(c);
 }
@@ -3109,7 +3132,7 @@ function renderAbsen(c){
     apiFetch('/payroll_periods.php?project_id='+encodeURIComponent(pid)+'&tgl='+tgl).catch(function(e){ if(e.network){ offline = true; return null; } throw e; }),
     apiFetch('/kasbon_requests.php').catch(function(){ return []; }),
   ]).then(function(r){
-    if(STATE.projectId !== pid || ABSEN.tgl !== tgl || STATE.tab !== 'absen') return; // user moved on while loading
+    if(STATE.projectId !== pid || ABSEN.tgl !== tgl || STATE.section !== 'absen') return; // user moved on while loading
     ABSEN.workers = r[0]; ABSEN.period = r[2]; ABSEN.offline = offline;
     ABSEN.kreq = (r[3]||[]).filter(function(k){ return k.project_id === pid; }).slice(0, 5);
     ABSEN.cur = {}; ABSEN.orig = {};
@@ -3229,7 +3252,7 @@ function drawAbsen(c){
   var kasbonBox = kreqList ? '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2 mb-3"><div class="text-[11px] font-extrabold uppercase tracking-wide text-slate-400 pt-1.5">Pengajuan kasbon</div>'+kreqList+'</div>' : '';
   var ajukan = ABSEN.period && ABSEN.period.status==='draft' || !ABSEN.period
     ? '<button type="button" id="abAjukan" class="w-full h-12 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-sm flex items-center justify-center gap-2 mb-3"><i data-lucide="send" class="w-4 h-4"></i>Ajukan absen minggu ini ke pusat</button>' : '';
-  var bar = ed && ABSEN.workers.length ? '<div class="sticky bottom-3 z-10"><button type="button" id="abSave" '+(absenDirty()?'':'disabled')+
+  var bar = ed && ABSEN.workers.length ? '<div class="sticky bottom-20 z-10"><button type="button" id="abSave" '+(absenDirty()?'':'disabled')+
       ' class="w-full h-14 rounded-2xl text-white font-extrabold text-[16px] shadow-lg shadow-emerald-200 transition '+(absenDirty()?'bg-emerald-600':'bg-slate-300 shadow-none')+'">'+
       (absenDirty() ? 'Simpan Absen'+(n.belum?' · '+n.belum+' belum diisi':'') : (n.belum? n.belum+' pekerja belum diisi' : 'Tersimpan ✓'))+'</button></div>' : '';
 
