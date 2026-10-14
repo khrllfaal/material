@@ -20,6 +20,7 @@ diubah ke `backend/api` (bukan `../backend/api`).
 2. Salin `backend/api/config.sample.php` jadi `backend/api/config.php`, isi kredensial database.
 3. Pastikan versi PHP 8.1+ (hPanel > Advanced > PHP Configuration).
 4. Buat akun admin (lihat README).
+   Database lama: jalankan juga `migrations_2026-10-payroll.sql` (fitur absensi & gaji) satu kali.
 5. Buka `https://domain-anda/` — otomatis masuk ke aplikasi.
 
 ## 403 Forbidden di halaman utama

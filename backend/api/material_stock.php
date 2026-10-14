@@ -164,6 +164,8 @@ $out = array_map(function ($r) use ($tglTo, $countsByPm) {
     $r['total_keluar'] = (float)$r['total_keluar'];
     $r['masuk_periode'] = (float)$r['masuk_periode'];
     $r['keluar_periode'] = (float)$r['keluar_periode'];
+    // Opening balance of the chosen window (kartu stok: awal + masuk - keluar = akhir).
+    $r['stok_awal'] = round($stok - $r['masuk_periode'] + $r['keluar_periode'], 3);
     $r['rap_qty'] = $rapQty;
     $r['sisa_kebutuhan'] = $sisaKebutuhan;
     // Flags a project+material that keeps receiving deliveries but

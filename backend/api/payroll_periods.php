@@ -1,0 +1,124 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/payroll_lib.php';
+
+/**
+ * Siklus periode gaji mingguan per proyek: draft -> diajukan -> dibayar.
+ *   GET  ?project_id=&tgl=      status minggu itu (tanpa nominal, aman untuk lapangan)
+ *   POST action=header          isi penanggung jawab / nama grup / catatan
+ *   POST action=ajukan          lapangan/admin/akuntan mengajukan minggu ke pusat
+ *   POST action=buka            admin membuka kembali pengajuan (belum ada pembayaran)
+ *   POST action=bayar           akuntan/admin mencatat pembayaran (semua / per pekerja)
+ */
+send_cors_headers();
+$method = $_SERVER['REQUEST_METHOD'];
+$user = $method === 'GET' ? require_login() : require_role(['admin', 'akuntan', 'lapangan']);
+$role = $user['role'];
+
+if ($method === 'GET') {
+    $projectId = (string)($_GET['project_id'] ?? '');
+    if ($projectId === '') json_error('Proyek wajib dipilih.', 422);
+    require_project_access($user, $projectId);
+    $tgl = !empty($_GET['tgl']) ? require_valid_date($_GET['tgl']) : date('Y-m-d');
+    [$s, $e] = payroll_week($tgl);
+    $st = db()->prepare('SELECT id, project_id, tgl_mulai, tgl_akhir, status, pj_nama, grup_nama, catatan FROM payroll_periods WHERE project_id = ? AND tgl_mulai = ?');
+    $st->execute([$projectId, $s]);
+    $p = $st->fetch() ?: ['id' => null, 'project_id' => $projectId, 'tgl_mulai' => $s, 'tgl_akhir' => $e, 'status' => 'draft', 'pj_nama' => '', 'grup_nama' => '', 'catatan' => ''];
+    if ($p['pj_nama'] === '' && $p['grup_nama'] === '') { // remember the last values used on this project
+        $l = db()->prepare("SELECT pj_nama, grup_nama FROM payroll_periods WHERE project_id = ? AND (pj_nama <> '' OR grup_nama <> '') ORDER BY tgl_mulai DESC LIMIT 1");
+        $l->execute([$projectId]);
+        if ($x = $l->fetch()) { $p['pj_nama'] = $x['pj_nama']; $p['grup_nama'] = $x['grup_nama']; }
+    }
+    json_response($p);
+}
+
+$b = read_json_body();
+$action = (string)($b['action'] ?? '');
+$projectId = (string)($b['project_id'] ?? '');
+if ($projectId === '') json_error('Proyek wajib dipilih.', 422);
+require_project_access($user, $projectId);
+$tgl = require_valid_date($b['tgl'] ?? date('Y-m-d'), 'Tanggal');
+$p = payroll_period($projectId, $tgl);
+$pid = $p['id'];
+$clip = fn($v, $n) => mb_substr(trim((string)$v), 0, $n);
+
+if ($action === 'header') {
+    if ($p['status'] === 'dibayar') json_error('Periode sudah dibayar dan terkunci.', 409);
+    if ($role === 'lapangan' && $p['status'] !== 'draft') json_error('Minggu ini sudah diajukan.', 409);
+    db()->prepare('UPDATE payroll_periods SET pj_nama=?, grup_nama=?, catatan=? WHERE id=?')
+        ->execute([$clip($b['pj_nama'] ?? '', 120), $clip($b['grup_nama'] ?? '', 120), $clip($b['catatan'] ?? '', 255), $pid]);
+    audit('update', 'payroll_periods', $pid, 'header');
+    json_response(['ok' => true]);
+}
+
+if ($action === 'ajukan') {
+    if ($p['status'] !== 'draft') json_error('Minggu ini sudah diajukan.', 409);
+    $c = db()->prepare('SELECT COUNT(*) FROM attendance WHERE project_id = ? AND tgl BETWEEN ? AND ?');
+    $c->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
+    if ((int)$c->fetchColumn() === 0) json_error('Belum ada absen pada minggu ini.', 422);
+    $pj = $clip($b['pj_nama'] ?? $p['pj_nama'], 120);
+    if ($pj === '') json_error('Nama penanggung jawab wajib diisi.', 422);
+    db()->prepare("UPDATE payroll_periods SET status='diajukan', pj_nama=?, grup_nama=?, diajukan_at=NOW(), diajukan_by=? WHERE id=?")
+        ->execute([$pj, $clip($b['grup_nama'] ?? $p['grup_nama'], 120), $user['id'], $pid]);
+    audit('update', 'payroll_periods', $pid, 'diajukan');
+    json_response(['ok' => true, 'status' => 'diajukan']);
+}
+
+if ($action === 'buka') {
+    if ($role !== 'admin') json_error('Hanya Admin Pusat yang bisa membuka kembali pengajuan.', 403);
+    if ($p['status'] !== 'diajukan') json_error('Hanya pengajuan yang belum dibayar yang bisa dibuka kembali.', 409);
+    $c = db()->prepare('SELECT COUNT(*) FROM payroll_payments WHERE period_id = ?'); $c->execute([$pid]);
+    if ((int)$c->fetchColumn() > 0) json_error('Sudah ada pembayaran pada periode ini, tidak bisa dibuka. Buat penyesuaian di periode berikutnya.', 409);
+    $alasan = $clip($b['alasan'] ?? '', 200);
+    if ($alasan === '') json_error('Alasan wajib diisi.', 422);
+    db()->prepare("UPDATE payroll_periods SET status='draft', diajukan_at=NULL, diajukan_by=NULL WHERE id=?")->execute([$pid]);
+    audit('update', 'payroll_periods', $pid, "dibuka kembali: $alasan");
+    json_response(['ok' => true, 'status' => 'draft']);
+}
+
+if ($action === 'bayar') {
+    if (!in_array($role, ['admin', 'akuntan'], true)) json_error('Hanya Akuntan atau Admin Pusat yang bisa mencatat pembayaran.', 403);
+    if ($p['status'] === 'draft') json_error('Periode belum diajukan oleh lapangan.', 409);
+    $tglBayar = require_valid_date($b['tgl_bayar'] ?? date('Y-m-d'), 'Tanggal bayar');
+    $metode = (($b['metode'] ?? '') === 'transfer') ? 'transfer' : 'tunai';
+    $res = payroll_compute([$projectId], $p['tgl_mulai'], $p['tgl_akhir']);
+    $thisP = null;
+    foreach ($res['periods'] as $x) if ($x['id'] === $pid) $thisP = $x;
+    $sisaW = []; foreach ($res['rows'] as $r) $sisaW[$r['worker_id']] = $r['sisa'];
+    $groupOut = $thisP ? ($thisP['grup_net'] - $thisP['grup_dibayar']) : 0.0;
+
+    $items = [];
+    if (!empty($b['semua'])) {
+        foreach ($sisaW as $wid => $s) if ($s > 0.004) $items[] = ['worker_id' => $wid, 'jumlah' => round($s, 2)];
+        if (abs($groupOut) > 0.004) $items[] = ['worker_id' => null, 'jumlah' => round($groupOut, 2)];
+    } else {
+        foreach ((array)($b['items'] ?? []) as $it) $items[] = ['worker_id' => !empty($it['worker_id']) ? (string)$it['worker_id'] : null, 'jumlah' => round((float)($it['jumlah'] ?? 0), 2)];
+    }
+    if (!$items) json_error('Tidak ada pembayaran yang perlu dicatat.', 422);
+
+    $ins = db()->prepare('INSERT INTO payroll_payments (id, period_id, worker_id, jumlah, tgl_bayar, metode, ket, created_by) VALUES (?,?,?,?,?,?,?,?)');
+    $total = 0.0;
+    db()->beginTransaction();
+    foreach ($items as $it) {
+        if ($it['worker_id'] === null) {
+            // group line: must not overshoot what is owed (a negative amount is a retained deduction)
+            if (abs($it['jumlah']) > abs($groupOut) + 0.005) { db()->rollBack(); json_error('Jumlah penyesuaian grup melebihi yang harus dibayar.', 422); }
+        } else {
+            if (!isset($sisaW[$it['worker_id']])) { db()->rollBack(); json_error('Pekerja tidak termasuk dalam periode ini.', 422); }
+            if ($it['jumlah'] <= 0 || $it['jumlah'] > $sisaW[$it['worker_id']] + 0.005) { db()->rollBack(); json_error('Jumlah bayar melebihi sisa gaji pekerja.', 422); }
+        }
+        $ins->execute([new_id('pay_'), $pid, $it['worker_id'], $it['jumlah'], $tglBayar, $metode, $clip($b['ket'] ?? '', 255), $user['id']]);
+        $total += $it['jumlah'];
+    }
+    // closed once nothing is outstanding
+    $after = payroll_compute([$projectId], $p['tgl_mulai'], $p['tgl_akhir']);
+    $out = $after['totals']['sisa'];
+    $neg = 0.0;
+    foreach ($after['periods'] as $x) if ($x['id'] === $pid) $neg = $x['grup_net'] - $x['grup_dibayar'];
+    $open = $out > 0.005 || $neg < -0.005;
+    if (!$open) db()->prepare("UPDATE payroll_periods SET status='dibayar', dibayar_at=NOW(), dibayar_by=? WHERE id=?")->execute([$user['id'], $pid]);
+    db()->commit();
+    audit('update', 'payroll_payments', $pid, sprintf('%d baris, total %s, %s%s', count($items), $total, $metode, $open ? '' : ' — LUNAS'));
+    json_response(['ok' => true, 'dibayar' => $total, 'lunas' => !$open, 'status' => $open ? 'diajukan' : 'dibayar']);
+}
+json_error('Aksi tidak dikenal.', 422);

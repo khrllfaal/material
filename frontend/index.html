@@ -320,7 +320,7 @@ function genSeqCode(prefix, existingCodes){
   while (existingCodes.indexOf(code) > -1);
   return code;
 }
-function today(){ return new Date().toISOString().slice(0,10); }
+function today(){ return localISO(new Date()); } // local date: toISOString() is UTC and gives yesterday before 07.00 WIB
 function fv(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; }
 function icons(){ if(window.lucide) lucide.createIcons(); }
 function toast(msg, danger){
@@ -550,7 +550,7 @@ document.addEventListener('click', function(e){
 document.getElementById('btnProfil').onclick=function(){
   document.getElementById('userMenu').classList.add('hidden');
   var u=STATE.user||{};
-  var roleLabel={admin:'Admin Pusat',owner:'Owner (read-only)',lapangan:'Admin Lapangan'}[u.role]||u.role;
+  var roleLabel={admin:'Admin Pusat',owner:'Owner (read-only)',lapangan:'Admin Lapangan',akuntan:'Akuntan'}[u.role]||u.role;
   openModal('Profil Saya',
     '<div class="space-y-3.5 text-sm">'+
       '<div><div class="text-xs font-semibold text-slate-400 mb-1">Nama</div><div class="font-semibold text-slate-800">'+esc(u.nama)+'</div></div>'+
@@ -580,7 +580,7 @@ function boot(user){
     document.getElementById('mobileShell').classList.add('hidden');
     document.getElementById('desktopShell').classList.remove('hidden');
     document.getElementById('desktopShell').style.display='block';
-    var roleLabel = {admin:'Admin Pusat',owner:'Owner (read-only)'}[user.role]||user.role;
+    var roleLabel = {admin:'Admin Pusat',owner:'Owner (read-only)',akuntan:'Akuntan'}[user.role]||user.role;
     document.getElementById('whoInfo').innerHTML = '<div class="font-semibold text-slate-200">'+esc(user.nama)+'</div>'+
       '<div class="mt-0.5">'+roleLabel+'</div>';
     document.getElementById('topbarName').textContent = user.nama;
@@ -591,7 +591,7 @@ function boot(user){
     document.getElementById('umRole').textContent = roleLabel;
     renderNav();
     icons();
-    go('dashboard');
+    go(user.role==='akuntan' ? 'rekap_gaji' : 'dashboard');
   }
 }
 
@@ -609,10 +609,17 @@ var NAV=[
   {id:'stock', label:'Monitor Stok', icon:'layers'},
   {id:'rap_proyek_report', label:'Analisis RAP per Proyek', icon:'trending-up'},
   {id:'rap_report', label:'Analisis RAP per Pekerjaan (detail)', icon:'trending-up'},
+  {id:'rekap_gaji', label:'Rekap Gaji', icon:'wallet'},
+  {id:'pekerja', label:'Pekerja & Tarif', icon:'hard-hat'},
+  {id:'kasbon', label:'Kasbon', icon:'banknote'},
   {id:'users', label:'Kelola User', icon:'users'},
 ];
+/* Akuntan keeps it simple: only the pay menus. */
+var NAV_AKUNTAN = ['rekap_gaji','pekerja','kasbon'];
 function renderNav(){
-  document.getElementById('navList').innerHTML = NAV.map(function(n){
+  var role = STATE.user && STATE.user.role;
+  var navItems = role==='akuntan' ? NAV.filter(function(n){ return NAV_AKUNTAN.indexOf(n.id)>-1; }) : NAV.filter(function(n){ return role==='admin' || n.id!=='users'; });
+  document.getElementById('navList').innerHTML = navItems.map(function(n){
     return '<a data-page="'+n.id+'" class="nav-link flex items-center gap-2.5 mx-3 my-0.5 px-3 py-2.5 rounded-xl text-[13.5px] font-medium cursor-pointer transition-colors">'+
       '<i data-lucide="'+n.icon+'" class="w-4 h-4"></i>'+esc(n.label)+'</a>';
   }).join('');
@@ -1215,14 +1222,14 @@ PAGES.dashboard = function(c){
       'Kondisi material seluruh proyek hari ini — deteksi dini untuk pengambilan keputusan. Klik angka atau status untuk melihat detailnya.',
       exportBtnsHtml('dPeriod')) +
     '<div class="flex flex-wrap items-center gap-2.5 mb-2">'+
-      '<input type="date" id="dashFrom" title="Dari tanggal (pemakaian vs RAP)" class="'+dateInput+'">'+
+      '<input type="date" id="dashFrom" title="Dari tanggal" class="'+dateInput+'">'+
       '<span class="text-slate-300 text-sm">–</span>'+
       '<input type="date" id="dashTo" title="Sampai tanggal (pemakaian vs RAP)" class="'+dateInput+'">'+
       '<button id="dashDateReset" class="'+btnGhostSm+'" title="Reset rentang tanggal">Reset</button>'+
       '<select id="dashProj" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 min-w-[200px]"><option value="">Semua Proyek</option></select>'+
       '<span id="dashUpdated" class="ml-auto text-xs text-slate-400"></span>'+
     '</div>'+
-    '<div class="text-xs text-slate-400 mb-6">Filter tanggal hanya berlaku untuk pemakaian vs RAP. Sisa stok selalu kumulatif sejak awal proyek.</div>'+
+    '<div class="text-xs text-slate-400 mb-6" id="dPeriodInfo">Seluruh periode.</div>'+
     '<div id="dKpi" class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5"></div>'+
     '<div class="grid lg:grid-cols-2 gap-5 mb-5">'+
       '<div>'+panel('<div id="dStockHealth"></div>')+'</div>'+
@@ -1320,14 +1327,32 @@ PAGES.dashboard = function(c){
       }); }, [2,3], dashCards);
   }
 
+  // Stock status and RAP status are both evaluated "as of" the chosen Sampai
+  // date, from transactions dated up to then; Dari–Sampai also feeds the
+  // movement summary line under the filters.
   function loadRapReport(){
     var qs = [];
     var from = fv('dashFrom'), to = fv('dashTo');
     if(from) qs.push('tgl_from='+encodeURIComponent(from));
     if(to) qs.push('tgl_to='+encodeURIComponent(to));
-    return apiFetch('/material_rap_proyek_report.php'+(qs.length?'?'+qs.join('&'):'')).then(function(data){
-      rapReportAll = data; render();
-    }).catch(function(e){ toast('Gagal memuat RAP: '+e.message, true); });
+    var q = qs.length?'?'+qs.join('&'):'';
+    return Promise.all([
+      apiFetch('/material_stock.php'+q), apiFetch('/material_rap_proyek_report.php'+q),
+    ]).then(function(r){
+      stockAll = r[0]; rapReportAll = r[1];
+      var info = document.getElementById('dPeriodInfo');
+      if(info){
+        if(from||to){
+          var masuk = stockAll.filter(function(x){ return x.masuk_periode>0; }).length, pakai = stockAll.filter(function(x){ return x.keluar_periode>0; }).length;
+          info.textContent = periodLabel(from, to)+': '+masuk+' bahan ada yang masuk, '+pakai+' bahan terpakai. Status stok & RAP dihitung per tanggal Sampai.';
+        } else info.textContent = 'Seluruh periode: status dihitung dari semua transaksi sejak awal proyek.';
+      }
+      render();
+    }).catch(function(e){
+      toast('Gagal memuat: '+e.message, true);
+      document.getElementById('dKpi').innerHTML='<div class="col-span-full text-center py-8">'+loadErrorHtml(e.message)+'</div>';
+      var rb=document.getElementById('btnRetry'); if(rb) rb.onclick=function(){ go('dashboard'); };
+    });
   }
 
   function render(){
@@ -1438,10 +1463,8 @@ PAGES.dashboard = function(c){
     document.getElementById('dashProj').innerHTML = '<option value="">Semua Proyek</option>'+
       list.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }).map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
     enhanceSelect(document.getElementById('dashProj'));
-    return apiFetch('/material_stock.php');
-  }).then(function(stockData){
-    stockAll = stockData;
-    loadRapReport();
+    return loadRapReport();
+  }).then(function(){
     document.getElementById('dashProj').addEventListener('change', render);
     var setDashPeriod = function(v){ document.getElementById('dPeriod').value = v; };
     document.getElementById('dashFrom').addEventListener('change', function(){ setDashPeriod('kustom'); loadRapReport(); });
@@ -1601,6 +1624,7 @@ function reportPage(cfg){
         '<span class="text-xs text-slate-400">'+esc(cfg.dateFilter.toLabel||'Sampai')+'</span>'+
         '<input type="date" id="rpTo" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100">'+
         '<button id="rpDateReset" class="'+btnGhostSm+'">Reset</button>'+
+        (cfg.movingFn ? '<label id="rpMovingWrap" class="hidden items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none"><input type="checkbox" id="rpMoving" class="w-4 h-4 rounded border-slate-300 text-indigo-600"> Hanya yang ada transaksi di periode ini</label>' : '')+
         '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span>'+
       '</div>'
     ) : '';
@@ -1629,9 +1653,13 @@ function reportPage(cfg){
     // on first load so it doesn't stick around on later visits.
     var pending = STATE.pendingFilter; STATE.pendingFilter = null;
     if(pending && pending.q!=null) document.getElementById('q').value = pending.q;
+    function movingOn(){
+      var cb = document.getElementById('rpMoving');
+      return !!(cfg.movingFn && cb && cb.checked && (fv('rpFrom') || fv('rpTo')));
+    }
     function cardPool(){
-      var projId = fv('fProj');
-      return projId ? rows.filter(function(r){ return r.project_id===projId; }) : rows;
+      var projId = fv('fProj'), mv = movingOn();
+      return rows.filter(function(r){ return (!projId || r.project_id===projId) && (!mv || cfg.movingFn(r)); });
     }
     function renderCards(){
       var el = document.getElementById('stCards');
@@ -1659,7 +1687,11 @@ function reportPage(cfg){
       if(keep!==true) PG.page=1;
       renderCards();
       var q=fv('q').toLowerCase(), projId=fv('fProj'), statusVal=cfg.statusFilter?fv('fStatus'):'';
+      var mvWrap = document.getElementById('rpMovingWrap');
+      if(mvWrap){ var hasP = !!(fv('rpFrom')||fv('rpTo')); mvWrap.classList.toggle('hidden', !hasP); mvWrap.classList.toggle('inline-flex', hasP); }
+      var mv = movingOn();
       filteredList = rows.filter(function(r){
+        if(mv && !cfg.movingFn(r)) return false;
         if(q && cfg.searchFn(r).toLowerCase().indexOf(q)===-1) return false;
         if(projId && r.project_id!==projId) return false;
         if(statusVal && r.status!==statusVal) return false;
@@ -1670,19 +1702,22 @@ function reportPage(cfg){
       // date is actually chosen; otherwise they are dead "–" columns that
       // push the status column off-screen. Export follows the same rule.
       var showPeriod = !!(fv('rpFrom') || fv('rpTo'));
-      var expCols = cfg.columns.filter(function(cl){ return !cl.periodOnly || showPeriod; });
+      var expCols = cfg.columns.filter(function(cl){ return (!cl.periodOnly || showPeriod) && !(cl.hideOnPeriod && showPeriod); });
       var visCols = expCols.filter(function(cl){ return !cl.screenHidden; });
       var dropIdx = (!showPeriod && cfg.periodExportIdx) ? cfg.periodExportIdx : [];
+      var perColExport = cfg.columns.every(function(cl){ return typeof cl.exp==='function'; });
       var exportStatus = STATUS_COL==null ? null : STATUS_COL - dropIdx.filter(function(i){ return i<STATUS_COL; }).length;
+      if(perColExport){ var si = expCols.findIndex(function(cl){ return cl.isStatus; }); exportStatus = si<0 ? null : si; }
       document.getElementById('cnt').textContent=list.length+' data';
-      document.getElementById('tbl').innerHTML='<thead><tr>'+visCols.map(function(cl){ return '<th class="'+TH_CLS+' leading-snug">'+esc(cl.label)+'</th>'; }).join('')+'</tr></thead>'+
+      document.getElementById('tbl').innerHTML='<thead><tr>'+visCols.map(function(cl){ return '<th class="'+TH_CLS+' leading-snug">'+esc(showPeriod && cl.labelPeriod ? cl.labelPeriod : cl.label)+'</th>'; }).join('')+'</tr></thead>'+
         '<tbody>'+(list.length?pagedSlice(list,PG).map(function(r){ return '<tr class="border-b border-slate-100 hover:bg-indigo-50/40">'+visCols.map(function(cl){ return '<td class="py-3 pr-4">'+cl.get(r)+'</td>'; }).join('')+'</tr>'; }).join(''):
         '<tr><td colspan="'+visCols.length+'" class="text-center text-slate-400 text-sm py-10">'+esc(cfg.emptyMsg)+'</td></tr>')+'</tbody>';
       renderPager(list.length, PG, draw);
       var fromNow = fv('rpFrom'), toNow = fv('rpTo');
       bindExportBtns(cfg.filename+(cfg.dateFilter?periodSuffix(fromNow, toNow):''), cfg.title,
-        cfg.dateFilter ? cfg.sub+' · '+periodLabel(fromNow, toNow) : cfg.sub, expCols.map(function(cl){ return cl.label; }),
+        cfg.dateFilter ? cfg.sub+' · '+periodLabel(fromNow, toNow) : cfg.sub, expCols.map(function(cl){ return showPeriod && cl.labelPeriod ? cl.labelPeriod : cl.label; }),
         function(){ return filteredList.map(function(r){
+          if(perColExport) return expCols.map(function(cl){ return cl.exp(r); });
           var row = cfg.exportRow(r);
           return dropIdx.length ? row.filter(function(_,i){ return dropIdx.indexOf(i)===-1; }) : row;
         }); }, exportStatus, cfg.statusFilter ? statusSummary(cardPool(), cfg.statusFilter.options) : null);
@@ -1718,6 +1753,7 @@ function reportPage(cfg){
       document.getElementById('q').addEventListener('input',draw);
       document.getElementById('fProj').addEventListener('change',draw);
       if(cfg.statusFilter) document.getElementById('fStatus').addEventListener('change',draw);
+      var mvCb = document.getElementById('rpMoving'); if(mvCb) mvCb.addEventListener('change',draw);
       if(cfg.dateFilter){
         var setPeriod = function(v){ document.getElementById('exPeriod').value = v; };
         document.getElementById('rpFrom').addEventListener('change', function(){ setPeriod('kustom'); load(); });
@@ -1743,7 +1779,8 @@ PAGES.rap_proyek_report = reportPage({
   title:'Analisis RAP per Proyek', sub:'Berapa pagu bahan sudah terpakai di setiap proyek — dipakai untuk memutuskan bahan mana yang perlu ditahan, ditambah pagunya, atau segera dikirim.',
   endpoint:'/material_rap_proyek_report.php', filename:'Analisis_RAP_per_Proyek', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:10, emptyMsg:'Belum ada RAP per Proyek yang diisi.',
+  movingFn:function(r){ return r.masuk_periode>0 || r.usage_periode>0; },
+  emptyMsg:'Belum ada RAP per Proyek yang diisi.',
   statusFilter:{options:[
     {value:'AMAN', label:'Aman'}, {value:'HAMPIR_HABIS', label:'Hampir Habis'},
     {value:'MELEBIHI', label:'Melebihi Pagu'}, {value:'DATA_TIDAK_LENGKAP', label:'Pagu Belum Diisi'},
@@ -1754,45 +1791,44 @@ PAGES.rap_proyek_report = reportPage({
     {t:'Terpakai & % Terpakai', d:'Pemakaian yang tercatat dibanding pagu. Hijau = aman (di bawah 90%), kuning = hampir habis (90% ke atas), merah = sudah melewati pagu.'},
     {t:'Sisa Pagu', d:'Pagu dikurangi pemakaian: sisa yang masih boleh dipakai proyek ini.'},
     {t:'Selisih', d:'Pemakaian dikurangi pagu. Minus = masih di bawah pagu; plus = sudah melewati pagu.'},
-    {t:'Tanggal', d:'Filter tanggal hanya menyaring pemakaian yang dihitung. Pagu dan barang masuk selalu angka penuh.'},
+    {t:'Saat periode dipilih', d:'Muncul kolom Datang (periode) dan Terpakai (periode) dari tanggal transaksi. Sisa Pagu, persentase, dan status tetap kumulatif sampai tanggal Sampai.'},
   ],
-  dateFilter:{hint:'Rentang tanggal hanya menyaring Pemakaian yang dihitung (mis. "pemakaian bulan ini"). Pagu dan Datang tetap angka penuh.'},
+  dateFilter:{hint:'Pilih periode: kolom (periode) memakai tanggal transaksi yang diinput. Pagu, sisa pagu, persentase, dan status dihitung kumulatif sampai tanggal "Sampai" karena pagu berlaku untuk seluruh proyek.'},
   columns:[
-    {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
-    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.satuan)+'</span>'; }},
-    {label:'Satuan', screenHidden:true, get:function(r){ return esc(r.satuan); }},
-    {label:'Pagu', get:function(r){ return num0(r.rap_qty); }},
-    {label:'Sudah Datang', get:function(r){ return num0(r.total_masuk); }},
-    {label:'Datang %', get:function(r){
+    {label:'Proyek', exp:function(r){ return r.project_nama; }, get:function(r){ return esc(r.project_nama); }},
+    {label:'Bahan', exp:function(r){ return r.material_nama; }, get:function(r){ return '<b>'+esc(r.material_nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.satuan)+'</span>'; }},
+    {label:'Satuan', screenHidden:true, exp:function(r){ return r.satuan; }, get:function(r){ return esc(r.satuan); }},
+    {label:'Pagu', exp:function(r){ return r.rap_qty; }, get:function(r){ return num0(r.rap_qty); }},
+    {label:'Datang (periode)', periodOnly:true, exp:function(r){ return r.masuk_periode; }, get:function(r){
+      return r.masuk_periode>0 ? '<b class="text-emerald-600">+'+num0(r.masuk_periode)+'</b>' : '<span class="text-slate-300">0</span>'; }},
+    {label:'Terpakai (periode)', periodOnly:true, exp:function(r){ return r.usage_periode; }, get:function(r){
+      return r.usage_periode>0 ? '<b class="text-amber-600">−'+num0(r.usage_periode)+'</b>' : '<span class="text-slate-300">0</span>'; }},
+    {label:'Sudah Datang', labelPeriod:'Datang (kumulatif)', exp:function(r){ return r.total_masuk; }, get:function(r){ return num0(r.total_masuk); }},
+    {label:'Datang %', exp:function(r){ return r.pct_didatangkan==null?'—':pct(r.pct_didatangkan); }, get:function(r){
       // Receiving control — independent of Pemakaian entirely, so it
       // works even when a proyek's admin lapangan never logs usage.
       if(r.pct_didatangkan==null) return '<span class="text-slate-300 italic">—</span>';
       if(r.pct_didatangkan>5) return cekPaguBadge();
       return '<b class="'+(r.pct_didatangkan>1?'text-red-600':'text-slate-700')+'">'+pct(r.pct_didatangkan)+'</b>';
     }},
-    {label:'Terpakai', get:function(r){ return num0(r.aktual_pemakaian); }},
-    {label:'Sisa Pagu', get:function(r){
+    {label:'Terpakai', labelPeriod:'Terpakai (kumulatif)', exp:function(r){ return r.aktual_pemakaian; }, get:function(r){ return num0(r.aktual_pemakaian); }},
+    {label:'Sisa Pagu', exp:function(r){ return r.sisa_kebutuhan; }, get:function(r){
       if(r.rap_qty==null) return '<span class="text-slate-300 italic">—</span>';
       return '<span class="font-semibold text-slate-800">'+num0(r.sisa_kebutuhan)+'</span>';
     }},
-    {label:'Selisih', get:function(r){ return '<b class="'+(r.deviasi>0?'text-red-600':'text-emerald-600')+'">'+numSigned(r.deviasi)+'</b>'; }},
-    {label:'% Terpakai', get:function(r){
+    {label:'Selisih', exp:function(r){ return r.deviasi; }, get:function(r){ return '<b class="'+(r.deviasi>0?'text-red-600':'text-emerald-600')+'">'+numSigned(r.deviasi)+'</b>'; }},
+    {label:'% Terpakai', exp:function(r){ return r.persentase==null?'–':pct(r.persentase); }, get:function(r){
       if(r.persentase==null) return '<span class="text-slate-300 italic">—</span>';
       if(r.persentase>5) return cekPaguBadge();
       var c = r.persentase>1 ? 'text-red-600' : (r.persentase>=0.9 ? 'text-amber-600' : 'text-emerald-600');
       return '<b class="'+c+'">'+pct(r.persentase)+'</b>';
     }},
-    {label:'Status', get:function(r){
+    {label:'Status', isStatus:true, exp:function(r){ return r.status; }, get:function(r){
       var map={AMAN:['aman','Aman'],HAMPIR_HABIS:['warn','Hampir Habis'],MELEBIHI:['danger','Melebihi Pagu'],DATA_TIDAK_LENGKAP:['neutral','Pagu Belum Diisi']};
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){
-    return [r.project_nama, r.material_nama, r.satuan, r.rap_qty, r.total_masuk,
-      r.pct_didatangkan==null?'—':pct(r.pct_didatangkan), r.aktual_pemakaian, r.sisa_kebutuhan,
-      r.deviasi, r.persentase==null?'–':pct(r.persentase), r.status];
-  },
 });
 
 PAGES.riwayat = function(c){
@@ -1951,9 +1987,10 @@ PAGES.stock = reportPage({
   title:'Monitor Stok Bahan (Semua Proyek)', sub:'Stok fisik di lapangan dan perkiraan kapan perlu kirim lagi — metrik RAP (pagu/ambang batas) ada di Analisis RAP per Proyek.',
   endpoint:'/material_stock.php', filename:'Monitor_Stok_Bahan', searchPlaceholder:'Cari proyek / bahan…',
   searchFn:function(r){ return r.project_nama+' '+r.material_nama; },
-  statusCol:10, periodExportIdx:[7,8],
+  movingFn:function(r){ return r.masuk_periode>0 || r.keluar_periode>0; },
   guide:[
     {t:'Total Masuk, Pemakaian, Sisa Stok', d:'Saldo fisik di lapangan: barang yang sudah datang, sudah terpakai, dan yang masih ada sekarang.'},
+    {t:'Saat periode dipilih', d:'Stok Awal = sisa sebelum tanggal Dari. Masuk dan Pemakaian = transaksi bertanggal di dalam periode. Stok Akhir = sisa pada tanggal Sampai. Centang "Hanya yang ada transaksi" untuk menyembunyikan bahan yang tidak bergerak.'},
     {t:'Pesan Ulang Saat', d:'Begitu sisa stok sama atau di bawah angka ini, pesan lagi. Laju harian × 10 hari (waktu kirim + cadangan). Laju diambil dari hitungan fisik bila ada, kalau tidak dari pemakaian yang tercatat.'},
     {t:'Fisik & tidak tercatat', d:'Angka fisik adalah hitungan terakhir di lapangan. ⚠ berarti material keluar dari lapangan lebih banyak daripada yang tercatat sebagai pemakaian di antara dua hitungan.'},
     {t:'Perkiraan Habis', d:'Perkiraan tanggal stok habis jika pemakaian tetap seperti biasa. Tidak tampil jika pemakaian belum cukup dicatat.'},
@@ -1971,18 +2008,23 @@ PAGES.stock = reportPage({
   // evaluated as of that date); "Dari" only narrows the two "Periode
   // Ini" columns below — never the running balance, which a lower
   // bound would otherwise silently corrupt.
-  dateFilter:{hint:'"Sampai" = lihat Sisa Stok seolah-olah per tanggal itu (saldo sebelumnya tetap terbawa). "Dari" hanya menyaring kolom Periode Ini — Total Masuk, Total Pemakaian, dan Sisa Stok tidak ikut terpotong oleh "Dari".'},
+  dateFilter:{hint:'Pilih periode: tabel berubah menjadi kartu stok — Stok Awal + Masuk − Pemakaian = Stok Akhir, dihitung dari tanggal transaksi yang diinput. Tanpa periode: total sejak awal proyek.'},
   emptyMsg:'Belum ada data bahan masuk/pemakaian.',
   columns:[
-    {label:'Proyek', get:function(r){ return esc(r.project_nama); }},
-    {label:'Bahan', get:function(r){ return '<b>'+esc(r.material_nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.satuan)+'</span>'; }},
-    {label:'Satuan', screenHidden:true, get:function(r){ return esc(r.satuan); }},
-    {label:'Total Masuk', get:function(r){ return num0(r.total_masuk); }},
-    {label:'Total Pemakaian', get:function(r){
+    {label:'Proyek', exp:function(r){ return r.project_nama; }, get:function(r){ return esc(r.project_nama); }},
+    {label:'Bahan', exp:function(r){ return r.material_nama; }, get:function(r){ return '<b>'+esc(r.material_nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.satuan)+'</span>'; }},
+    {label:'Satuan', screenHidden:true, exp:function(r){ return r.satuan; }, get:function(r){ return esc(r.satuan); }},
+    {label:'Stok Awal', periodOnly:true, exp:function(r){ return r.stok_awal; }, get:function(r){ return num0(r.stok_awal); }},
+    {label:'Masuk', periodOnly:true, exp:function(r){ return r.masuk_periode; }, get:function(r){
+      return r.masuk_periode>0 ? '<b class="text-emerald-600">+'+num0(r.masuk_periode)+'</b>' : '<span class="text-slate-300">0</span>'; }},
+    {label:'Pemakaian', periodOnly:true, exp:function(r){ return r.keluar_periode; }, get:function(r){
+      return r.keluar_periode>0 ? '<b class="text-amber-600">−'+num0(r.keluar_periode)+'</b>' : '<span class="text-slate-300">0</span>'; }},
+    {label:'Total Masuk', hideOnPeriod:true, exp:function(r){ return r.total_masuk; }, get:function(r){ return num0(r.total_masuk); }},
+    {label:'Total Pemakaian', hideOnPeriod:true, exp:function(r){ return r.total_keluar; }, get:function(r){
       return num0(r.total_keluar)+
         (r.usage_stale?' <span class="text-amber-500" title="Ada Bahan Masuk tapi Pemakaian belum/lama tidak diupdate — kemungkinan pemakaian riil lebih tinggi dari yang tercatat">⚠</span>':'');
     }},
-    {label:'Sisa Stok', get:function(r){
+    {label:'Sisa Stok', labelPeriod:'Stok Akhir', exp:function(r){ return r.stok; }, get:function(r){
       var fisik = r.stok_fisik!=null
         ? '<div class="text-xs text-slate-400 mt-0.5">fisik '+num0(r.stok_fisik)+' · '+esc(r.stok_fisik_tgl)+'</div>'
         : '';
@@ -1991,39 +2033,22 @@ PAGES.stock = reportPage({
         : '';
       return '<b>'+num0(r.stok)+'</b>'+(fv('rpTo')?' <span class="text-xs text-slate-400">per '+esc(fv('rpTo'))+'</span>':'')+fisik+hilang;
     }},
-    {label:'Pesan Ulang Saat', get:function(r){
+    {label:'Pesan Ulang Saat', exp:function(r){ return r.reorder_point==null ? '—' : Math.round(r.reorder_point*1000)/1000; }, get:function(r){
       if(r.reorder_point==null) return '<span class="text-slate-300 italic" title="Butuh pemakaian terbaru atau hitungan sisa stok untuk menghitung">belum ada hitungan</span>';
       var src = r.rate_source==='FISIK' ? 'dari hitungan fisik' : 'dari pemakaian';
       return '<b class="text-slate-800">'+num0(r.reorder_point)+'</b> <span class="text-xs text-slate-400" title="laju '+num0(r.daily_usage_rate)+'/hari × '+r.reorder_cover_hari+' hari">'+src+'</span>';
     }},
-    {label:'Masuk Periode Ini', periodOnly:true, get:function(r){
-      if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
-      return num0(r.masuk_periode);
-    }},
-    {label:'Pemakaian Periode Ini', periodOnly:true, get:function(r){
-      if(!fv('rpFrom') && !fv('rpTo')) return '<span class="text-slate-300 italic" title="Atur Dari/Sampai untuk lihat pergerakan periode ini">–</span>';
-      return num0(r.keluar_periode);
-    }},
-    {label:'Perkiraan Habis', get:function(r){
-      // Simple run-rate forecast (days-of-supply): avg daily usage
-      // observed so far, projected against current stock. Only shown
-      // when usage logging is active and recent — a rate from stale or
-      // near-zero data would just be a confident-looking wrong number.
+    {label:'Perkiraan Habis', exp:function(r){ return r.forecast_date||'—'; }, get:function(r){
       if(r.forecast_date==null) return '<span class="text-slate-300 italic" title="Butuh riwayat Pemakaian yang aktif (bukan data lama) untuk dihitung">— belum cukup data</span>';
       var soon = r.forecast_days<=14;
       return '<span class="'+(soon?'text-red-600 font-bold':'text-slate-600')+'">'+esc(r.forecast_date)+'</span> <span class="text-xs text-slate-400">('+r.forecast_days+' hari lagi)</span>';
     }},
-    {label:'Status', get:function(r){
+    {label:'Status', isStatus:true, exp:function(r){ return r.status; }, get:function(r){
       var map={AMAN:['aman','Aman'],MENIPIS:['warn','Perlu Dikirim'],HABIS:['danger','Stok Habis'],DATA_TIDAK_LENGKAP:['neutral','RAP Belum Diisi'],BELUM_ADA_HITUNGAN:['neutral','Belum Ada Hitungan'],BELUM_ADA_TRANSAKSI:['neutral','Belum Ada Transaksi']};
       var m=map[r.status]||['neutral',r.status];
       return badge(m[0], m[1]);
     }},
   ],
-  exportRow:function(r){
-    return [r.project_nama, r.material_nama, r.satuan, r.total_masuk, r.total_keluar,
-      r.stok, r.reorder_point==null?'—':Math.round(r.reorder_point*1000)/1000,
-      r.masuk_periode, r.keluar_periode, r.forecast_date||'—', r.status];
-  },
 });
 
 PAGES.rap_report = reportPage({
@@ -2063,6 +2088,581 @@ PAGES.rap_report = reportPage({
 });
 
 /* ---------------- user management (admin only) ---------------- */
+/* ============================================================
+   GAJI PEKERJA — Rekap Gaji, Pekerja & Tarif, Kasbon
+   Admin Pusat and Akuntan write; Owner reads. All money is computed on the
+   server (payroll_lib.php) from the rate snapshot stored with each absen row,
+   so the screen, the payment and the download always agree.
+   ============================================================ */
+function rp(n){ n = Number(n)||0; return (n<0?'−':'')+'Rp '+Math.abs(Math.round(n)).toLocaleString('id-ID'); }
+function canWritePay(){ return !!(STATE.user && (STATE.user.role==='admin' || STATE.user.role==='akuntan')); }
+var HARI_ABBR = ['MG','SN','SL','RB','KM','JM','SB'];
+var PAY_BADGE = {lunas:['aman','Lunas'], sebagian:['warn','Sebagian'], belum:['danger','Belum dibayar'], nol:['neutral','—']};
+var FLAG_LABEL = {tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan'};
+function fmtHariVal(v){ return v===1 ? '1' : (v===0.5 ? '½' : (v>0 ? String(v).replace('.',',') : '–')); }
+function datesBetween(from, to, max){ var out=[], d=from; while(d<=to && out.length<(max||62)){ out.push(d); d=addDays(d,1); } return out; }
+function periodStatusBadge(st){ var m = PERIOD_STATUS[st]||PERIOD_STATUS.draft; return badge(m[0], m[1]); }
+
+PAGES.rekap_gaji = function(c){
+  var write = canWritePay();
+  var wk = weekOf(today());
+  var G = {from:wk.from, to:wk.to, data:null, bayar:'', flagOnly:false, open:{}, PG:{page:1}, preset:'minggu'};
+  var projects = [];
+  var selCls = 'px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100';
+  c.innerHTML = pageHead('Rekap Gaji', 'Absen dari lapangan langsung menjadi rekap gaji. Pilih periode, cek angkanya, lalu catat pembayaran.',
+      '<div class="flex items-center gap-2 flex-wrap justify-end"><button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button>'+
+      '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button></div>')+
+    '<div id="gjCards" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5"></div>'+
+    panel(
+      '<div class="flex items-center gap-3 flex-wrap mb-3">'+
+        '<div class="relative flex-1 min-w-[200px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute z-[2] pointer-events-none left-3 top-1/2 -translate-y-1/2"></i>'+
+        '<input type="text" id="q" placeholder="Cari nama pekerja / tim…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
+        '<select id="fProj" class="'+selCls+' min-w-[180px]"><option value="">Semua Proyek</option></select>'+
+        '<select id="gjBayar" class="'+selCls+' min-w-[150px]"><option value="">Semua status bayar</option><option value="belum">Belum dibayar</option><option value="sebagian">Sebagian</option><option value="lunas">Lunas</option></select>'+
+        '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span>'+
+      '</div>'+
+      '<div class="flex items-center gap-3 flex-wrap mb-4">'+
+        '<select id="gjPreset" class="'+selCls+' font-semibold"><option value="minggu">Minggu ini (Jum–Kam)</option><option value="lalu">Minggu lalu</option><option value="bulan">Bulan ini</option><option value="kustom">Rentang manual</option></select>'+
+        '<span class="text-xs text-slate-400">Dari</span><input type="date" id="gjFrom" class="'+selCls+'">'+
+        '<span class="text-xs text-slate-400">Sampai</span><input type="date" id="gjTo" class="'+selCls+'">'+
+        '<span class="text-xs text-slate-400" id="gjRangeNote"></span>'+
+      '</div>'+
+      TBL_WRAP
+    )+'<div class="mt-6"><div class="text-sm font-extrabold text-slate-700 mb-3 px-1">Periode, penyesuaian &amp; pembayaran</div><div id="gjPeriods"></div></div>';
+  icons();
+  enhanceClearable(document.getElementById('q'));
+  enhanceSelect(document.getElementById('gjBayar'));
+  enhanceSelect(document.getElementById('gjPreset'));
+  document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to;
+
+  function setPreset(v){
+    var t = today();
+    if(v==='minggu'){ var w=weekOf(t); G.from=w.from; G.to=w.to; }
+    else if(v==='lalu'){ var w2=weekOf(addDays(t,-7)); G.from=w2.from; G.to=w2.to; }
+    else if(v==='bulan'){ var d=parseISO(t); G.from=localISO(new Date(d.getFullYear(), d.getMonth(), 1)); G.to=t; }
+    document.getElementById('gjFrom').value=G.from; document.getElementById('gjTo').value=G.to;
+  }
+  function load(){
+    var qs = 'tgl_from='+G.from+'&tgl_to='+G.to+(fv('fProj')?'&project_id='+encodeURIComponent(fv('fProj')):'');
+    document.getElementById('gjRangeNote').textContent = G.from===G.to ? fmtTglPanjang(G.from) : fmtTglPendek(G.from)+' – '+fmtTglPendek(G.to)+' '+G.to.slice(0,4);
+    return apiFetch('/payroll.php?'+qs).then(function(d){ G.data = d; draw(); })
+      .catch(function(e){
+        toast('Gagal memuat: '+e.message, true);
+        document.getElementById('gjCards').innerHTML='';
+        document.getElementById('tbl').innerHTML='<tbody><tr><td class="py-10 text-center">'+loadErrorHtml(e.message)+'</td></tr></tbody>';
+        var rb=document.getElementById('btnRetry'); if(rb) rb.onclick=function(){ load(); };
+      });
+  }
+  function filtered(){
+    var q = fv('q').toLowerCase(), by = fv('gjBayar');
+    return G.data.rows.filter(function(r){
+      if(q && (r.nama+' '+r.tim+' '+r.grade_nama).toLowerCase().indexOf(q)===-1) return false;
+      if(by && r.status_bayar!==by) return false;
+      if(G.bayarCard && r.status_bayar!=='belum' && r.status_bayar!=='sebagian') return false;
+      if(G.flagOnly && !r.flags.length) return false;
+      return true;
+    });
+  }
+  function drawCards(){
+    var t = G.data.totals;
+    var card = function(icon, color, label, val, sub, attr, on){
+      return '<'+(attr?'button type="button" '+attr:'div')+' class="flex flex-col items-start text-left bg-white rounded-2xl border p-4 shadow-sm transition-all '+(attr?'hover:shadow-md ':'')+(on?'border-indigo-400 ring-2 ring-indigo-100':'border-slate-200')+'">'+
+        '<div class="flex items-center gap-2 text-sm font-semibold text-slate-600 leading-snug"><i data-lucide="'+icon+'" class="w-4 h-4 '+color+'"></i>'+esc(label)+'</div>'+
+        '<div class="text-2xl font-extrabold text-slate-900 mt-3 leading-none tabular-nums">'+val+'</div>'+
+        '<div class="text-xs text-slate-400 mt-2">'+sub+'</div></'+(attr?'button':'div')+'>';
+    };
+    var net = t.tambah + t.grup_tambah - t.potong - t.grup_potong;
+    document.getElementById('gjCards').innerHTML =
+      card('wallet','text-indigo-500','Total Pembayaran', rp(t.total_bayar), t.pekerja+' pekerja · '+num0(t.hari)+' hari kerja')+
+      card('calendar-check','text-emerald-500','Gaji Pokok', rp(t.gaji), num0(t.hari)+' hari × tarif harian')+
+      card('history','text-sky-500','Lembur', rp(t.lembur_rp), num0(t.lembur_jam)+' jam dicatat · '+num0(t.lembur_jam_bayar)+' jam dibayar')+
+      card('banknote','text-amber-500','Tambahan & Potongan', (net<0?'−':(net>0?'+':''))+rp(Math.abs(net)).replace('Rp ','Rp '), '+'+rp(t.tambah+t.grup_tambah).replace('Rp ','')+' / −'+rp(t.potong+t.grup_potong).replace('Rp ',''))+
+      card('send','text-red-500','Belum Dibayar', rp(t.sisa), t.belum_dibayar+' pekerja · klik untuk menyaring', 'data-gj-card="bayar"', !!G.bayarCard)+
+      card('alert-triangle','text-orange-500','Perlu Dicek', String(t.perlu_dicek), 'absen kosong, tarif 0, lembur tinggi', 'data-gj-card="flag"', G.flagOnly);
+    document.querySelectorAll('[data-gj-card]').forEach(function(b){
+      b.onclick = function(){
+        if(b.getAttribute('data-gj-card')==='bayar') G.bayarCard = !G.bayarCard; else G.flagOnly = !G.flagOnly;
+        G.PG.page = 1; draw();
+      };
+    });
+  }
+  function dayChips(r){
+    var days = datesBetween(G.from, G.to, 62);
+    if(days.length > 31) days = days.filter(function(d){ return r.days[d]; });
+    if(!days.length) return '<span class="text-xs text-slate-400">Tidak ada absen pada rentang ini.</span>';
+    return '<div class="flex flex-wrap gap-1.5">'+days.map(function(d){
+      var v = r.days[d], dt = parseISO(d);
+      var cls = !v ? 'bg-slate-50 text-slate-300 border-slate-100' : (v[0]===1 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : (v[0]===0.5 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-red-50 text-red-500 border-red-100'));
+      return '<div class="w-[52px] rounded-lg border px-1 py-1.5 text-center '+cls+'"><div class="text-[10px] font-bold opacity-70">'+HARI_ABBR[dt.getDay()]+' '+dt.getDate()+'</div>'+
+        '<div class="text-sm font-extrabold leading-tight">'+(v?fmtHariVal(v[0]):'?')+'</div>'+
+        '<div class="text-[10px] font-semibold">'+(v && v[1]>0 ? '+'+fmtJam(v[1])+'j' : '&nbsp;')+'</div></div>';
+    }).join('')+'</div>';
+  }
+  function rowDetail(r){
+    var adj = [];
+    (G.data.periods||[]).forEach(function(p){ if(p.project_id!==r.project_id) return; p.adjustments.forEach(function(x){ if(x.worker_id===r.worker_id) adj.push(x); }); });
+    var saldo = G.data.kasbon_saldo[r.project_id+'|'+r.worker_id];
+    return '<div class="px-4 py-4 bg-slate-50/70 rounded-xl m-2">'+
+      '<div class="flex flex-wrap gap-x-8 gap-y-1 text-xs text-slate-500 mb-3">'+
+        '<span>Tarif harian <b class="text-slate-700">'+rp(r.tarif_harian)+'</b></span><span>Lembur per jam <b class="text-slate-700">'+rp(r.tarif_lembur)+'</b></span>'+
+        '<span>Jam lembur dibayar <b class="text-slate-700">'+fmtJam(r.lembur_jam_bayar)+'</b> <span class="text-slate-400">(dicatat '+fmtJam(r.lembur_jam)+', dikurangi 0,5 jam istirahat per hari lembur)</span></span>'+
+        (r.no_rek ? '<span>Rekening <b class="text-slate-700">'+esc(r.no_rek)+'</b></span>' : '')+
+        (saldo ? '<span>Saldo kasbon <b class="text-red-600">'+rp(saldo)+'</b></span>' : '')+
+      '</div>'+dayChips(r)+
+      (adj.length ? '<div class="mt-3 text-xs text-slate-500">'+adj.map(function(x){ return '<div>'+(x.jenis==='tambah'?'<b class="text-emerald-600">+':'<b class="text-red-600">−')+rp(x.jumlah).replace('Rp ','Rp ')+'</b> '+esc(x.label)+'</div>'; }).join('')+'</div>' : '')+
+      (r.flags.length ? '<div class="mt-3 flex flex-wrap gap-1.5">'+r.flags.map(function(f){ return '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700">⚠ '+esc(FLAG_LABEL[f]||f)+(f==='belum_diisi'&&r.kosong?' ('+r.kosong+' hari)':'')+'</span>'; }).join('')+'</div>' : '')+
+    '</div>';
+  }
+  function draw(){
+    drawCards();
+    var list = filtered(), multi = !fv('fProj') && new Set(G.data.rows.map(function(r){ return r.project_id; })).size > 1;
+    document.getElementById('cnt').textContent = list.length+' pekerja';
+    var cols = ['Pekerja'].concat(multi?['Proyek']:[], ['Hari','Lembur','Gaji','Lembur (Rp)','± Penyesuaian','Diterima','Status']);
+    var body = pagedSlice(list, G.PG).map(function(r){
+      var k = r.project_id+'|'+r.worker_id, open = !!G.open[k], adj = r.tambah - r.potong, b = PAY_BADGE[r.status_bayar]||PAY_BADGE.nol;
+      return '<tr class="border-b border-slate-100 hover:bg-indigo-50/40 cursor-pointer" data-gj-row="'+esc(k)+'">'+
+        '<td class="py-3 pr-4"><div class="flex items-center gap-2"><i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 shrink-0 transition-transform '+(open?'rotate-90':'')+'"></i>'+
+          '<div><div class="font-bold text-slate-800 leading-tight">'+esc(r.nama)+(r.flags.length?' <span class="text-orange-500" title="Perlu dicek">⚠</span>':'')+'</div>'+
+          '<div class="text-xs text-slate-400 mt-0.5"><span class="font-semibold '+((GRADE_CLS[r.grade]||'').split(' ')[1]||'')+'">'+esc(r.grade_nama)+'</span>'+(r.tim?' · '+esc(r.tim):'')+'</div></div></div></td>'+
+        (multi?'<td class="py-3 pr-4 text-slate-600">'+esc(r.project_nama)+'</td>':'')+
+        '<td class="py-3 pr-4 tabular-nums">'+num0(r.hari)+'</td>'+
+        '<td class="py-3 pr-4 tabular-nums">'+(r.lembur_jam>0?fmtJam(r.lembur_jam)+' <span class="text-xs text-slate-400">jam</span>':'<span class="text-slate-300">–</span>')+'</td>'+
+        '<td class="py-3 pr-4 tabular-nums">'+rp(r.gaji)+'</td>'+
+        '<td class="py-3 pr-4 tabular-nums">'+(r.lembur_rp>0?rp(r.lembur_rp):'<span class="text-slate-300">–</span>')+'</td>'+
+        '<td class="py-3 pr-4 tabular-nums '+(adj<0?'text-red-600':(adj>0?'text-emerald-600':'text-slate-300'))+'">'+(adj===0?'–':(adj>0?'+':'')+rp(adj).replace('Rp ','Rp '))+'</td>'+
+        '<td class="py-3 pr-4 tabular-nums font-extrabold text-slate-900">'+rp(r.net)+'</td>'+
+        '<td class="py-3 pr-4">'+badge(b[0], b[1])+'</td></tr>'+
+        (open?'<tr class="border-b border-slate-100"><td colspan="'+cols.length+'" class="p-0">'+rowDetail(r)+'</td></tr>':'');
+    }).join('');
+    document.getElementById('tbl').innerHTML = '<thead><tr>'+cols.map(function(h){ return '<th class="'+TH_CLS+'">'+h+'</th>'; }).join('')+'</tr></thead><tbody>'+
+      (list.length ? body : '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada absen pada periode ini.</td></tr>')+'</tbody>';
+    renderPager(list.length, G.PG, draw);
+    document.querySelectorAll('[data-gj-row]').forEach(function(tr){
+      tr.onclick = function(){ var k = tr.getAttribute('data-gj-row'); G.open[k] = !G.open[k]; draw(); icons(); };
+    });
+    icons();
+    drawPeriods();
+    bindPayExports(list);
+  }
+  function bindPayExports(list){
+    var headers = ['Proyek','Nama','Status','Tim','Hari','Lembur (jam dicatat)','Gaji','Lembur (Rp)','Tambahan','Potongan','Diterima','Sudah dibayar','Sisa','Status bayar'];
+    var rowsFn = function(){
+      var out = list.map(function(r){ return [r.project_nama, r.nama, r.grade_nama, r.tim, r.hari, r.lembur_jam, Math.round(r.gaji), Math.round(r.lembur_rp), Math.round(r.tambah), Math.round(r.potong), Math.round(r.net), Math.round(r.dibayar), Math.round(r.sisa), (PAY_BADGE[r.status_bayar]||['',''])[1]]; });
+      var sum = function(i){ return out.reduce(function(a,r){ return a+(Number(r[i])||0); }, 0); };
+      out.push(['TOTAL','','','', sum(4), sum(5), sum(6), sum(7), sum(8), sum(9), sum(10), sum(11), sum(12), '']);
+      return out;
+    };
+    var sub = 'Periode '+G.from+' s/d '+G.to;
+    bindExportBtns('Rekap_Gaji_'+G.from+'_sd_'+G.to, 'Rekap Gaji Pekerja', sub, headers, rowsFn, null, null);
+  }
+
+  /* ---- periods ---- */
+  function drawPeriods(){
+    var host = document.getElementById('gjPeriods'), pj = G.data.periods.filter(function(p){ return p.hari>0 || p.adjustments.length || p.payments.length; });
+    if(!pj.length){ host.innerHTML = '<div class="text-sm text-slate-400 bg-white rounded-2xl border border-slate-200 px-5 py-8 text-center">Belum ada periode dengan absen pada rentang ini.</div>'; return; }
+    host.innerHTML = pj.map(function(p){
+      var locked = p.status==='dibayar';
+      var mini = function(l, v, cls){ return '<div><div class="text-[11px] font-semibold text-slate-400">'+l+'</div><div class="text-[15px] font-extrabold tabular-nums '+(cls||'text-slate-800')+'">'+v+'</div></div>'; };
+      var adjRows = p.adjustments.map(function(x){
+        return '<tr class="border-t border-slate-100"><td class="py-2 pr-3 text-sm">'+esc(x.label)+(x.kategori==='kasbon'?' <span class="text-[11px] font-bold text-red-500">kasbon</span>':'')+'</td>'+
+          '<td class="py-2 pr-3 text-xs text-slate-500">'+(x.worker_nama?esc(x.worker_nama):'Seluruh grup')+'</td>'+
+          '<td class="py-2 pr-3 text-right tabular-nums font-bold '+(x.jenis==='tambah'?'text-emerald-600':'text-red-600')+'">'+(x.jenis==='tambah'?'+':'−')+rp(x.jumlah).replace('Rp ','Rp ')+'</td>'+
+          '<td class="py-2 text-right">'+(write && !locked?'<button class="text-xs text-slate-300 hover:text-red-600 font-bold" data-adj-del="'+esc(x.id)+'" title="Hapus">✕</button>':'')+'</td></tr>';
+      }).join('');
+      var btn = function(attr, icon, label, primary){ return '<button type="button" '+attr+' class="'+(primary?btnPrimary:btnGhostSm+' flex items-center gap-1')+'">'+(icon?'<i data-lucide="'+icon+'" class="w-3.5 h-3.5"></i>':'')+label+'</button>'; };
+      var acts = '';
+      if(write && !locked) acts += btn('data-pj-adj="'+esc(p.id)+'"','plus','Tambahan / Potongan');
+      if(write && p.status==='draft') acts += btn('data-pj-ajukan="'+esc(p.id)+'"','send','Ajukan (atas nama lapangan)');
+      if(write && p.status==='diajukan') acts += btn('data-pj-bayar="'+esc(p.id)+'"','banknote','Catat Pembayaran', true);
+      if(STATE.user.role==='admin' && p.status==='diajukan' && !p.payments.length) acts += btn('data-pj-buka="'+esc(p.id)+'"','','Buka kembali');
+      if(write && !locked) acts += btn('data-pj-head="'+esc(p.id)+'"','','Ubah PJ / grup');
+      acts += btn('data-pj-xls="'+esc(p.id)+'"','file-down','Absen Upah (Excel)');
+      acts += btn('data-pj-pdf="'+esc(p.id)+'"','file-text','Daftar Bayar (PDF)');
+      return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-4">'+
+        '<div class="flex items-start justify-between gap-3 flex-wrap mb-4"><div><div class="font-extrabold text-slate-800">'+esc(p.project_nama)+'</div>'+
+          '<div class="text-xs text-slate-500 mt-0.5">'+esc(fmtTglPendek(p.tgl_mulai))+' – '+esc(fmtTglPendek(p.tgl_akhir))+' '+p.tgl_akhir.slice(0,4)+
+          (p.pj_nama?' · PJ <b class="text-slate-700">'+esc(p.pj_nama)+'</b>':'')+(p.grup_nama?' · '+esc(p.grup_nama):'')+'</div></div>'+periodStatusBadge(p.status)+'</div>'+
+        '<div class="grid grid-cols-2 md:grid-cols-6 gap-4 pb-4 border-b border-slate-100">'+
+          mini('Pekerja', p.pekerja)+mini('Hari kerja', num0(p.hari))+mini('Gaji + lembur', rp(p.gaji+p.lembur_rp))+
+          mini('Tambahan / potongan', (p.adj_tambah-p.adj_potong===0?'–':(p.adj_tambah-p.adj_potong>0?'+':'')+rp(p.adj_tambah-p.adj_potong)))+
+          mini('Total pembayaran', rp(p.total_bayar),'text-indigo-700')+mini('Sisa belum dibayar', rp(Math.max(0,p.sisa)), p.sisa>0.5?'text-red-600':'text-emerald-600')+'</div>'+
+        (p.adjustments.length ? '<table class="w-full mt-3"><tbody>'+adjRows+'</tbody></table>' : '<div class="text-xs text-slate-400 mt-3">Belum ada tambahan / potongan.</div>')+
+        '<div class="flex flex-wrap gap-2 mt-4">'+acts+'</div></div>';
+    }).join('');
+    icons();
+    var P = function(id){ return G.data.periods.find(function(x){ return x.id===id; }); };
+    var on = function(sel, attr, fn){ host.querySelectorAll(sel).forEach(function(b){ b.onclick = function(){ fn(P(b.getAttribute(attr))); }; }); };
+    on('[data-pj-adj]','data-pj-adj', openAdjustment); on('[data-pj-bayar]','data-pj-bayar', openPayment);
+    on('[data-pj-ajukan]','data-pj-ajukan', doAjukan); on('[data-pj-buka]','data-pj-buka', doBuka); on('[data-pj-head]','data-pj-head', openHeader);
+    on('[data-pj-xls]','data-pj-xls', function(p){ exportAbsenUpah(p); }); on('[data-pj-pdf]','data-pj-pdf', function(p){ exportDaftarBayar(p); });
+    host.querySelectorAll('[data-adj-del]').forEach(function(b){
+      b.onclick = function(){ confirmModal('Hapus Penyesuaian','Hapus baris ini dari periode?', function(){
+        apiFetch('/payroll_adjustments.php?id='+encodeURIComponent(b.getAttribute('data-adj-del')), {method:'DELETE'}).then(function(){ toast('Dihapus.'); load(); }).catch(function(e){ toast(e.message, true); });
+      }); };
+    });
+  }
+
+  function post(url, body, okMsg){
+    return apiFetch(url, {method:'POST', body:JSON.stringify(body)}).then(function(r){ if(okMsg) toast(okMsg); closeModal(); return load().then(function(){ return r; }); })
+      .catch(function(e){ toast(e.message, true); });
+  }
+  function openHeader(p){
+    openModal('Penanggung Jawab & Grup',
+      '<div class="space-y-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Penanggung jawab</label><input id="hd_pj" type="text" value="'+esc(p.pj_nama)+'" class="'+fieldCls+'"></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama grup</label><input id="hd_grup" type="text" value="'+esc(p.grup_nama)+'" class="'+fieldCls+'"></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Catatan</label><input id="hd_cat" type="text" value="'+esc(p.catatan)+'" class="'+fieldCls+'"></div></div>',
+      function(){ post('/payroll_periods.php', {action:'header', project_id:p.project_id, tgl:p.tgl_mulai, pj_nama:fv('hd_pj'), grup_nama:fv('hd_grup'), catatan:fv('hd_cat')}, 'Disimpan.'); });
+  }
+  function doAjukan(p){
+    if(!p.pj_nama){ toast('Isi penanggung jawab dulu lewat "Ubah PJ / grup".', true); return; }
+    confirmModal('Ajukan Periode','Tandai absen periode ini sebagai <b>diajukan</b>? Setelah itu lapangan tidak bisa mengubahnya dan akuntan bisa mencatat pembayaran.', function(){
+      post('/payroll_periods.php', {action:'ajukan', project_id:p.project_id, tgl:p.tgl_mulai, pj_nama:p.pj_nama, grup_nama:p.grup_nama}, 'Periode diajukan.');
+    });
+  }
+  function doBuka(p){
+    openModal('Buka Kembali Pengajuan','<p class="text-sm text-slate-600 mb-3">Pengajuan dikembalikan ke <b>Draft</b> agar lapangan/Admin Pusat bisa mengoreksi absen. Hanya bisa jika belum ada pembayaran.</p>'+
+      '<label class="block text-xs font-semibold text-slate-500 mb-1.5">Alasan *</label><input id="bk_alasan" type="text" class="'+fieldCls+'">',
+      function(){ if(!fv('bk_alasan')){ toast('Alasan wajib diisi.', true); return; } post('/payroll_periods.php', {action:'buka', project_id:p.project_id, tgl:p.tgl_mulai, alasan:fv('bk_alasan')}, 'Pengajuan dibuka kembali.'); });
+  }
+  function openAdjustment(p){
+    var ws = G.data.rows.filter(function(r){ return r.project_id===p.project_id; });
+    var optsW = '<option value="">Seluruh grup (satu angka untuk semua)</option>'+ws.map(function(r){ return '<option value="'+esc(r.worker_id)+'">'+esc(r.nama)+' · '+esc(r.grade_nama)+'</option>'; }).join('');
+    openModal('Tambahan / Potongan — '+p.project_nama,
+      '<div class="space-y-4">'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis</label><select id="ad_kat" class="'+fieldCls+'">'+
+          '<option value="tambahan|tambah">Tambahan (mis. air galon, uang makan)</option><option value="bonus|tambah">Bonus</option>'+
+          '<option value="potongan|potong">Potongan (denda, alat hilang)</option><option value="kasbon|potong">Potong kasbon</option></select></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Untuk</label><select id="ad_w" class="'+fieldCls+'">'+optsW+'</select><div id="ad_saldo" class="text-xs text-slate-500 mt-1.5"></div></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan *</label><input id="ad_label" type="text" class="'+fieldCls+'" placeholder="mis. air galon, kasbon minggu lalu"></div>'+
+        '<div class="grid grid-cols-3 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Qty</label>'+numInputHtml('ad_qty','',fieldCls)+'</div>'+
+          '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Harga satuan</label>'+numInputHtml('ad_harga','',fieldCls)+'</div>'+
+          '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Atau jumlah (Rp)</label>'+numInputHtml('ad_jumlah','',fieldCls)+'</div></div>'+
+        '<div class="text-xs text-slate-400">Isi Qty × Harga, atau langsung Jumlah. Contoh sheet: air galon 54 × 7.000 = 378.000.</div>'+
+      '</div>',
+      function(){
+        var kp = fv('ad_kat').split('|'), qty = parseIdNum(fv('ad_qty')), harga = parseIdNum(fv('ad_harga')), jum = parseIdNum(fv('ad_jumlah'));
+        if(!fv('ad_label')){ toast('Keterangan wajib diisi.', true); return; }
+        var body = {project_id:p.project_id, tgl:p.tgl_mulai, jenis:kp[1], kategori:kp[0], label:fv('ad_label'), worker_id:fv('ad_w')||null};
+        if(!Number.isNaN(qty) && !Number.isNaN(harga)){ body.qty = qty; body.harga = harga; }
+        else if(!Number.isNaN(jum)) body.jumlah = jum;
+        else { toast('Isi Qty × Harga atau Jumlah.', true); return; }
+        post('/payroll_adjustments.php', body, 'Ditambahkan.');
+      });
+    var upd = function(){
+      var el = document.getElementById('ad_saldo'); if(!el) return;
+      if(fv('ad_kat').split('|')[0]!=='kasbon'){ el.textContent=''; return; }
+      var s = G.data.kasbon_saldo[p.project_id+'|'+fv('ad_w')];
+      el.innerHTML = 'Saldo kasbon: <b class="'+(s>0?'text-red-600':'text-slate-500')+'">'+rp(s||0)+'</b>'+(s>0?'':' — belum ada kasbon, catat dulu di menu Kasbon');
+    };
+    document.getElementById('ad_kat').addEventListener('change', upd); document.getElementById('ad_w').addEventListener('change', upd);
+  }
+  function openPayment(p){
+    apiFetch('/payroll.php?project_id='+encodeURIComponent(p.project_id)+'&tgl_from='+p.tgl_mulai+'&tgl_to='+p.tgl_akhir).then(function(d){
+      var per = d.periods.find(function(x){ return x.id===p.id; }) || p;
+      var owed = d.rows.filter(function(r){ return r.sisa>0.5; });
+      var grp = per.grup_net - per.grup_dibayar;
+      if(!owed.length && Math.abs(grp)<0.5){ toast('Semua sudah dibayar.'); return; }
+      var rowsHtml = owed.map(function(r){
+        return '<tr class="border-t border-slate-100"><td class="py-2 pr-2"><input type="checkbox" checked data-py-w="'+esc(r.worker_id)+'" class="w-4 h-4"></td>'+
+          '<td class="py-2 pr-3 text-sm"><b>'+esc(r.nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.grade_nama)+'</span></td>'+
+          '<td class="py-2 pr-3 text-right text-xs text-slate-400 tabular-nums">sisa '+rp(r.sisa)+'</td>'+
+          '<td class="py-2"><input type="text" data-num inputmode="decimal" data-py-amt="'+esc(r.worker_id)+'" value="'+fmtIdNum(Math.round(r.sisa))+'" class="w-32 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-right tabular-nums"></td></tr>';
+      }).join('');
+      var grpHtml = Math.abs(grp)>=0.5 ? '<tr class="border-t border-slate-200 bg-slate-50"><td class="py-2 pr-2"><input type="checkbox" checked data-py-grp class="w-4 h-4"></td><td class="py-2 pr-3 text-sm font-bold">Penyesuaian grup</td>'+
+        '<td class="py-2 pr-3 text-right text-xs text-slate-400">tambahan − potongan</td><td class="py-2 text-right font-bold tabular-nums pr-1">'+rp(grp)+'</td></tr>' : '';
+      var total = owed.reduce(function(a,r){ return a+r.sisa; },0)+grp;
+      openModal('Catat Pembayaran — '+p.project_nama,
+        '<div class="grid grid-cols-2 gap-3 mb-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal bayar</label><input id="py_tgl" type="date" value="'+today()+'" class="'+fieldCls+'"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Metode</label><select id="py_met" class="'+fieldCls+'"><option value="tunai">Tunai</option><option value="transfer">Transfer</option></select></div></div>'+
+        '<div class="max-h-[46vh] overflow-auto rounded-xl border border-slate-200 px-3"><table class="w-full">'+rowsHtml+grpHtml+'</table></div>'+
+        '<div class="text-xs text-slate-500 mt-3">Yang dicentang akan dicatat sebagai dibayar. Total jika semua dibayar: <b class="text-slate-800">'+rp(total)+'</b></div>',
+        function(){
+          var items = [];
+          document.querySelectorAll('[data-py-w]').forEach(function(cb){
+            if(!cb.checked) return;
+            var id = cb.getAttribute('data-py-w'), amt = parseIdNum(document.querySelector('[data-py-amt="'+id+'"]').value);
+            if(!Number.isNaN(amt) && amt>0) items.push({worker_id:id, jumlah:amt});
+          });
+          var gcb = document.querySelector('[data-py-grp]'); if(gcb && gcb.checked) items.push({worker_id:null, jumlah:Math.round(grp*100)/100});
+          if(!items.length){ toast('Pilih minimal satu pembayaran.', true); return; }
+          post('/payroll_periods.php', {action:'bayar', project_id:p.project_id, tgl:p.tgl_mulai, tgl_bayar:fv('py_tgl'), metode:fv('py_met'), items:items}, 'Pembayaran tercatat ✓');
+        });
+      var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Catat Dibayar';
+    }).catch(function(e){ toast(e.message, true); });
+  }
+
+  /* ---- exports for one period ---- */
+  function periodData(p){
+    return apiFetch('/payroll.php?project_id='+encodeURIComponent(p.project_id)+'&tgl_from='+p.tgl_mulai+'&tgl_to='+p.tgl_akhir).then(function(d){
+      return {period:d.periods.find(function(x){ return x.id===p.id; })||p, rows:d.rows, totals:d.totals};
+    });
+  }
+  function exportDaftarBayar(p){
+    periodData(p).then(function(d){
+      var rows = d.rows.filter(function(r){ return r.net>0 || r.hari>0; }).map(function(r, i){
+        return [i+1, r.nama, r.grade_nama, r.tim, r.hari, Math.round(r.net), Math.round(r.dibayar), Math.round(r.sisa), ''];
+      });
+      var sum = function(i){ return rows.reduce(function(a,r){ return a+(Number(r[i])||0); }, 0); };
+      rows.push(['', 'TOTAL PEKERJA', '', '', sum(4), sum(5), sum(6), sum(7), '']);
+      var g = d.period;
+      if(Math.abs(g.grup_net)>0.5) rows.push(['', 'Penyesuaian grup (tambahan - potongan)', '', '', '', Math.round(g.grup_net), '', '', '']);
+      rows.push(['', 'TOTAL PEMBAYARAN', '', '', '', Math.round(g.total_bayar), Math.round(g.dibayar), Math.round(g.sisa), '']);
+      exportPdf('Daftar Pembayaran Upah — '+p.project_nama, 'Periode '+p.tgl_mulai+' s/d '+p.tgl_akhir+(g.pj_nama?' · PJ '+g.pj_nama:'')+(g.grup_nama?' · '+g.grup_nama:''),
+        ['No','Nama','Status','Tim','Hari','Diterima (Rp)','Dibayar','Sisa','Tanda tangan'], rows, {});
+    }).catch(function(e){ toast(e.message, true); });
+  }
+  function exportAbsenUpah(p){ periodData(p).then(function(d){ exportAbsenUpahExcel(d.period, d.rows); }).catch(function(e){ toast(e.message, true); }); }
+
+  /* ---- wiring ---- */
+  apiFetch('/projects.php').then(function(list){
+    projects = list.slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); });
+    document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+projects.map(function(x){ return '<option value="'+esc(x.id)+'">'+esc(x.nama)+'</option>'; }).join('');
+    enhanceSelect(document.getElementById('fProj'));
+    var pend = STATE.pendingFilter; STATE.pendingFilter = null;
+    return load();
+  });
+  document.getElementById('q').addEventListener('input', function(){ G.PG.page=1; if(G.data) draw(); });
+  document.getElementById('gjBayar').addEventListener('change', function(){ G.PG.page=1; if(G.data) draw(); });
+  document.getElementById('fProj').addEventListener('change', function(){ G.PG.page=1; load(); });
+  document.getElementById('gjPreset').addEventListener('change', function(){ if(this.value!=='kustom'){ setPreset(this.value); } G.PG.page=1; load(); });
+  ['gjFrom','gjTo'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){
+      var f = fv('gjFrom'), t = fv('gjTo');
+      if(!f || !t) return;
+      if(t < f){ toast('Tanggal sampai harus setelah tanggal dari.', true); return; }
+      G.from = f; G.to = t;
+      var sel = document.getElementById('gjPreset'); sel.value = 'kustom'; sel.dispatchEvent(new Event('ss-refresh'));
+      G.PG.page=1; load();
+    });
+  });
+};
+
+/* Excel in the same layout as the paper "Absen Upah" sheet. */
+async function exportAbsenUpahExcel(period, rows){
+  try{ await loadExcelJS(); } catch(e){ toast('Gagal memuat modul Excel — cek koneksi lalu coba lagi.', true); return; }
+  var wb = new ExcelJS.Workbook(); wb.creator = 'Material & Stok'; wb.created = new Date();
+  var ws = wb.addWorksheet('Absen Upah');
+  var days = datesBetween(period.tgl_mulai, period.tgl_akhir, 7);
+  var LAST = 2 + days.length*2 + 8; // No, Nama, 2/day, Ket, Gaji, Hari, Total, /jam, jam, total, Grand
+  var thin = {style:'thin', color:{argb:'FF94A3B8'}};
+  var box = function(cell){ cell.border = {top:thin, left:thin, bottom:thin, right:thin}; };
+  var put = function(r, c, v, o){ var cell = ws.getCell(r, c); cell.value = v; o = o||{}; cell.font = {name:'Calibri', size:o.size||10, bold:!!o.bold, color:{argb:o.color||'FF0F172A'}};
+    cell.alignment = {horizontal:o.h||'left', vertical:'middle', wrapText:!!o.wrap}; if(o.fill) cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:o.fill}}; if(o.numFmt) cell.numFmt = o.numFmt; if(o.box) box(cell); return cell; };
+  ws.mergeCells(1,1,1,LAST); put(1,1,'ABSEN UPAH KERJA',{bold:true,size:14,h:'center'});
+  ws.mergeCells(2,1,2,LAST); put(2,1,'Absensi Periode Tgl. '+fmtTglPendek(period.tgl_mulai)+' '+period.tgl_mulai.slice(0,4)+'  s/d  '+fmtTglPendek(period.tgl_akhir)+' '+period.tgl_akhir.slice(0,4),{h:'center'});
+  put(3,1,'Penanggung jawab',{bold:true}); put(3,4,period.pj_nama||'-');
+  put(4,1,'Nama Grup',{bold:true}); put(4,4,period.grup_nama||'-'); put(4,LAST-6,'Jam Kerja :',{bold:true}); put(4,LAST-4,'07.00 - 16.00',{bold:true});
+  put(4,2,'');
+  var H1 = 6, H2 = 7, hdrFill = 'FFE2E8F0';
+  ws.mergeCells(H1,1,H2,1); put(H1,1,'No',{bold:true,h:'center',fill:hdrFill,box:true});
+  ws.mergeCells(H1,2,H2,2); put(H1,2,'Nama Karyawan',{bold:true,h:'center',fill:hdrFill,box:true});
+  days.forEach(function(d,i){ var c = 3+i*2, dt = parseISO(d);
+    ws.mergeCells(H1,c,H1,c+1); put(H1,c,HARI_ABBR[dt.getDay()]+' '+dt.getDate(),{bold:true,h:'center',fill:hdrFill,box:true}); box(ws.getCell(H1,c+1));
+    put(H2,c,'',{fill:hdrFill,box:true}); put(H2,c+1,'lmbr',{h:'center',fill:hdrFill,box:true,size:9}); });
+  var cK = 3+days.length*2;
+  var singles = [['Ket',0],['Gaji Harian',1],['Jumlah Hari kerja',2],['Total Gaji',3],['Lembur per jam',4],['Jam lembur dibayar',5],['Total Lembur',6],['Grand Total',7]];
+  singles.forEach(function(s){ var c = cK+s[1]; ws.mergeCells(H1,c,H2,c); put(H1,c,s[0],{bold:true,h:'center',fill:hdrFill,box:true,wrap:true}); box(ws.getCell(H2,c)); });
+  ws.getRow(H1).height = 20; ws.getRow(H2).height = 16;
+  var r0 = H2+1, money = '#,##0', row = r0;
+  rows.forEach(function(r, i){
+    put(row,1,i+1,{h:'center',box:true}); put(row,2,r.nama,{box:true});
+    days.forEach(function(d, di){ var v = r.days[d], c = 3+di*2;
+      put(row,c, v && v[0]>0 ? v[0] : '',{h:'center',box:true}); put(row,c+1, v && v[1]>0 ? v[1] : '',{h:'center',box:true}); });
+    put(row,cK,{KTK:'KTK',TK:'TK',LD:'LD',OBK:'OBK',SPR:'SPR',OMX:'OMX',LAIN:'LAIN'}[r.grade]||r.grade,{h:'center',box:true});
+    put(row,cK+1,r.tarif_harian,{h:'right',box:true,numFmt:money}); put(row,cK+2,r.hari,{h:'center',box:true,numFmt:'0.0'});
+    put(row,cK+3,Math.round(r.gaji),{h:'right',box:true,numFmt:money}); put(row,cK+4,r.tarif_lembur,{h:'right',box:true,numFmt:money});
+    put(row,cK+5,r.lembur_jam_bayar,{h:'center',box:true,numFmt:'0.0'}); put(row,cK+6,Math.round(r.lembur_rp),{h:'right',box:true,numFmt:money});
+    put(row,cK+7,Math.round(r.gaji+r.lembur_rp),{h:'right',box:true,bold:true,numFmt:money});
+    row++;
+  });
+  var rEnd = row-1;
+  // headcount per day (overall and per status)
+  var count = function(filterFn, d){ return rows.filter(function(r){ return filterFn(r) && r.days[d] && r.days[d][0]>0; }).length; };
+  var sumRow = function(label, fn){ put(row,2,label,{bold:true,box:true});
+    days.forEach(function(d,di){ var c = 3+di*2, n = count(fn,d); ws.mergeCells(row,c,row,c+1); put(row,c,n,{h:'center',bold:true,box:true}); box(ws.getCell(row,c+1)); }); row++; };
+  sumRow('Total Pekerja', function(){ return true; });
+  Object.keys(GRADE_NAMA).forEach(function(g){ if(rows.some(function(r){ return r.grade===g; })) sumRow('Total '+GRADE_NAMA[g], function(r){ return r.grade===g; }); });
+  var G0 = rows.reduce(function(a,r){ return a+r.gaji+r.lembur_rp; },0);
+  var lab = cK+5;
+  var line = function(label, val, bold, fill){ ws.mergeCells(row,lab-1,row,lab+1); put(row,lab-1,label,{bold:bold,h:'right',fill:fill}); put(row,cK+7,Math.round(val),{bold:bold,h:'right',numFmt:money,fill:fill,box:true}); row++; };
+  row++;
+  line('GRAND TOTAL', G0, true, 'FFFEF3C7');
+  (period.adjustments||[]).forEach(function(x){ line((x.worker_nama?x.worker_nama+' — ':'')+x.label, (x.jenis==='tambah'?1:-1)*x.jumlah, false); });
+  line('TOTAL PEMBAYARAN', period.total_bayar, true, 'FFDCFCE7');
+  ws.getColumn(1).width = 5; ws.getColumn(2).width = 22;
+  for(var i=3;i<cK;i++) ws.getColumn(i).width = 5;
+  ws.getColumn(cK).width = 7; ws.getColumn(cK+1).width = 13; ws.getColumn(cK+2).width = 9; ws.getColumn(cK+3).width = 14; ws.getColumn(cK+4).width = 11; ws.getColumn(cK+5).width = 10; ws.getColumn(cK+6).width = 13; ws.getColumn(cK+7).width = 15;
+  ws.views = [{state:'frozen', xSplit:2, ySplit:H2}];
+  ws.pageSetup = {orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9};
+  var buf = await wb.xlsx.writeBuffer();
+  var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download = 'Absen_Upah_'+filenameFromTitle(period.project_nama||'proyek')+'_'+period.tgl_mulai+'_sd_'+period.tgl_akhir+'.xlsx';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+}
+
+PAGES.pekerja = function(c){
+  var write = canWritePay();
+  var D = {projects:[], workers:[], rates:[], proj:'', PG:{page:1}};
+  var selCls = 'px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100';
+  c.innerHTML = pageHead('Pekerja & Tarif', 'Daftar pekerja per proyek dan tarif upah per status. Perubahan tarif hanya berlaku untuk absen berikutnya (kecuali Anda memilih menerapkannya ke periode yang belum dibayar).',
+      write ? '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>Pekerja</button>' : '')+
+    panel('<div class="flex items-center justify-between flex-wrap gap-3 mb-1"><div class="font-extrabold text-slate-800">Tarif per status</div>'+
+      '<select id="trProj" class="'+selCls+' min-w-[220px]"></select></div>'+
+      '<div class="text-xs text-slate-400 mb-4">Lembur dikosongkan = tarif harian ÷ 8, dibulatkan ke bawah per Rp500. Jam lembur dibayar = jam dicatat − 0,5 jam istirahat.</div>'+
+      '<div id="trTable"></div>'+
+      (write ? '<label class="flex items-center gap-2 text-xs font-semibold text-slate-600 mt-4 cursor-pointer"><input type="checkbox" id="trApply" class="w-4 h-4 rounded border-slate-300"> Terapkan juga ke absen yang sudah ada tapi belum dibayar (koreksi tarif)</label>' : ''))+
+    '<div class="mt-5"></div>'+
+    panel('<div class="flex items-center gap-3 flex-wrap mb-4"><div class="relative flex-1 min-w-[200px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute z-[2] pointer-events-none left-3 top-1/2 -translate-y-1/2"></i>'+
+      '<input type="text" id="q" placeholder="Cari nama / tim…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
+      '<select id="fProj" class="'+selCls+' min-w-[180px]"><option value="">Semua Proyek</option></select>'+
+      '<select id="fGrade" class="'+selCls+'"><option value="">Semua status</option>'+GRADE_ORDER.map(function(g){ return '<option value="'+g+'">'+esc(GRADE_NAMA[g])+'</option>'; }).join('')+'</select>'+
+      '<label class="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer"><input type="checkbox" id="fOff" class="w-4 h-4 rounded border-slate-300"> Tampilkan nonaktif</label>'+
+      '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span></div>'+TBL_WRAP);
+  icons();
+  enhanceClearable(document.getElementById('q'));
+  var rateOf = function(pid, g){ return D.rates.find(function(r){ return r.project_id===pid && r.grade===g; }); };
+  function eff(w){
+    var r = rateOf(w.project_id, w.grade) || {tarif_harian:0, tarif_lembur:0};
+    var h = w.tarif_harian!=null ? w.tarif_harian : r.tarif_harian;
+    var l = w.tarif_lembur!=null ? w.tarif_lembur : (w.tarif_harian==null && r.tarif_lembur>0 ? r.tarif_lembur : Math.floor(h/8/500)*500);
+    return [h, l, w.tarif_harian!=null || w.tarif_lembur!=null];
+  }
+  function drawRates(){
+    var pid = D.proj; if(!pid){ document.getElementById('trTable').innerHTML=''; return; }
+    document.getElementById('trTable').innerHTML = '<table class="w-full"><thead><tr><th class="'+TH_CLS+'">Status</th><th class="'+TH_CLS+'">Tarif harian (Rp)</th><th class="'+TH_CLS+'">Lembur per jam (Rp)</th><th class="'+TH_CLS+'">Pekerja</th><th class="'+TH_CLS+'"></th></tr></thead><tbody>'+
+      GRADE_ORDER.map(function(g){
+        var r = rateOf(pid, g), n = D.workers.filter(function(w){ return w.project_id===pid && w.grade===g && w.aktif; }).length;
+        var inp = function(id, v){ return write ? numInputHtml(id, v||'', 'w-36 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-right tabular-nums', ' placeholder="0"') : '<span class="tabular-nums">'+(v?rp(v):'<span class="text-slate-300">belum diisi</span>')+'</span>'; };
+        return '<tr class="border-b border-slate-100"><td class="py-2.5 pr-4"><b>'+esc(GRADE_NAMA[g])+'</b> <span class="text-xs text-slate-400">'+g+'</span></td>'+
+          '<td class="py-2.5 pr-4">'+inp('tr_h_'+g, r&&r.tarif_harian)+'</td><td class="py-2.5 pr-4">'+inp('tr_l_'+g, r&&r.tarif_lembur)+'</td>'+
+          '<td class="py-2.5 pr-4 text-sm text-slate-500">'+n+' orang</td>'+
+          '<td class="py-2.5">'+(write?'<button class="'+btnGhostSm+'" data-tr-save="'+g+'">Simpan</button>':'')+'</td></tr>';
+      }).join('')+'</tbody></table>';
+    document.querySelectorAll('[data-tr-save]').forEach(function(b){
+      b.onclick = function(){
+        var g = b.getAttribute('data-tr-save'), h = parseIdNum(fv('tr_h_'+g)), l = parseIdNum(fv('tr_l_'+g));
+        if(Number.isNaN(h) || h<=0){ toast('Isi tarif harian dulu.', true); return; }
+        var body = {project_id:pid, grade:g, tarif_harian:h, apply_unpaid: !!(document.getElementById('trApply')||{}).checked};
+        if(!Number.isNaN(l) && l>0) body.tarif_lembur = l;
+        apiFetch('/labor_rates.php', {method:'POST', body:JSON.stringify(body)}).then(function(r){
+          toast('Tarif '+GRADE_NAMA[g]+' disimpan'+(r.diterapkan?' · '+r.diterapkan+' absen diperbarui':'')+'.'); return load();
+        }).catch(function(e){ toast(e.message, true); });
+      };
+    });
+  }
+  function drawWorkers(){
+    var q = fv('q').toLowerCase(), pj = fv('fProj'), gr = fv('fGrade'), off = document.getElementById('fOff').checked;
+    var list = D.workers.filter(function(w){
+      if(!off && !w.aktif) return false;
+      if(pj && w.project_id!==pj) return false;
+      if(gr && w.grade!==gr) return false;
+      if(q && (w.nama+' '+w.tim).toLowerCase().indexOf(q)===-1) return false;
+      return true;
+    });
+    document.getElementById('cnt').textContent = list.length+' pekerja';
+    var pn = function(id){ var p = D.projects.find(function(x){ return x.id===id; }); return p?p.nama:id; };
+    var cols = ['Nama','Status','Tim','Proyek','Tarif harian','Lembur/jam','Rekening']; if(write) cols.push('');
+    document.getElementById('tbl').innerHTML = '<thead><tr>'+cols.map(function(h){ return '<th class="'+TH_CLS+'">'+h+'</th>'; }).join('')+'</tr></thead><tbody>'+
+      (list.length ? pagedSlice(list, D.PG).map(function(w){
+        var e = eff(w);
+        return '<tr class="border-b border-slate-100 hover:bg-indigo-50/40 '+(w.aktif?'':'opacity-50')+'"><td class="py-3 pr-4"><b>'+esc(w.nama)+'</b>'+(w.aktif?'':' <span class="text-xs text-slate-400">nonaktif</span>')+'</td>'+
+          '<td class="py-3 pr-4"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(GRADE_CLS[w.grade]||GRADE_CLS.LAIN)+'">'+esc(GRADE_NAMA[w.grade]||w.grade)+'</span></td>'+
+          '<td class="py-3 pr-4 text-slate-600">'+esc(w.tim||'–')+'</td><td class="py-3 pr-4 text-slate-600">'+esc(pn(w.project_id))+'</td>'+
+          '<td class="py-3 pr-4 tabular-nums">'+(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>')+(e[2]?' <span class="text-[10px] font-bold text-indigo-500">khusus</span>':'')+'</td>'+
+          '<td class="py-3 pr-4 tabular-nums">'+(e[1]?rp(e[1]):'–')+'</td><td class="py-3 pr-4 text-xs text-slate-500">'+esc(w.no_rek||'–')+'</td>'+
+          (write?'<td class="py-3"><button class="'+btnGhostSm+'" data-w-edit="'+esc(w.id)+'">Edit</button></td>':'')+'</tr>';
+      }).join('') : '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada pekerja. Admin Lapangan bisa menambahkannya dari HP, atau tambahkan di sini.</td></tr>')+'</tbody>';
+    renderPager(list.length, D.PG, drawWorkers);
+    document.querySelectorAll('[data-w-edit]').forEach(function(b){ b.onclick = function(){ openWorker(b.getAttribute('data-w-edit')); }; });
+  }
+  function openWorker(id){
+    var w = id ? D.workers.find(function(x){ return x.id===id; }) : null;
+    var v = function(k, d){ return w && w[k]!=null ? w[k] : (d===undefined?'':d); };
+    openModal(w?'Edit Pekerja':'Tambah Pekerja',
+      '<div class="space-y-4">'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek *</label><select id="wk_proj" class="'+fieldCls+'">'+D.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===(w?w.project_id:(D.proj||fv('fProj')))?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('')+'</select></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama *</label><input id="wk_nama" type="text" value="'+esc(v('nama'))+'" class="'+fieldCls+'"></div>'+
+        '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Status *</label><select id="wk_grade" class="'+fieldCls+'">'+GRADE_ORDER.map(function(g){ return '<option value="'+g+'"'+(g===v('grade','TK')?' selected':'')+'>'+esc(GRADE_NAMA[g])+'</option>'; }).join('')+'</select></div>'+
+          '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tim</label><input id="wk_tim" type="text" value="'+esc(v('tim'))+'" class="'+fieldCls+'"></div></div>'+
+        '<div class="rounded-xl bg-slate-50 border border-slate-200 p-3"><div class="text-xs font-semibold text-slate-500 mb-2">Tarif khusus (opsional — kosongkan agar ikut tarif status)</div>'+
+          '<div class="grid grid-cols-2 gap-3"><div>'+numInputHtml('wk_h', v('tarif_harian',''), fieldCls, ' placeholder="harian"')+'</div><div>'+numInputHtml('wk_l', v('tarif_lembur',''), fieldCls, ' placeholder="lembur/jam"')+'</div></div></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Rekening / e-wallet (opsional)</label><input id="wk_rek" type="text" value="'+esc(v('no_rek'))+'" class="'+fieldCls+'"></div>'+
+        '<label class="flex items-center gap-2 text-sm font-semibold text-slate-600"><input type="checkbox" id="wk_aktif" class="w-4 h-4" '+(!w||w.aktif?'checked':'')+'> Aktif</label>'+
+      '</div>',
+      function(){
+        var h = parseIdNum(fv('wk_h')), l = parseIdNum(fv('wk_l'));
+        var body = {id:id||'', project_id:fv('wk_proj'), nama:fv('wk_nama'), grade:fv('wk_grade'), tim:fv('wk_tim'), no_rek:fv('wk_rek'), aktif:document.getElementById('wk_aktif').checked,
+          tarif_harian: Number.isNaN(h)?null:h, tarif_lembur: Number.isNaN(l)?null:l};
+        if(!id) delete body.id;
+        if(!body.nama){ toast('Nama wajib diisi.', true); return; }
+        apiFetch('/workers.php', {method:'POST', body:JSON.stringify(body)}).then(function(){ closeModal(); toast('Disimpan.'); return load(); }).catch(function(e){ toast(e.message, true); });
+      });
+  }
+  function load(){
+    return Promise.all([apiFetch('/projects.php'), apiFetch('/workers.php?all=1'), apiFetch('/labor_rates.php')]).then(function(r){
+      D.projects = r[0].slice().sort(function(a,b){ return a.nama.localeCompare(b.nama); }); D.workers = r[1]; D.rates = r[2];
+      var opt = D.projects.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('');
+      var tp = document.getElementById('trProj'); var keep = D.proj || (D.projects[0] && D.projects[0].id) || ''; D.proj = keep;
+      tp.innerHTML = opt; tp.value = keep;
+      var fp = document.getElementById('fProj'), fk = fp.value; fp.innerHTML = '<option value="">Semua Proyek</option>'+opt; fp.value = fk;
+      if(!tp._enhanced) enhanceSelect(tp); else tp.dispatchEvent(new Event('ss-refresh'));
+      if(!fp._enhanced) enhanceSelect(fp); else fp.dispatchEvent(new Event('ss-refresh'));
+      drawRates(); drawWorkers();
+    }).catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+  }
+  load();
+  document.getElementById('trProj').addEventListener('change', function(){ D.proj = this.value; drawRates(); });
+  ['q'].forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ D.PG.page=1; drawWorkers(); }); });
+  ['fProj','fGrade','fOff'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ D.PG.page=1; drawWorkers(); }); });
+  var ba = document.getElementById('btnAdd'); if(ba) ba.onclick = function(){ openWorker(null); };
+};
+
+PAGES.kasbon = function(c){
+  var write = canWritePay();
+  var K = {data:{kasbon:[], saldo:[]}, projects:[], workers:[]};
+  c.innerHTML = pageHead('Kasbon', 'Buku kasbon pekerja / penanggung jawab. Saldo berkurang otomatis saat Anda memotong kasbon pada gaji di Rekap Gaji.',
+      write ? '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>Kasbon</button>' : '')+
+    '<div class="grid lg:grid-cols-2 gap-5"><div id="ksSaldo"></div><div id="ksRiwayat"></div></div>';
+  icons();
+  function draw(){
+    var sal = K.data.saldo.filter(function(s){ return Math.abs(s.saldo)>0.5; });
+    document.getElementById('ksSaldo').innerHTML = panel('<div class="font-extrabold text-slate-800 mb-3">Saldo kasbon berjalan</div>'+
+      (sal.length ? '<table class="w-full"><tbody>'+sal.map(function(s){ return '<tr class="border-t border-slate-100"><td class="py-2.5 pr-3"><b>'+esc(s.nama)+'</b><div class="text-xs text-slate-400">'+esc(s.project_nama)+'</div></td><td class="py-2.5 text-right font-extrabold tabular-nums '+(s.saldo>0?'text-red-600':'text-slate-500')+'">'+rp(s.saldo)+'</td></tr>'; }).join('')+'</tbody></table>'
+        : '<div class="text-sm text-slate-400 py-6 text-center">Tidak ada kasbon yang masih berjalan.</div>'));
+    document.getElementById('ksRiwayat').innerHTML = panel('<div class="font-extrabold text-slate-800 mb-3">Riwayat kasbon diberikan</div>'+
+      (K.data.kasbon.length ? '<table class="w-full"><tbody>'+K.data.kasbon.map(function(k){ return '<tr class="border-t border-slate-100"><td class="py-2.5 pr-3"><b>'+esc(k.worker_nama||'Grup / penanggung jawab')+'</b><div class="text-xs text-slate-400">'+esc(k.project_nama)+' · '+esc(k.tgl)+(k.ket?' · '+esc(k.ket):'')+'</div></td>'+
+        '<td class="py-2.5 text-right font-bold tabular-nums">'+rp(k.jumlah)+'</td><td class="py-2.5 pl-2 text-right">'+(write?'<button class="text-xs text-slate-300 hover:text-red-600 font-bold" data-ks-del="'+esc(k.id)+'">✕</button>':'')+'</td></tr>'; }).join('')+'</tbody></table>'
+        : '<div class="text-sm text-slate-400 py-6 text-center">Belum ada kasbon.</div>'));
+    document.querySelectorAll('[data-ks-del]').forEach(function(b){ b.onclick = function(){ confirmModal('Hapus Kasbon','Hapus catatan kasbon ini?', function(){
+      apiFetch('/kasbon.php?id='+encodeURIComponent(b.getAttribute('data-ks-del')), {method:'DELETE'}).then(function(){ toast('Dihapus.'); load(); }).catch(function(e){ toast(e.message, true); });
+    }); }; });
+    icons();
+  }
+  function load(){
+    return Promise.all([apiFetch('/kasbon.php'), apiFetch('/projects.php'), apiFetch('/workers.php?all=1')]).then(function(r){ K.data = r[0]; K.projects = r[1]; K.workers = r[2]; draw(); })
+      .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
+  }
+  load();
+  var ba = document.getElementById('btnAdd');
+  if(ba) ba.onclick = function(){
+    var opts = function(pid){ return '<option value="">Grup / penanggung jawab</option>'+K.workers.filter(function(w){ return w.project_id===pid && w.aktif; }).map(function(w){ return '<option value="'+esc(w.id)+'">'+esc(w.nama)+' · '+esc(GRADE_NAMA[w.grade]||w.grade)+'</option>'; }).join(''); };
+    var first = K.projects[0] ? K.projects[0].id : '';
+    openModal('Kasbon Baru',
+      '<div class="space-y-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek *</label><select id="ks_proj" class="'+fieldCls+'">'+K.projects.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.nama)+'</option>'; }).join('')+'</select></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Atas nama</label><select id="ks_w" class="'+fieldCls+'">'+opts(first)+'</select></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah (Rp) *</label>'+numInputHtml('ks_jum','',fieldCls)+'</div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal</label><input id="ks_tgl" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="ks_ket" type="text" class="'+fieldCls+'"></div></div>',
+      function(){
+        var j = parseIdNum(fv('ks_jum')); if(Number.isNaN(j) || j<=0){ toast('Isi jumlah kasbon.', true); return; }
+        apiFetch('/kasbon.php', {method:'POST', body:JSON.stringify({project_id:fv('ks_proj'), worker_id:fv('ks_w')||null, tgl:fv('ks_tgl'), jumlah:j, ket:fv('ks_ket')})})
+          .then(function(){ closeModal(); toast('Kasbon dicatat.'); return load(); }).catch(function(e){ toast(e.message, true); });
+      });
+    document.getElementById('ks_proj').addEventListener('change', function(){ var w = document.getElementById('ks_w'); w.innerHTML = opts(this.value); w.dispatchEvent(new Event('ss-refresh')); });
+  };
+};
+
+
 PAGES.users = function(c){
   if(!STATE.user || STATE.user.role!=='admin'){
     c.innerHTML = pageHead('Kelola User','') + panel('<div class="text-sm text-slate-500">Hanya Admin Pusat yang bisa mengelola user.</div>');
@@ -2087,8 +2687,9 @@ PAGES.users = function(c){
   var cols=[
     {label:'Nama', get:function(r){ return '<b>'+esc(r.nama)+'</b>'; }},
     {label:'Username', get:function(r){ return esc(r.username); }},
-    {label:'Role', get:function(r){ return {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan'}[r.role]||esc(r.role); }},
+    {label:'Role', get:function(r){ return {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan',akuntan:'Akuntan'}[r.role]||esc(r.role); }},
     {label:'Proyek Ditugaskan', get:function(r){
+      if(r.role==='akuntan') return '<span class="text-slate-400 italic">Hanya menu gaji</span>';
       if(r.role!=='lapangan') return '<span class="text-slate-300 italic">Semua (akses penuh)</span>';
       var names=(r.projectIds||[]).map(function(id){ var p=projects.find(function(x){ return x.id===id; }); return p?p.nama:id; });
       return names.length?esc(names.join(', ')):'<span class="text-slate-300 italic">Belum ada proyek</span>';
@@ -2134,8 +2735,8 @@ PAGES.users = function(c){
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama *</label><input id="f_nama" value="'+esc(rec?rec.nama:'')+'" class="'+fieldCls+'"></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Username *</label><input id="f_username" type="text" autocapitalize="none" autocorrect="off" value="'+esc(rec?rec.username:'')+'" class="'+fieldCls+'" placeholder="huruf kecil, angka, . _ -"></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Role *</label><select id="f_role" class="'+fieldCls+'">'+
-        ['lapangan','admin','owner'].map(function(r){ return '<option value="'+r+'"'+(rec&&rec.role===r?' selected':'')+'>'+
-          {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan'}[r]+'</option>'; }).join('')+
+        ['lapangan','admin','owner','akuntan'].map(function(r){ return '<option value="'+r+'"'+(rec&&rec.role===r?' selected':'')+'>'+
+          {admin:'Admin Pusat',owner:'Owner',lapangan:'Admin Lapangan',akuntan:'Akuntan (hanya menu gaji)'}[r]+'</option>'; }).join('')+
       '</select></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Password '+(id?'(kosongkan jika tidak diubah)':'*')+'</label><input id="f_password" type="password" placeholder="Min. 10 karakter" class="'+fieldCls+'"></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek yang Ditugaskan (khusus Admin Lapangan)</label>'+
@@ -2162,7 +2763,7 @@ PAGES.users = function(c){
 /* ============================================================
    MOBILE SHELL — Admin Lapangan
    ============================================================ */
-var TAB_ICONS = {masuk:'truck', pakai:'hammer', stok:'layers', riwayat:'history'};
+var TAB_ICONS = {masuk:'truck', pakai:'hammer', absen:'hard-hat', stok:'layers', riwayat:'history'};
 
 function bootMobile(user){
   document.getElementById('mWhoName').textContent = user.nama;
@@ -2233,6 +2834,7 @@ function pekerjaanForProject(){
 var TABS = [
   {id:'masuk', label:'Bahan Masuk'},
   {id:'pakai', label:'Pemakaian'},
+  {id:'absen', label:'Absen'},
   {id:'stok', label:'Stok'},
   {id:'riwayat', label:'Riwayat'},
 ];
@@ -2253,6 +2855,7 @@ function renderTab(){
   var c = document.getElementById('mContent');
   if(STATE.tab === 'masuk') return renderInputForm(c, 'masuk');
   if(STATE.tab === 'pakai') return renderInputForm(c, 'pakai');
+  if(STATE.tab === 'absen') return renderAbsen(c);
   if(STATE.tab === 'stok') return renderStok(c);
   if(STATE.tab === 'riwayat') return renderRiwayat(c);
 }
@@ -2416,6 +3019,272 @@ function statusBadge(status){
   var m = map[status] || ['bg-slate-100 text-slate-500', status];
   return '<span class="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap '+m[0]+'">'+esc(m[1])+'</span>';
 }
+
+/* ============================================================
+   ABSEN PEKERJA (Admin Lapangan, HP)
+   One tap per worker: Hadir / ½ / Absen, plus overtime hours. The roster is
+   the project's worker list (grouped by tim); new people are added on the
+   spot. No money anywhere on this screen — the server never sends rates to
+   field accounts. Saves offline through the same outbox as Bahan Masuk.
+   ============================================================ */
+var BULAN_PANJANG = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+var HARI_NAMA = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+var GRADE_NAMA = {KTK:'Kepala Tukang', TK:'Tukang', LD:'Laden', OBK:'Operator Beko', SPR:'Supir', OMX:'Operator Mixer', LAIN:'Lainnya'};
+var GRADE_ORDER = ['KTK','TK','LD','OBK','SPR','OMX','LAIN'];
+var GRADE_CLS = {KTK:'bg-violet-50 text-violet-700', TK:'bg-sky-50 text-sky-700', LD:'bg-slate-100 text-slate-600',
+  OBK:'bg-amber-50 text-amber-700', SPR:'bg-teal-50 text-teal-700', OMX:'bg-orange-50 text-orange-700', LAIN:'bg-slate-100 text-slate-500'};
+function parseISO(t){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t||''); return m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(); }
+function addDays(t, n){ var d=parseISO(t); d.setDate(d.getDate()+n); return localISO(d); }
+function fmtTglPanjang(t){ var d=parseISO(t); return HARI_NAMA[d.getDay()]+', '+d.getDate()+' '+BULAN_PANJANG[d.getMonth()]+' '+d.getFullYear(); }
+function fmtTglPendek(t){ var d=parseISO(t); return d.getDate()+' '+BULAN_PANJANG[d.getMonth()].slice(0,3); }
+/* Weeks run Friday–Thursday (same as the paper "Absen Upah" sheet). */
+function weekOf(t){ var d=parseISO(t); var back=(d.getDay()+2)%7; var s=addDays(t,-back); return {from:s, to:addDays(s,6)}; }
+var PERIOD_STATUS = {draft:['neutral','Draft'], diajukan:['warn','Diajukan'], dibayar:['aman','Dibayar']};
+
+var ABSEN = {tgl:null, workers:[], cur:{}, orig:{}, period:null, editable:true, offline:false, reason:''};
+
+function renderAbsen(c){
+  if(!ABSEN.tgl) ABSEN.tgl = today();
+  var pid = STATE.projectId, tgl = ABSEN.tgl;
+  c.innerHTML = card('<div class="text-center text-sm text-slate-400 py-6">Memuat absen…</div>');
+  var offline = false;
+  var wKey = 'ms_workers_'+pid;
+  Promise.all([
+    apiFetch('/workers.php?project_id='+encodeURIComponent(pid)).then(function(w){ lsSet(wKey, w); return w; })
+      .catch(function(e){ if(e.network){ offline = true; return lsGet(wKey, []); } throw e; }),
+    apiFetch('/attendance.php?project_id='+encodeURIComponent(pid)+'&tgl_from='+tgl+'&tgl_to='+tgl).catch(function(e){ if(e.network){ offline = true; return []; } throw e; }),
+    apiFetch('/payroll_periods.php?project_id='+encodeURIComponent(pid)+'&tgl='+tgl).catch(function(e){ if(e.network){ offline = true; return null; } throw e; }),
+  ]).then(function(r){
+    if(STATE.projectId !== pid || ABSEN.tgl !== tgl || STATE.tab !== 'absen') return; // user moved on while loading
+    ABSEN.workers = r[0]; ABSEN.period = r[2]; ABSEN.offline = offline;
+    ABSEN.cur = {}; ABSEN.orig = {};
+    ABSEN.workers.forEach(function(w){ ABSEN.cur[w.id] = {h:null, l:0}; ABSEN.orig[w.id] = {h:null, l:0}; });
+    r[1].forEach(function(a){
+      if(!ABSEN.cur[a.worker_id]) return;
+      ABSEN.cur[a.worker_id] = {h:Number(a.hari), l:Number(a.lembur_jam)||0};
+      ABSEN.orig[a.worker_id] = {h:Number(a.hari), l:Number(a.lembur_jam)||0};
+    });
+    // Anything still waiting in the outbox for this day is shown as already entered.
+    outboxGet().forEach(function(o){
+      if(o.endpoint !== '/attendance.php' || o.payload.project_id !== pid || o.payload.tgl !== tgl) return;
+      o.payload.entries.forEach(function(e){
+        if(!ABSEN.cur[e.worker_id]) return;
+        ABSEN.cur[e.worker_id] = {h: e.hari===null ? null : Number(e.hari), l: Number(e.lembur_jam)||0};
+        ABSEN.orig[e.worker_id] = {h: ABSEN.cur[e.worker_id].h, l: ABSEN.cur[e.worker_id].l};
+      });
+    });
+    var earliest = addDays(today(), -3);
+    ABSEN.editable = true; ABSEN.reason = '';
+    if(tgl > today()){ ABSEN.editable = false; ABSEN.reason = 'Tanggal ini belum tiba.'; }
+    else if(tgl < earliest){ ABSEN.editable = false; ABSEN.reason = 'Lebih dari 3 hari lalu — hanya Admin Pusat yang bisa mengubah.'; }
+    else if(ABSEN.period && ABSEN.period.status !== 'draft'){ ABSEN.editable = false; ABSEN.reason = 'Minggu ini sudah '+(ABSEN.period.status==='dibayar'?'dibayar':'diajukan')+'. Hubungi Admin Pusat untuk koreksi.'; }
+    drawAbsen(c);
+  }).catch(function(e){ c.innerHTML = card('<div class="text-center text-sm text-red-500 py-4">Gagal memuat: '+esc(e.message)+'</div>'); });
+}
+
+function absenCounts(){
+  var n = {hadir:0, setengah:0, absen:0, belum:0, lembur:0};
+  ABSEN.workers.forEach(function(w){
+    var x = ABSEN.cur[w.id];
+    if(x.h===null) n.belum++; else if(x.h===1) n.hadir++; else if(x.h===0.5) n.setengah++; else n.absen++;
+    if(x.h>0) n.lembur += x.l;
+  });
+  return n;
+}
+function absenDirty(){
+  return ABSEN.workers.some(function(w){
+    var a = ABSEN.cur[w.id], b = ABSEN.orig[w.id];
+    return a.h !== b.h || (a.h>0 && a.l !== b.l);
+  });
+}
+function fmtJam(n){ return String(n).replace('.', ','); }
+
+function drawAbsen(c){
+  var tgl = ABSEN.tgl, ed = ABSEN.editable, n = absenCounts();
+  var wk = weekOf(tgl), st = ABSEN.period ? ABSEN.period.status : 'draft';
+  var ps = PERIOD_STATUS[st] || PERIOD_STATUS.draft;
+  var canPrev = true, canNext = tgl < today();
+
+  // group by tim, keeping the server's order (tim, status, name)
+  var groups = [], idx = {};
+  ABSEN.workers.forEach(function(w){
+    var k = w.tim || '';
+    if(!(k in idx)){ idx[k] = groups.length; groups.push({tim:k, list:[]}); }
+    groups[idx[k]].list.push(w);
+  });
+
+  var tile = function(label, val, cls){ return '<div class="rounded-xl px-2 py-2.5 text-center '+cls+'"><div class="text-xl font-extrabold leading-none tabular-nums">'+val+'</div><div class="text-[11px] font-semibold mt-1 opacity-80">'+label+'</div></div>'; };
+  var head =
+    '<div class="flex items-center justify-between gap-2 mb-3">'+
+      '<button type="button" id="abPrev" class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>'+
+      '<div class="text-center min-w-0"><div class="font-extrabold text-[16px] leading-tight">'+esc(fmtTglPanjang(tgl))+'</div>'+
+      '<div class="text-xs text-slate-400 mt-0.5">Minggu '+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+' · '+badge(ps[0], ps[1])+'</div></div>'+
+      '<button type="button" id="abNext" '+(canNext?'':'disabled')+' class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center disabled:opacity-30"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>'+
+    '</div>'+
+    '<div class="grid grid-cols-4 gap-2">'+
+      tile('Hadir', n.hadir, 'bg-emerald-50 text-emerald-700')+tile('½ Hari', n.setengah, 'bg-amber-50 text-amber-700')+
+      tile('Absen', n.absen, 'bg-red-50 text-red-600')+tile('Belum', n.belum, n.belum? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500')+
+    '</div>'+
+    (n.lembur>0 ? '<div class="text-xs text-slate-500 mt-2 text-center">Total lembur hari ini: <b class="text-slate-700">'+fmtJam(n.lembur)+' jam</b></div>' : '');
+
+  var banner = '';
+  if(ABSEN.offline) banner += '<div class="text-xs text-slate-600 bg-slate-100 rounded-xl px-3 py-2 mb-3">Tidak ada sinyal. Memakai daftar pekerja yang tersimpan; absen akan dikirim saat sinyal kembali.</div>';
+  if(!ed) banner += '<div class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-3">'+esc(ABSEN.reason)+'</div>';
+
+  var list = '';
+  if(!ABSEN.workers.length){
+    list = card('<div class="text-center py-6"><div class="text-slate-500 text-sm mb-4">Belum ada pekerja di proyek ini.</div>'+
+      (ed?'<button type="button" data-ab-add class="px-5 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm">+ Tambah pekerja pertama</button>':'')+'</div>');
+  } else {
+    groups.forEach(function(g, gi){
+      var open = g.list.filter(function(w){ return ABSEN.cur[w.id].h===null; }).length;
+      list += '<div class="mb-4">'+
+        '<div class="flex items-center justify-between px-1 mb-2"><div class="text-xs font-extrabold uppercase tracking-wide text-slate-500">'+esc(g.tim||'Tanpa tim')+
+        ' <span class="font-semibold text-slate-400 normal-case">· '+g.list.length+' orang'+(open?' · '+open+' belum':'')+'</span></div>'+
+        (ed ? '<button type="button" data-ab-all="'+gi+'" class="text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg px-3 py-1.5">Semua hadir</button>' : '')+'</div>'+
+        g.list.map(function(w){
+          var x = ABSEN.cur[w.id], seg = function(v, lab, on, cls){
+            return '<button type="button" '+(ed?'':'disabled')+' data-ab="'+esc(w.id)+'|'+v+'" class="h-11 flex-1 rounded-lg text-[14px] font-bold transition '+(on?cls:'bg-slate-100 text-slate-400')+'">'+lab+'</button>';
+          };
+          return '<div class="bg-white rounded-2xl border '+(x.h===null?'border-slate-200':'border-slate-100')+' shadow-sm px-3.5 py-3 mb-2">'+
+            '<div class="flex items-center justify-between gap-2 mb-2.5"><div class="font-bold text-[15px] leading-tight min-w-0 truncate">'+esc(w.nama)+'</div>'+
+            '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap '+(GRADE_CLS[w.grade]||GRADE_CLS.LAIN)+'">'+esc(GRADE_NAMA[w.grade]||w.grade)+'</span></div>'+
+            '<div class="flex gap-1.5">'+seg(1,'Hadir',x.h===1,'bg-emerald-600 text-white')+seg(0.5,'½',x.h===0.5,'bg-amber-500 text-white')+seg(0,'Absen',x.h===0,'bg-red-500 text-white')+'</div>'+
+            (x.h>0 ? '<div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-slate-100"><span class="text-xs font-semibold text-slate-500">Lembur</span>'+
+              '<div class="flex items-center gap-2"><button type="button" '+(ed?'':'disabled')+' data-ab-l="'+esc(w.id)+'|-" class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 text-lg font-bold flex items-center justify-center"><i data-lucide="minus" class="w-4 h-4"></i></button>'+
+              '<span class="w-20 whitespace-nowrap text-center font-extrabold tabular-nums '+(x.l>0?'text-indigo-600':'text-slate-400')+'">'+fmtJam(x.l)+' jam</span>'+
+              '<button type="button" '+(ed?'':'disabled')+' data-ab-l="'+esc(w.id)+'|+" class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><i data-lucide="plus" class="w-4 h-4"></i></button></div></div>' : '')+
+          '</div>';
+        }).join('')+'</div>';
+    });
+  }
+
+  var tools = ed ? '<div class="grid grid-cols-2 gap-2 mb-3">'+
+      '<button type="button" data-ab-add class="h-12 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-700 flex items-center justify-center gap-2"><i data-lucide="user-plus" class="w-4 h-4"></i>Tambah pekerja</button>'+
+      '<button type="button" id="abRain" class="h-12 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-700 flex items-center justify-center gap-2"><i data-lucide="cloud-rain" class="w-4 h-4"></i>Libur / hujan</button></div>' : '';
+  var ajukan = ABSEN.period && ABSEN.period.status==='draft' || !ABSEN.period
+    ? '<button type="button" id="abAjukan" class="w-full h-12 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-sm flex items-center justify-center gap-2 mb-3"><i data-lucide="send" class="w-4 h-4"></i>Ajukan absen minggu ini ke pusat</button>' : '';
+  var bar = ed && ABSEN.workers.length ? '<div class="sticky bottom-3 z-10"><button type="button" id="abSave" '+(absenDirty()?'':'disabled')+
+      ' class="w-full h-14 rounded-2xl text-white font-extrabold text-[16px] shadow-lg shadow-emerald-200 transition '+(absenDirty()?'bg-emerald-600':'bg-slate-300 shadow-none')+'">'+
+      (absenDirty() ? 'Simpan Absen'+(n.belum?' · '+n.belum+' belum diisi':'') : (n.belum? n.belum+' pekerja belum diisi' : 'Tersimpan ✓'))+'</button></div>' : '';
+
+  c.innerHTML = card(head) + banner + list + tools + ajukan + bar;
+  icons();
+  bindAbsen(c);
+}
+
+function bindAbsen(c){
+  var redraw = function(){ var y = window.scrollY; drawAbsen(c); window.scrollTo(0, y); };
+  document.getElementById('abPrev').onclick = function(){ ABSEN.tgl = addDays(ABSEN.tgl, -1); renderTab(); };
+  document.getElementById('abNext').onclick = function(){ if(ABSEN.tgl < today()){ ABSEN.tgl = addDays(ABSEN.tgl, 1); renderTab(); } };
+  c.querySelectorAll('[data-ab]').forEach(function(b){
+    b.onclick = function(){
+      var p = b.getAttribute('data-ab').split('|'), x = ABSEN.cur[p[0]], v = Number(p[1]);
+      if(x.h === v){ x.h = null; x.l = 0; }
+      else { x.h = v; if(v===0) x.l = 0; }
+      redraw();
+    };
+  });
+  c.querySelectorAll('[data-ab-l]').forEach(function(b){
+    b.onclick = function(){
+      var p = b.getAttribute('data-ab-l').split('|'), x = ABSEN.cur[p[0]];
+      x.l = Math.min(16, Math.max(0, x.l + (p[1]==='+' ? 0.5 : -0.5)));
+      redraw();
+    };
+  });
+  var groups = {};
+  ABSEN.workers.forEach(function(w){ var k = w.tim||''; (groups[k] = groups[k] || []).push(w); });
+  var keys = Object.keys(groups);
+  // keep the same tim order as drawAbsen (first-seen order)
+  var order = []; ABSEN.workers.forEach(function(w){ var k=w.tim||''; if(order.indexOf(k)<0) order.push(k); });
+  c.querySelectorAll('[data-ab-all]').forEach(function(b){
+    b.onclick = function(){
+      var list = groups[order[Number(b.getAttribute('data-ab-all'))]] || [];
+      list.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null) x.h = 1; });
+      redraw();
+    };
+  });
+  c.querySelectorAll('[data-ab-add]').forEach(function(b){ b.onclick = function(){ openAddWorker(c); }; });
+  var rain = document.getElementById('abRain');
+  if(rain) rain.onclick = function(){
+    confirmModal('Libur / hujan', 'Tandai SEMUA pekerja yang belum diisi sebagai <b>Absen</b> pada '+esc(fmtTglPanjang(ABSEN.tgl))+'?', function(){
+      ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null) x.h = 0; });
+      redraw();
+    });
+  };
+  var save = document.getElementById('abSave');
+  if(save) save.onclick = function(){ saveAbsen(c); };
+  var aj = document.getElementById('abAjukan');
+  if(aj) aj.onclick = function(){ openAjukan(c); };
+}
+
+function saveAbsen(c){
+  var pid = STATE.projectId, tgl = ABSEN.tgl, entries = [];
+  ABSEN.workers.forEach(function(w){
+    var x = ABSEN.cur[w.id], o = ABSEN.orig[w.id];
+    if(x.h !== null) entries.push({worker_id:w.id, hari:x.h, lembur_jam: x.h>0 ? x.l : 0});
+    else if(o.h !== null) entries.push({worker_id:w.id, hari:null});
+  });
+  if(!entries.length){ toast('Belum ada yang diisi.', true); return; }
+  var payload = {project_id:pid, tgl:tgl, entries:entries};
+  var done = function(msg){
+    ABSEN.workers.forEach(function(w){ ABSEN.orig[w.id] = {h:ABSEN.cur[w.id].h, l:ABSEN.cur[w.id].l}; });
+    toast(msg); drawAbsen(c);
+  };
+  var btn = document.getElementById('abSave'); if(btn){ btn.disabled = true; btn.textContent = 'Menyimpan…'; }
+  apiFetch('/attendance.php', {method:'POST', body:JSON.stringify(payload)})
+    .then(function(){ done('Absen '+fmtTglPendek(tgl)+' tersimpan ✓'); })
+    .catch(function(e){
+      if(e.network){
+        outboxAdd({endpoint:'/attendance.php', payload:payload, label:'Absen '+fmtTglPendek(tgl)});
+        done('Tidak ada sinyal. Absen disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
+      } else { toast(e.message, true); drawAbsen(c); }
+    });
+}
+
+function openAddWorker(c){
+  var tims = []; ABSEN.workers.forEach(function(w){ if(w.tim && tims.indexOf(w.tim)<0) tims.push(w.tim); });
+  var lastTim = tims.length ? tims[tims.length-1] : '';
+  openModal('Tambah Pekerja',
+    '<div class="space-y-4">'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Nama pekerja *</label><input id="nw_nama" type="text" autocomplete="off" class="'+inputCls+'" placeholder="mis. Asep"></div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Status *</label><select id="nw_grade" class="'+inputCls+'">'+
+        GRADE_ORDER.map(function(g){ return '<option value="'+g+'"'+(g==='TK'?' selected':'')+'>'+esc(GRADE_NAMA[g])+'</option>'; }).join('')+'</select></div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Tim</label><input id="nw_tim" list="nw_tims" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(lastTim)+'" placeholder="mis. Tim Pondasi">'+
+        '<datalist id="nw_tims">'+tims.map(function(t){ return '<option value="'+esc(t)+'">'; }).join('')+'</datalist></div>'+
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Upah mengikuti tarif status yang diatur Admin Pusat/Akuntan.</div>'+
+    '</div>',
+    function(){
+      var nama = fv('nw_nama'), grade = fv('nw_grade'), tim = fv('nw_tim');
+      if(!nama){ toast('Nama pekerja wajib diisi.', true); return; }
+      var id = 'wrk_'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);
+      var body = {id:id, project_id:STATE.projectId, nama:nama, grade:grade, tim:tim};
+      apiFetch('/workers.php', {method:'POST', body:JSON.stringify(body)}).then(function(r){
+        var w = {id:r.id, project_id:STATE.projectId, nama:nama.replace(/\s+/g,' '), grade:grade, tim:tim, aktif:1};
+        closeModal(); toast('"'+w.nama+'" ditambahkan.');
+        renderTab(); // reload roster from server (keeps order & grouping consistent)
+      }).catch(function(e){ toast(e.network ? 'Tambah pekerja butuh sinyal. Coba lagi saat ada sinyal.' : e.message, true); });
+    });
+}
+
+function openAjukan(c){
+  var n = absenCounts(), wk = weekOf(ABSEN.tgl), p = ABSEN.period || {};
+  if(absenDirty()){ toast('Simpan absen dulu sebelum mengajukan.', true); return; }
+  openModal('Ajukan Absen Minggu Ini',
+    '<div class="space-y-4">'+
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">Periode <b>'+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+'</b>. Setelah diajukan, absen minggu ini dikunci untuk Anda dan diteruskan ke pusat untuk dibayar.</div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Penanggung jawab *</label><input id="aj_pj" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(p.pj_nama||'')+'" placeholder="mis. Arya"></div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Nama grup</label><input id="aj_grup" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(p.grup_nama||'')+'" placeholder="mis. Upah Harian"></div>'+
+    '</div>',
+    function(){
+      var pj = fv('aj_pj');
+      if(!pj){ toast('Nama penanggung jawab wajib diisi.', true); return; }
+      apiFetch('/payroll_periods.php', {method:'POST', body:JSON.stringify({action:'ajukan', project_id:STATE.projectId, tgl:ABSEN.tgl, pj_nama:pj, grup_nama:fv('aj_grup')})})
+        .then(function(){ closeModal(); toast('Absen minggu ini sudah diajukan ✓'); renderTab(); })
+        .catch(function(e){ toast(e.network ? 'Mengajukan butuh sinyal.' : e.message, true); });
+    });
+}
+
 
 function renderStok(c){
   c.innerHTML = card('<div class="text-center text-sm text-slate-400 py-4">Memuat stok…</div>');

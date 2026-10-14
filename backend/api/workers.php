@@ -1,0 +1,115 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/helpers.php';
+
+/**
+ * Master pekerja per proyek. Admin Lapangan can list the roster of their own
+ * projects (name, status, team only — never rates or bank details) and add a
+ * new worker on the spot. Admin Pusat and Akuntan manage everything,
+ * including rates; Owner is read-only.
+ */
+send_cors_headers();
+$method = $_SERVER['REQUEST_METHOD'];
+$user = $method === 'GET' ? require_login() : require_role(['admin', 'akuntan', 'lapangan']);
+$isField = $user['role'] === 'lapangan';
+$scope = user_project_ids($user);
+
+function norm_name(string $s): string { return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $s))); }
+
+if ($method === 'GET') {
+    $conds = []; $params = [];
+    if ($scope !== null) {
+        if (!$scope) json_response([]);
+        $conds[] = 'project_id IN (' . implode(',', array_fill(0, count($scope), '?')) . ')';
+        $params = array_merge($params, $scope);
+    }
+    if (!empty($_GET['project_id'])) { $conds[] = 'project_id = ?'; $params[] = $_GET['project_id']; }
+    if (empty($_GET['all'])) $conds[] = 'aktif = 1';
+    $cols = $isField ? 'id, project_id, nama, grade, tim, aktif'
+                     : 'id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif';
+    $st = db()->prepare("SELECT $cols FROM workers" . ($conds ? ' WHERE ' . implode(' AND ', $conds) : '') . ' ORDER BY tim, FIELD(grade,\'KTK\',\'TK\',\'LD\',\'OBK\',\'SPR\',\'OMX\',\'LAIN\'), nama');
+    $st->execute($params);
+    $rows = array_map(function ($r) use ($isField) {
+        $r['aktif'] = (int)$r['aktif'];
+        if (!$isField) {
+            $r['tarif_harian'] = $r['tarif_harian'] === null ? null : (float)$r['tarif_harian'];
+            $r['tarif_lembur'] = $r['tarif_lembur'] === null ? null : (float)$r['tarif_lembur'];
+        }
+        return $r;
+    }, $st->fetchAll());
+    json_response($rows);
+}
+
+if ($method === 'POST') {
+    $b = read_json_body();
+    $id = (string)($b['id'] ?? '');
+    $projectId = (string)($b['project_id'] ?? '');
+    $nama = trim(preg_replace('/\s+/u', ' ', (string)($b['nama'] ?? '')));
+    $grade = (string)($b['grade'] ?? '');
+    $tim = trim((string)($b['tim'] ?? ''));
+    if ($projectId === '') json_error('Proyek wajib dipilih.', 422);
+    if ($nama === '' || mb_strlen($nama) > 120) json_error('Nama pekerja wajib diisi (maksimal 120 karakter).', 422);
+    if (!isset(WORKER_GRADES[$grade])) json_error('Status pekerja tidak valid.', 422);
+    if (mb_strlen($tim) > 80) json_error('Nama tim terlalu panjang.', 422);
+    require_project_access($user, $projectId);
+
+    $exists = null;
+    if ($id !== '') {
+        if (!preg_match('/^wrk_[a-z0-9]{6,30}$/', $id)) json_error('id tidak valid.', 422);
+        $st = db()->prepare('SELECT * FROM workers WHERE id = ?');
+        $st->execute([$id]);
+        $exists = $st->fetch() ?: null;
+    }
+    if ($isField && $exists) json_error('Data pekerja sudah tersimpan. Perubahan dilakukan oleh Admin Pusat.', 403);
+
+    // Same name + status + team in one project = almost certainly a duplicate.
+    $dup = db()->prepare('SELECT id, nama, tim FROM workers WHERE project_id = ? AND grade = ? AND id <> ?');
+    $dup->execute([$projectId, $grade, $id]);
+    foreach ($dup->fetchAll() as $d) {
+        if (norm_name($d['nama']) === norm_name($nama) && norm_name($d['tim']) === norm_name($tim)) {
+            json_error('Pekerja bernama sama (status dan tim sama) sudah ada di proyek ini. Pilih dari daftar, atau beri tambahan nama agar berbeda (mis. "Endang B").', 409);
+        }
+    }
+
+    $aktif = array_key_exists('aktif', $b) ? ((int)(bool)$b['aktif']) : 1;
+    if ($isField) {
+        $id = $id !== '' ? $id : new_id('wrk_');
+        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, aktif, created_by) VALUES (?,?,?,?,?,1,?)')
+            ->execute([$id, $projectId, $nama, $grade, $tim, $user['id']]);
+        audit('create', 'workers', $id, "$nama ($grade)");
+        json_response(['ok' => true, 'id' => $id]);
+    }
+
+    $harian = (isset($b['tarif_harian']) && $b['tarif_harian'] !== '') ? money_in($b['tarif_harian'], 'Tarif harian') : null;
+    $lembur = (isset($b['tarif_lembur']) && $b['tarif_lembur'] !== '') ? money_in($b['tarif_lembur'], 'Tarif lembur') : null;
+    $rek = mb_substr(trim((string)($b['no_rek'] ?? '')), 0, 80);
+    if ($exists) {
+        db()->prepare('UPDATE workers SET project_id=?, nama=?, grade=?, tim=?, tarif_harian=?, tarif_lembur=?, no_rek=?, aktif=? WHERE id=?')
+            ->execute([$projectId, $nama, $grade, $tim, $harian, $lembur, $rek, $aktif, $id]);
+        $detail = '';
+        if ((string)$exists['tarif_harian'] !== (string)$harian || (string)$exists['tarif_lembur'] !== (string)$lembur || $exists['grade'] !== $grade) {
+            $detail = sprintf('tarif/status: %s %s/%s -> %s %s/%s', $exists['grade'], $exists['tarif_harian'] ?? '-', $exists['tarif_lembur'] ?? '-', $grade, $harian ?? '-', $lembur ?? '-');
+        }
+        audit('update', 'workers', $id, $detail);
+    } else {
+        $id = $id !== '' ? $id : new_id('wrk_');
+        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
+            ->execute([$id, $projectId, $nama, $grade, $tim, $harian, $lembur, $rek, $aktif, $user['id']]);
+        audit('create', 'workers', $id, "$nama ($grade)");
+    }
+    fill_zero_snapshots($projectId, null, $id);
+    json_response(['ok' => true, 'id' => $id]);
+}
+
+if ($method === 'DELETE') {
+    if ($user['role'] !== 'admin') json_error('Hanya Admin Pusat yang bisa menghapus pekerja. Nonaktifkan bila sudah pernah absen.', 403);
+    $id = (string)($_GET['id'] ?? '');
+    if ($id === '') json_error('id wajib diisi', 422);
+    $c = db()->prepare('SELECT COUNT(*) FROM attendance WHERE worker_id = ?');
+    $c->execute([$id]);
+    if ((int)$c->fetchColumn() > 0) json_error('Pekerja ini sudah punya riwayat absen, jadi tidak dihapus. Ubah menjadi Nonaktif.', 409);
+    db()->prepare('DELETE FROM workers WHERE id = ?')->execute([$id]);
+    audit('delete', 'workers', $id);
+    json_response(['ok' => true]);
+}
+json_error('Method not allowed', 405);

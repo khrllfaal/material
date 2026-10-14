@@ -37,7 +37,7 @@ if ($method === 'POST') {
     $projectIds = is_array($body['projectIds'] ?? null) ? $body['projectIds'] : [];
     $id = (string)($body['id'] ?? '');
 
-    if (!in_array($role, ['admin', 'owner', 'lapangan'], true)) json_error('Role tidak valid.', 422);
+    if (!in_array($role, ['admin', 'owner', 'lapangan', 'akuntan'], true)) json_error('Role tidak valid.', 422);
     if ($username === '' || $nama === '') json_error('Username dan nama wajib diisi.', 422);
     if (!preg_match('/^[a-z0-9._-]{3,40}$/', $username)) {
         json_error('Username 3-40 karakter, hanya huruf kecil/angka/titik/garis bawah/strip, tanpa spasi.', 422);

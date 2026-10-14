@@ -71,6 +71,9 @@ scripts/
 - **Admin Pusat** (`admin`) — akses penuh: kelola Master Proyek,
   Master Bahan, Master Pekerjaan, Konfigurasi RAP, lihat semua
   laporan, dan kelola user.
+- **Akuntan** (`akuntan`) — hanya menu gaji: Rekap Gaji, Pekerja & Tarif, Kasbon.
+  Bisa mengubah tarif, mencatat tambahan/potongan/kasbon, dan membayar; tidak
+  bisa mengubah absen, dan seluruh endpoint stok/bahan/user ditolak (403).
 - **Owner** (`owner`) — bisa melihat semua menu, tapi setiap endpoint
   menolak permintaan tulis (POST/DELETE) dari role ini dengan HTTP
   403; tombol Tambah/Edit/Hapus juga disembunyikan di UI.
@@ -88,3 +91,15 @@ scripts/
 4. Dashboard **Analisis RAP Bahan** membandingkan pemakaian aktual
    dengan target ideal (koefisien RAP × progress volume pekerjaan
    terakhir), menandai pemborosan (Melebihi RAP) per pekerjaan.
+
+## Absensi & Rekap Gaji
+
+- Admin Lapangan: tab **Absen** di HP — satu ketukan per pekerja (Hadir / ½ / Absen),
+  lembur dalam jam, tambah pekerja baru, lalu **Ajukan** absen mingguan (Jumat–Kamis).
+  Tidak pernah melihat nominal gaji.
+- Admin Pusat / Akuntan / Owner: menu **Rekap Gaji** (kartu, filter proyek, cari, tanggal),
+  **Pekerja & Tarif**, **Kasbon**. Ekspor Excel format lembar "Absen Upah" dan PDF Daftar Bayar.
+- Gaji = hari × tarif harian; lembur = (jam − 0,5 istirahat) × tarif lembur; tarif disimpan
+  per baris absen sehingga kenaikan tarif tidak mengubah periode yang sudah lewat.
+- Database yang sudah berjalan: jalankan `backend/mysql/migrations_2026-10-payroll.sql` sekali,
+  lalu (opsional) `backend/mysql/seed_absensi_percobaan.sql` untuk 2 proyek percobaan.

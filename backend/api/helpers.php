@@ -8,6 +8,10 @@ require_once __DIR__ . '/db.php';
 // filesystem paths. Log the real error server-side and hand back a
 // generic JSON 500 instead, so every response stays JSON and every
 // endpoint's error handling in the frontend keeps working.
+// Indonesian business dates ("today", period edges, week boundaries) must
+// follow local time, not UTC, or entries made before 07.00 WIB land on
+// yesterday. Hosts that run elsewhere can override with 'timezone' in config.php.
+date_default_timezone_set('Asia/Jakarta');
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 
@@ -126,9 +130,20 @@ function current_user(): ?array {
     return $_SESSION['user'] ?? null;
 }
 
+/** Endpoints an 'akuntan' (accountant) account may call. Everything else —
+ *  stock, materials, RAP, users — answers 403 for that role, enforced here
+ *  once so no individual endpoint can forget it. */
+const AKUNTAN_ENDPOINTS = [
+    'auth_me.php', 'auth_logout.php', 'projects.php', 'workers.php', 'labor_rates.php',
+    'attendance.php', 'payroll.php', 'payroll_periods.php', 'payroll_adjustments.php', 'kasbon.php',
+];
+
 function require_login(): array {
     $u = current_user();
     if (!$u) json_error('Belum login.', 401);
+    if ($u['role'] === 'akuntan' && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), AKUNTAN_ENDPOINTS, true)) {
+        json_error('Anda tidak punya akses untuk aksi ini.', 403);
+    }
     return $u;
 }
 
@@ -193,4 +208,85 @@ function ensure_stock_counts_table(): bool {
         error_log('[material] ensure_stock_counts_table: ' . $e->getMessage());
         return false;
     }
+}
+
+
+/* ---------------- Absensi & gaji ---------------- */
+
+/** Status pekerja. Kode dipakai di database, nama untuk tampilan. */
+const WORKER_GRADES = [
+    'KTK' => 'Kepala Tukang', 'TK' => 'Tukang', 'LD' => 'Laden',
+    'OBK' => 'Operator Beko', 'SPR' => 'Supir', 'OMX' => 'Operator Mixer', 'LAIN' => 'Lainnya',
+];
+
+/** Gaji dibayar mingguan, Jumat–Kamis (sesuai lembar pengajuan absen). */
+function payroll_week(string $tgl): array {
+    $t = strtotime($tgl . ' 12:00:00');
+    $daysSinceFriday = ((int)date('N', $t) + 2) % 7; // N: Mon=1..Sun=7; Fri=5 -> 0
+    $start = strtotime("-$daysSinceFriday days", $t);
+    return [date('Y-m-d', $start), date('Y-m-d', strtotime('+6 days', $start))];
+}
+
+/** Returns the (project, week) period row, creating a draft if needed. */
+function payroll_period(string $projectId, string $tgl): array {
+    [$start, $end] = payroll_week($tgl);
+    $id = 'per_' . $projectId . '_' . $start;
+    db()->prepare('INSERT IGNORE INTO payroll_periods (id, project_id, tgl_mulai, tgl_akhir) VALUES (?,?,?,?)')
+        ->execute([$id, $projectId, $start, $end]);
+    $st = db()->prepare('SELECT * FROM payroll_periods WHERE id = ?');
+    $st->execute([$id]);
+    return $st->fetch();
+}
+
+/** Jam lembur yang dicatat adalah lama kerja setelah jam normal (mis. 16.00–18.00 = 2).
+ *  Lembar pengajuan asli membayar jam itu dikurangi 0,5 jam istirahat per hari lembur
+ *  (2 -> 1,5; 6 -> 5,5; 1 -> 0,5). */
+const LEMBUR_ISTIRAHAT_JAM = 0.5;
+function lembur_paid_hours(float $jam): float {
+    return $jam > 0 ? max(0.0, $jam - LEMBUR_ISTIRAHAT_JAM) : 0.0;
+}
+
+/** Lembur per jam when none is configured: gaji harian / 8, rounded down to Rp500. */
+function default_lembur_rate(float $harian): float {
+    return floor($harian / 8 / 500) * 500;
+}
+
+/** Effective rates for a worker: personal override, else the project's status rate. */
+function worker_rates(array $worker): array {
+    $st = db()->prepare('SELECT tarif_harian, tarif_lembur FROM labor_rates WHERE project_id = ? AND grade = ?');
+    $st->execute([$worker['project_id'], $worker['grade']]);
+    $r = $st->fetch() ?: ['tarif_harian' => 0, 'tarif_lembur' => 0];
+    $harian = $worker['tarif_harian'] !== null ? (float)$worker['tarif_harian'] : (float)$r['tarif_harian'];
+    if ($worker['tarif_lembur'] !== null) $lembur = (float)$worker['tarif_lembur'];
+    elseif ($worker['tarif_harian'] === null && (float)$r['tarif_lembur'] > 0) $lembur = (float)$r['tarif_lembur'];
+    else $lembur = default_lembur_rate($harian);
+    return [$harian, $lembur];
+}
+
+function new_id(string $prefix): string { return $prefix . bin2hex(random_bytes(6)); }
+
+function money_in($v, string $label): float {
+    if (!is_numeric($v) || (float)$v < 0 || (float)$v > 1e12) json_error("$label harus berupa angka nol atau lebih.", 422);
+    return round((float)$v, 2);
+}
+
+/** Attendance saved before any rate existed carries a 0 snapshot. When a rate
+ *  is later set, fill only those zeros (never touching a non-zero snapshot)
+ *  in periods that are not yet paid, so entering rates after the fact still
+ *  produces the right pay. */
+function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerId): int {
+    $n = 0;
+    $st = db()->prepare("SELECT w.* FROM workers w WHERE w.project_id = ?" . ($grade !== null ? ' AND w.grade = ?' : '') . ($workerId !== null ? ' AND w.id = ?' : ''));
+    $st->execute(array_values(array_filter([$projectId, $grade, $workerId], fn($v) => $v !== null)));
+    $up = db()->prepare(
+        "UPDATE attendance a JOIN payroll_periods p ON p.project_id = a.project_id AND a.tgl BETWEEN p.tgl_mulai AND p.tgl_akhir
+            SET a.tarif_harian = IF(a.tarif_harian = 0, ?, a.tarif_harian), a.tarif_lembur = IF(a.tarif_lembur = 0, ?, a.tarif_lembur)
+          WHERE a.worker_id = ? AND a.project_id = ? AND p.status <> 'dibayar' AND (a.tarif_harian = 0 OR a.tarif_lembur = 0)");
+    foreach ($st->fetchAll() as $w) {
+        [$h, $l] = worker_rates($w);
+        if ($h <= 0) continue;
+        $up->execute([$h, $l, $w['id'], $projectId]);
+        $n += $up->rowCount();
+    }
+    return $n;
 }

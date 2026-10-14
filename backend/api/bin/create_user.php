@@ -21,8 +21,8 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../db.php';
 
 [$script, $username, $password, $nama, $role] = array_pad($argv, 5, null);
-if (!$username || !$password || !$nama || !in_array($role, ['admin', 'owner', 'lapangan'], true)) {
-    fwrite(STDERR, "Usage: php create_user.php <username> <password> <nama> <admin|owner|lapangan>\n");
+if (!$username || !$password || !$nama || !in_array($role, ['admin', 'owner', 'lapangan', 'akuntan'], true)) {
+    fwrite(STDERR, "Usage: php create_user.php <username> <password> <nama> <admin|owner|lapangan|akuntan>\n");
     fwrite(STDERR, "For 'lapangan' (field admin), assign project access afterwards via the Kelola User Lapangan screen or the users.php API.\n");
     exit(1);
 }
