@@ -135,7 +135,7 @@ function current_user(): ?array {
  *  once so no individual endpoint can forget it. */
 const AKUNTAN_ENDPOINTS = [
     'auth_me.php', 'auth_logout.php', 'projects.php', 'workers.php', 'labor_rates.php',
-    'attendance.php', 'payroll.php', 'payroll_periods.php', 'payroll_adjustments.php', 'kasbon.php',
+    'attendance.php', 'payroll.php', 'payroll_periods.php', 'payroll_adjustments.php', 'kasbon.php', 'kasbon_requests.php',
 ];
 
 function require_login(): array {
@@ -238,10 +238,11 @@ function payroll_period(string $projectId, string $tgl): array {
     return $st->fetch();
 }
 
-/** Jam lembur yang dicatat adalah lama kerja setelah jam normal (mis. 16.00–18.00 = 2).
- *  Lembar pengajuan asli membayar jam itu dikurangi 0,5 jam istirahat per hari lembur
- *  (2 -> 1,5; 6 -> 5,5; 1 -> 0,5). */
-const LEMBUR_ISTIRAHAT_JAM = 0.5;
+/** Jam lembur yang diinput = jam yang dibayar (tidak ada pengurangan tersembunyi).
+ *  Lembar kertas lama menulis "2" untuk lembur yang dibayar 1,5 jam; di sistem
+ *  cukup ketik 1,5. Jika suatu saat perlu potongan istirahat otomatis, ubah
+ *  konstanta ini (mis. 0.5) — seluruh rekap, Excel, dan pembayaran ikut. */
+const LEMBUR_ISTIRAHAT_JAM = 0.0;
 function lembur_paid_hours(float $jam): float {
     return $jam > 0 ? max(0.0, $jam - LEMBUR_ISTIRAHAT_JAM) : 0.0;
 }

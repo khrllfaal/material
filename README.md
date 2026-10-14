@@ -96,10 +96,13 @@ scripts/
 
 - Admin Lapangan: tab **Absen** di HP — satu ketukan per pekerja (Hadir / ½ / Absen),
   lembur dalam jam, tambah pekerja baru, lalu **Ajukan** absen mingguan (Jumat–Kamis).
-  Tidak pernah melihat nominal gaji.
+  Tidak pernah melihat nominal gaji. Tombol **Kasbon** untuk mengajukan kasbon; statusnya
+  (Menunggu dicek / Disetujui / Ditolak) terlihat di layar yang sama.
+- Akuntan memeriksa pengajuan di menu **Kasbon** (angka di menu = jumlah yang menunggu),
+  lalu Setujui (otomatis masuk buku kasbon) atau Tolak dengan alasan.
 - Admin Pusat / Akuntan / Owner: menu **Rekap Gaji** (kartu, filter proyek, cari, tanggal),
   **Pekerja & Tarif**, **Kasbon**. Ekspor Excel format lembar "Absen Upah" dan PDF Daftar Bayar.
-- Gaji = hari × tarif harian; lembur = (jam − 0,5 istirahat) × tarif lembur; tarif disimpan
+- Gaji = hari × tarif harian; lembur = jam lembur × tarif lembur; tarif disimpan
   per baris absen sehingga kenaikan tarif tidak mengubah periode yang sudah lewat.
 - Database yang sudah berjalan: jalankan `backend/mysql/migrations_2026-10-payroll.sql` sekali,
   lalu (opsional) `backend/mysql/seed_absensi_percobaan.sql` untuk 2 proyek percobaan.

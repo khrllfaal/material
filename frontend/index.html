@@ -592,6 +592,7 @@ function boot(user){
     renderNav();
     icons();
     go(user.role==='akuntan' ? 'rekap_gaji' : 'dashboard');
+    refreshKasbonBadge();
   }
 }
 
@@ -626,6 +627,15 @@ function renderNav(){
   document.querySelectorAll('.nav-link').forEach(function(a){
     a.onclick=function(){ go(a.getAttribute('data-page')); closeSidebar(); };
   });
+}
+/* Small count next to "Kasbon" in the menu when field requests wait for review. */
+function refreshKasbonBadge(){
+  if(!STATE.user || (STATE.user.role!=='admin' && STATE.user.role!=='akuntan')) return;
+  apiFetch('/kasbon_requests.php?status=diajukan').then(function(list){
+    var a = document.querySelector('.nav-link[data-page="kasbon"]'); if(!a) return;
+    var old = a.querySelector('.kb-badge'); if(old) old.remove();
+    if(list.length){ var b = document.createElement('span'); b.className = 'kb-badge ml-auto text-[11px] font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5'; b.textContent = list.length; a.appendChild(b); }
+  }).catch(function(){});
 }
 function openSidebar(){
   document.getElementById('sidebar').classList.remove('-translate-x-full');
@@ -2175,7 +2185,7 @@ PAGES.rekap_gaji = function(c){
     document.getElementById('gjCards').innerHTML =
       card('wallet','text-indigo-500','Total Pembayaran', rp(t.total_bayar), t.pekerja+' pekerja · '+num0(t.hari)+' hari kerja')+
       card('calendar-check','text-emerald-500','Gaji Pokok', rp(t.gaji), num0(t.hari)+' hari × tarif harian')+
-      card('history','text-sky-500','Lembur', rp(t.lembur_rp), num0(t.lembur_jam)+' jam dicatat · '+num0(t.lembur_jam_bayar)+' jam dibayar')+
+      card('history','text-sky-500','Lembur', rp(t.lembur_rp), num0(t.lembur_jam)+' jam lembur')+
       card('banknote','text-amber-500','Tambahan & Potongan', (net<0?'−':(net>0?'+':''))+rp(Math.abs(net)).replace('Rp ','Rp '), '+'+rp(t.tambah+t.grup_tambah).replace('Rp ','')+' / −'+rp(t.potong+t.grup_potong).replace('Rp ',''))+
       card('send','text-red-500','Belum Dibayar', rp(t.sisa), t.belum_dibayar+' pekerja · klik untuk menyaring', 'data-gj-card="bayar"', !!G.bayarCard)+
       card('alert-triangle','text-orange-500','Perlu Dicek', String(t.perlu_dicek), 'absen kosong, tarif 0, lembur tinggi', 'data-gj-card="flag"', G.flagOnly);
@@ -2205,7 +2215,7 @@ PAGES.rekap_gaji = function(c){
     return '<div class="px-4 py-4 bg-slate-50/70 rounded-xl m-2">'+
       '<div class="flex flex-wrap gap-x-8 gap-y-1 text-xs text-slate-500 mb-3">'+
         '<span>Tarif harian <b class="text-slate-700">'+rp(r.tarif_harian)+'</b></span><span>Lembur per jam <b class="text-slate-700">'+rp(r.tarif_lembur)+'</b></span>'+
-        '<span>Jam lembur dibayar <b class="text-slate-700">'+fmtJam(r.lembur_jam_bayar)+'</b> <span class="text-slate-400">(dicatat '+fmtJam(r.lembur_jam)+', dikurangi 0,5 jam istirahat per hari lembur)</span></span>'+
+        '<span>Total jam lembur <b class="text-slate-700">'+fmtJam(r.lembur_jam)+'</b></span>'+
         (r.no_rek ? '<span>Rekening <b class="text-slate-700">'+esc(r.no_rek)+'</b></span>' : '')+
         (saldo ? '<span>Saldo kasbon <b class="text-red-600">'+rp(saldo)+'</b></span>' : '')+
       '</div>'+dayChips(r)+
@@ -2245,7 +2255,7 @@ PAGES.rekap_gaji = function(c){
     bindPayExports(list);
   }
   function bindPayExports(list){
-    var headers = ['Proyek','Nama','Status','Tim','Hari','Lembur (jam dicatat)','Gaji','Lembur (Rp)','Tambahan','Potongan','Diterima','Sudah dibayar','Sisa','Status bayar'];
+    var headers = ['Proyek','Nama','Status','Tim','Hari','Lembur (jam)','Gaji','Lembur (Rp)','Tambahan','Potongan','Diterima','Sudah dibayar','Sisa','Status bayar'];
     var rowsFn = function(){
       var out = list.map(function(r){ return [r.project_nama, r.nama, r.grade_nama, r.tim, r.hari, r.lembur_jam, Math.round(r.gaji), Math.round(r.lembur_rp), Math.round(r.tambah), Math.round(r.potong), Math.round(r.net), Math.round(r.dibayar), Math.round(r.sisa), (PAY_BADGE[r.status_bayar]||['',''])[1]]; });
       var sum = function(i){ return out.reduce(function(a,r){ return a+(Number(r[i])||0); }, 0); };
@@ -2460,7 +2470,7 @@ async function exportAbsenUpahExcel(period, rows){
     ws.mergeCells(H1,c,H1,c+1); put(H1,c,HARI_ABBR[dt.getDay()]+' '+dt.getDate(),{bold:true,h:'center',fill:hdrFill,box:true}); box(ws.getCell(H1,c+1));
     put(H2,c,'',{fill:hdrFill,box:true}); put(H2,c+1,'lmbr',{h:'center',fill:hdrFill,box:true,size:9}); });
   var cK = 3+days.length*2;
-  var singles = [['Ket',0],['Gaji Harian',1],['Jumlah Hari kerja',2],['Total Gaji',3],['Lembur per jam',4],['Jam lembur dibayar',5],['Total Lembur',6],['Grand Total',7]];
+  var singles = [['Ket',0],['Gaji Harian',1],['Jumlah Hari kerja',2],['Total Gaji',3],['Lembur per jam',4],['Jam lembur',5],['Total Lembur',6],['Grand Total',7]];
   singles.forEach(function(s){ var c = cK+s[1]; ws.mergeCells(H1,c,H2,c); put(H1,c,s[0],{bold:true,h:'center',fill:hdrFill,box:true,wrap:true}); box(ws.getCell(H2,c)); });
   ws.getRow(H1).height = 20; ws.getRow(H2).height = 16;
   var r0 = H2+1, money = '#,##0', row = r0;
@@ -2471,7 +2481,7 @@ async function exportAbsenUpahExcel(period, rows){
     put(row,cK,{KTK:'KTK',TK:'TK',LD:'LD',OBK:'OBK',SPR:'SPR',OMX:'OMX',LAIN:'LAIN'}[r.grade]||r.grade,{h:'center',box:true});
     put(row,cK+1,r.tarif_harian,{h:'right',box:true,numFmt:money}); put(row,cK+2,r.hari,{h:'center',box:true,numFmt:'0.0'});
     put(row,cK+3,Math.round(r.gaji),{h:'right',box:true,numFmt:money}); put(row,cK+4,r.tarif_lembur,{h:'right',box:true,numFmt:money});
-    put(row,cK+5,r.lembur_jam_bayar,{h:'center',box:true,numFmt:'0.0'}); put(row,cK+6,Math.round(r.lembur_rp),{h:'right',box:true,numFmt:money});
+    put(row,cK+5,r.lembur_jam,{h:'center',box:true,numFmt:'0.0'}); put(row,cK+6,Math.round(r.lembur_rp),{h:'right',box:true,numFmt:money});
     put(row,cK+7,Math.round(r.gaji+r.lembur_rp),{h:'right',box:true,bold:true,numFmt:money});
     row++;
   });
@@ -2508,7 +2518,7 @@ PAGES.pekerja = function(c){
       write ? '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>Pekerja</button>' : '')+
     panel('<div class="flex items-center justify-between flex-wrap gap-3 mb-1"><div class="font-extrabold text-slate-800">Tarif per status</div>'+
       '<select id="trProj" class="'+selCls+' min-w-[220px]"></select></div>'+
-      '<div class="text-xs text-slate-400 mb-4">Lembur dikosongkan = tarif harian ÷ 8, dibulatkan ke bawah per Rp500. Jam lembur dibayar = jam dicatat − 0,5 jam istirahat.</div>'+
+      '<div class="text-xs text-slate-400 mb-4">Lembur dikosongkan = tarif harian ÷ 8, dibulatkan ke bawah per Rp500.</div>'+
       '<div id="trTable"></div>'+
       (write ? '<label class="flex items-center gap-2 text-xs font-semibold text-slate-600 mt-4 cursor-pointer"><input type="checkbox" id="trApply" class="w-4 h-4 rounded border-slate-300"> Terapkan juga ke absen yang sudah ada tapi belum dibayar (koreksi tarif)</label>' : ''))+
     '<div class="mt-5"></div>'+
@@ -2622,9 +2632,52 @@ PAGES.kasbon = function(c){
   var K = {data:{kasbon:[], saldo:[]}, projects:[], workers:[]};
   c.innerHTML = pageHead('Kasbon', 'Buku kasbon pekerja / penanggung jawab. Saldo berkurang otomatis saat Anda memotong kasbon pada gaji di Rekap Gaji.',
       write ? '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>Kasbon</button>' : '')+
-    '<div class="grid lg:grid-cols-2 gap-5"><div id="ksSaldo"></div><div id="ksRiwayat"></div></div>';
+    '<div id="ksReq" class="mb-5"></div><div class="grid lg:grid-cols-2 gap-5"><div id="ksSaldo"></div><div id="ksRiwayat"></div></div>';
   icons();
+  function drawReq(){
+    var pend = (K.req||[]).filter(function(r){ return r.status==='diajukan'; });
+    var done = (K.req||[]).filter(function(r){ return r.status!=='diajukan'; }).slice(0, 5);
+    var host = document.getElementById('ksReq');
+    if(!pend.length && !done.length){ host.innerHTML = ''; return; }
+    var chip = function(st){ return st==='disetujui' ? badge('aman','Disetujui') : badge('danger','Ditolak'); };
+    host.innerHTML = panel('<div class="flex items-center gap-2 mb-3"><div class="font-extrabold text-slate-800">Pengajuan dari lapangan</div>'+(pend.length?'<span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">'+pend.length+' menunggu dicek</span>':'')+'</div>'+
+      (pend.length ? '<table class="w-full"><tbody>'+pend.map(function(r){
+        return '<tr class="border-t border-slate-100"><td class="py-3 pr-3"><b>'+esc(r.worker_nama||'Grup / penanggung jawab')+'</b><div class="text-xs text-slate-400">'+esc(r.project_nama)+' · '+esc((r.created_at||'').slice(0,10))+(r.ket?' · '+esc(r.ket):'')+'</div></td>'+
+          '<td class="py-3 pr-3 text-right font-extrabold tabular-nums">'+rp(r.jumlah)+'</td>'+
+          '<td class="py-3 text-right whitespace-nowrap">'+(write?'<button class="'+btnPrimary+' !py-1.5 !px-3 !text-xs" data-kr-ok="'+esc(r.id)+'">Setujui</button> <button class="'+btnDangerSm+'" data-kr-no="'+esc(r.id)+'">Tolak</button>':'')+'</td></tr>';
+      }).join('')+'</tbody></table>' : '<div class="text-sm text-slate-400 py-2">Tidak ada pengajuan yang menunggu.</div>')+
+      (done.length ? '<div class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-4 mb-1">Terakhir diproses</div>'+done.map(function(r){
+        return '<div class="flex items-center justify-between gap-3 py-1.5 text-sm"><span class="truncate">'+esc(r.worker_nama||'Grup')+' · '+esc(r.project_nama)+(r.catatan?' · <span class="text-slate-400">'+esc(r.catatan)+'</span>':'')+'</span><span class="flex items-center gap-2 shrink-0"><b class="tabular-nums">'+rp(r.jumlah)+'</b>'+chip(r.status)+'</span></div>'; }).join('') : ''));
+    var find = function(id){ return K.req.find(function(x){ return x.id===id; }); };
+    host.querySelectorAll('[data-kr-ok]').forEach(function(b){ b.onclick = function(){
+      var r = find(b.getAttribute('data-kr-ok'));
+      openModal('Setujui Kasbon',
+        '<div class="space-y-4"><div class="text-sm text-slate-600"><b>'+esc(r.worker_nama||'Grup / penanggung jawab')+'</b> · '+esc(r.project_nama)+(r.ket?'<div class="text-xs text-slate-400 mt-0.5">'+esc(r.ket)+'</div>':'')+'</div>'+
+        '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah disetujui (Rp)</label>'+numInputHtml('kr_ok_j', r.jumlah, fieldCls)+'</div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal diberikan</label><input id="kr_ok_t" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Catatan</label><input id="kr_ok_c" type="text" class="'+fieldCls+'"></div>'+
+        '<div class="text-xs text-slate-400">Setelah disetujui, otomatis tercatat di buku kasbon dan menambah saldo.</div></div>',
+        function(){
+          var j = parseIdNum(fv('kr_ok_j'));
+          if(Number.isNaN(j) || j<=0){ toast('Isi jumlah.', true); return; }
+          apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify({action:'setujui', id:r.id, jumlah:j, tgl:fv('kr_ok_t'), catatan:fv('kr_ok_c')})})
+            .then(function(){ closeModal(); toast('Disetujui dan dicatat ✓'); load(); refreshKasbonBadge(); }).catch(function(e){ toast(e.message, true); });
+        });
+      var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Setujui';
+    }; });
+    host.querySelectorAll('[data-kr-no]').forEach(function(b){ b.onclick = function(){
+      var r = find(b.getAttribute('data-kr-no'));
+      openModal('Tolak Pengajuan', '<p class="text-sm text-slate-600 mb-3">'+esc(r.worker_nama||'Grup')+' · '+rp(r.jumlah)+'</p><label class="block text-xs font-semibold text-slate-500 mb-1.5">Alasan *</label><input id="kr_no_c" type="text" class="'+fieldCls+'">',
+        function(){
+          if(!fv('kr_no_c')){ toast('Alasan wajib diisi.', true); return; }
+          apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify({action:'tolak', id:r.id, catatan:fv('kr_no_c')})})
+            .then(function(){ closeModal(); toast('Pengajuan ditolak.'); load(); refreshKasbonBadge(); }).catch(function(e){ toast(e.message, true); });
+        });
+    }; });
+    icons();
+  }
   function draw(){
+    drawReq();
     var sal = K.data.saldo.filter(function(s){ return Math.abs(s.saldo)>0.5; });
     document.getElementById('ksSaldo').innerHTML = panel('<div class="font-extrabold text-slate-800 mb-3">Saldo kasbon berjalan</div>'+
       (sal.length ? '<table class="w-full"><tbody>'+sal.map(function(s){ return '<tr class="border-t border-slate-100"><td class="py-2.5 pr-3"><b>'+esc(s.nama)+'</b><div class="text-xs text-slate-400">'+esc(s.project_nama)+'</div></td><td class="py-2.5 text-right font-extrabold tabular-nums '+(s.saldo>0?'text-red-600':'text-slate-500')+'">'+rp(s.saldo)+'</td></tr>'; }).join('')+'</tbody></table>'
@@ -2639,7 +2692,7 @@ PAGES.kasbon = function(c){
     icons();
   }
   function load(){
-    return Promise.all([apiFetch('/kasbon.php'), apiFetch('/projects.php'), apiFetch('/workers.php?all=1')]).then(function(r){ K.data = r[0]; K.projects = r[1]; K.workers = r[2]; draw(); })
+    return Promise.all([apiFetch('/kasbon.php'), apiFetch('/projects.php'), apiFetch('/workers.php?all=1'), apiFetch('/kasbon_requests.php')]).then(function(r){ K.data = r[0]; K.projects = r[1]; K.workers = r[2]; K.req = r[3]; draw(); })
       .catch(function(e){ toast('Gagal memuat: '+e.message, true); });
   }
   load();
@@ -3054,9 +3107,11 @@ function renderAbsen(c){
       .catch(function(e){ if(e.network){ offline = true; return lsGet(wKey, []); } throw e; }),
     apiFetch('/attendance.php?project_id='+encodeURIComponent(pid)+'&tgl_from='+tgl+'&tgl_to='+tgl).catch(function(e){ if(e.network){ offline = true; return []; } throw e; }),
     apiFetch('/payroll_periods.php?project_id='+encodeURIComponent(pid)+'&tgl='+tgl).catch(function(e){ if(e.network){ offline = true; return null; } throw e; }),
+    apiFetch('/kasbon_requests.php').catch(function(){ return []; }),
   ]).then(function(r){
     if(STATE.projectId !== pid || ABSEN.tgl !== tgl || STATE.tab !== 'absen') return; // user moved on while loading
     ABSEN.workers = r[0]; ABSEN.period = r[2]; ABSEN.offline = offline;
+    ABSEN.kreq = (r[3]||[]).filter(function(k){ return k.project_id === pid; }).slice(0, 5);
     ABSEN.cur = {}; ABSEN.orig = {};
     ABSEN.workers.forEach(function(w){ ABSEN.cur[w.id] = {h:null, l:0}; ABSEN.orig[w.id] = {h:null, l:0}; });
     r[1].forEach(function(a){
@@ -3159,16 +3214,26 @@ function drawAbsen(c){
     });
   }
 
-  var tools = ed ? '<div class="grid grid-cols-2 gap-2 mb-3">'+
-      '<button type="button" data-ab-add class="h-12 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-700 flex items-center justify-center gap-2"><i data-lucide="user-plus" class="w-4 h-4"></i>Tambah pekerja</button>'+
-      '<button type="button" id="abRain" class="h-12 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-700 flex items-center justify-center gap-2"><i data-lucide="cloud-rain" class="w-4 h-4"></i>Libur / hujan</button></div>' : '';
+  var btn3 = function(id, icon, label, attr){ return '<button type="button" '+(id?'id="'+id+'"':'')+' '+(attr||'')+' class="h-12 rounded-xl bg-white border border-slate-200 text-[13px] font-bold text-slate-700 flex flex-col items-center justify-center gap-0.5 leading-tight"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+label+'</button>'; };
+  var tools = '<div class="grid '+(ed?'grid-cols-3':'grid-cols-1')+' gap-2 mb-3">'+
+      (ed ? btn3('', 'user-plus', 'Pekerja', 'data-ab-add')+btn3('abRain', 'cloud-rain', 'Libur / hujan') : '')+btn3('abKasbon', 'banknote', 'Kasbon')+'</div>';
+  var kStat = {diajukan:['bg-amber-50 text-amber-700','Menunggu dicek'], disetujui:['bg-emerald-50 text-emerald-700','Disetujui'], ditolak:['bg-red-50 text-red-600','Ditolak']};
+  var pendingK = outboxGet().filter(function(o){ return o.endpoint==='/kasbon_requests.php' && o.payload.project_id===STATE.projectId; })
+    .map(function(o){ return {jumlah:o.payload.jumlah, worker_nama:(ABSEN.workers.find(function(w){ return w.id===o.payload.worker_id; })||{}).nama||'', status:'_antre', ket:o.payload.ket}; });
+  var kreqList = (pendingK.concat(ABSEN.kreq||[])).map(function(k){
+    var st = k.status==='_antre' ? ['bg-slate-100 text-slate-600','Menunggu sinyal'] : kStat[k.status];
+    return '<div class="flex items-center justify-between gap-3 py-2.5 border-t border-slate-100 first:border-0"><div class="min-w-0"><div class="text-sm font-bold truncate">'+esc(k.worker_nama||'Grup / penanggung jawab')+'</div>'+
+      '<div class="text-xs text-slate-400 truncate">'+esc(k.ket||'')+(k.status==='ditolak'&&k.catatan?' · '+esc(k.catatan):'')+'</div></div>'+
+      '<div class="text-right shrink-0"><div class="text-sm font-extrabold tabular-nums">'+fmtIdNum(k.jumlah)+'</div><span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+st[0]+'">'+st[1]+'</span></div></div>';
+  }).join('');
+  var kasbonBox = kreqList ? '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2 mb-3"><div class="text-[11px] font-extrabold uppercase tracking-wide text-slate-400 pt-1.5">Pengajuan kasbon</div>'+kreqList+'</div>' : '';
   var ajukan = ABSEN.period && ABSEN.period.status==='draft' || !ABSEN.period
     ? '<button type="button" id="abAjukan" class="w-full h-12 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-sm flex items-center justify-center gap-2 mb-3"><i data-lucide="send" class="w-4 h-4"></i>Ajukan absen minggu ini ke pusat</button>' : '';
   var bar = ed && ABSEN.workers.length ? '<div class="sticky bottom-3 z-10"><button type="button" id="abSave" '+(absenDirty()?'':'disabled')+
       ' class="w-full h-14 rounded-2xl text-white font-extrabold text-[16px] shadow-lg shadow-emerald-200 transition '+(absenDirty()?'bg-emerald-600':'bg-slate-300 shadow-none')+'">'+
       (absenDirty() ? 'Simpan Absen'+(n.belum?' · '+n.belum+' belum diisi':'') : (n.belum? n.belum+' pekerja belum diisi' : 'Tersimpan ✓'))+'</button></div>' : '';
 
-  c.innerHTML = card(head) + banner + list + tools + ajukan + bar;
+  c.innerHTML = card(head) + banner + tools + kasbonBox + list + ajukan + bar;
   icons();
   bindAbsen(c);
 }
@@ -3216,6 +3281,8 @@ function bindAbsen(c){
   if(save) save.onclick = function(){ saveAbsen(c); };
   var aj = document.getElementById('abAjukan');
   if(aj) aj.onclick = function(){ openAjukan(c); };
+  var kb = document.getElementById('abKasbon');
+  if(kb) kb.onclick = function(){ openKasbonRequest(c); };
 }
 
 function saveAbsen(c){
@@ -3264,6 +3331,28 @@ function openAddWorker(c){
         closeModal(); toast('"'+w.nama+'" ditambahkan.');
         renderTab(); // reload roster from server (keeps order & grouping consistent)
       }).catch(function(e){ toast(e.network ? 'Tambah pekerja butuh sinyal. Coba lagi saat ada sinyal.' : e.message, true); });
+    });
+}
+
+function openKasbonRequest(c){
+  openModal('Ajukan Kasbon',
+    '<div class="space-y-4">'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Atas nama</label><select id="kr_w" class="'+inputCls+'"><option value="">Grup / penanggung jawab</option>'+
+        ABSEN.workers.map(function(w){ return '<option value="'+esc(w.id)+'">'+esc(w.nama)+' · '+esc(GRADE_NAMA[w.grade]||w.grade)+'</option>'; }).join('')+'</select></div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Jumlah (Rp) *</label>'+numInputHtml('kr_jum','',inputCls,' placeholder="mis. 500.000"')+'</div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Keperluan</label><input id="kr_ket" type="text" autocomplete="off" class="'+inputCls+'" placeholder="Opsional"></div>'+
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Pengajuan akan dicek Akuntan. Anda bisa melihat statusnya di sini.</div>'+
+    '</div>',
+    function(){
+      var j = parseIdNum(fv('kr_jum'));
+      if(Number.isNaN(j) || j<=0){ toast('Isi jumlah kasbon.', true); return; }
+      var payload = {id:'ksr_'+Math.random().toString(36).slice(2,8)+Date.now().toString(36), project_id:STATE.projectId, worker_id:fv('kr_w')||null, jumlah:j, ket:fv('kr_ket')};
+      apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify(payload)})
+        .then(function(){ closeModal(); toast('Pengajuan kasbon terkirim ✓'); renderTab(); })
+        .catch(function(e){
+          if(e.network){ outboxAdd({endpoint:'/kasbon_requests.php', payload:payload, label:'Kasbon'}); closeModal(); toast('Tidak ada sinyal. Pengajuan disimpan dan dikirim otomatis saat sinyal kembali.'); renderTab(); }
+          else toast(e.message, true);
+        });
     });
 }
 

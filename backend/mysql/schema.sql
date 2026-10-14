@@ -313,3 +313,24 @@ CREATE TABLE IF NOT EXISTS kasbon (
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Pengajuan kasbon dari lapangan: lapangan mengajukan, Akuntan/Admin Pusat memeriksa
+-- lalu menyetujui (otomatis tercatat di buku kasbon) atau menolak.
+CREATE TABLE IF NOT EXISTS kasbon_requests (
+  id            VARCHAR(40) PRIMARY KEY,
+  project_id    VARCHAR(40) NOT NULL,
+  worker_id     VARCHAR(40) NULL,                 -- NULL = atas nama grup / penanggung jawab
+  jumlah        DECIMAL(14,2) NOT NULL,
+  ket           VARCHAR(255) NOT NULL DEFAULT '',
+  status        ENUM('diajukan','disetujui','ditolak') NOT NULL DEFAULT 'diajukan',
+  catatan       VARCHAR(255) NOT NULL DEFAULT '',  -- alasan penolakan / catatan akuntan
+  kasbon_id     VARCHAR(40) NULL,                  -- baris buku kasbon yang dibuat saat disetujui
+  created_by    VARCHAR(40) NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  diproses_by   VARCHAR(40) NULL,
+  diproses_at   DATETIME NULL,
+  INDEX idx_kreq_status (status, created_at),
+  INDEX idx_kreq_project (project_id),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
