@@ -46,7 +46,7 @@ function cfg(): array {
  * get a user "thrown out" on shared hosting: the temp folder is purged by
  * whichever site's (short) garbage-collection setting runs first, restarts
  * wipe it, and several PHP workers do not always see the same folder. A row in
- * MySQL survives all of that, and its lifetime is ours to decide: 30 days from
+ * MySQL survives all of that, and its lifetime is ours to decide: a year from
  * the last request (sliding). If the database cannot be used for sessions the
  * code quietly falls back to files.
  */
@@ -93,7 +93,7 @@ class DbSessionHandler implements SessionHandlerInterface, SessionUpdateTimestam
 
 function start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
-    $lifetime = 60 * 60 * 24 * 30; // signed in for 30 days after the last use, unless the user logs out
+    $lifetime = 60 * 60 * 24 * 365; // signed in for a year after the last use, unless the user logs out
     $secure = !empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
     ini_set('session.gc_maxlifetime', (string)$lifetime);
     ini_set('session.use_strict_mode', '1');

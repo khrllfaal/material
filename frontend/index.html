@@ -196,7 +196,7 @@ function apiFetch(path, opts){
     if(!res.ok){
       var err = new Error(data.error || ('HTTP '+res.status));
       err.status = res.status;
-      if(res.status === 401 && !/auth_login|auth_me|auth_logout/.test(path)){ err.auth = true; sessionLost(); }
+      if(res.status === 401 && !/auth_login|auth_me|auth_logout/.test(path)){ err.auth = true; }
       throw err;
     }
     return data;
@@ -206,28 +206,6 @@ function apiFetch(path, opts){
     throw err;
   });
 }
-
-/* If the server ever stops recognising the session, nobody is left staring at a
-   broken screen: the login page comes back with a clear message, anything still
-   waiting in the offline outbox stays on the device, and it is sent right after
-   the next login. */
-var _sessionLostShown = false;
-function sessionLost(){
-  if(_sessionLostShown || !STATE.user) return;
-  _sessionLostShown = true;
-  ['desktopShell','mobileShell'].forEach(function(id){ var el = document.getElementById(id); if(el){ el.classList.add('hidden'); } });
-  var ls = document.getElementById('loginScreen'); if(ls) ls.classList.remove('hidden');
-  var le = document.getElementById('loginErr');
-  if(le){ le.textContent = 'Sesi Anda berakhir. Silakan masuk lagi — data yang belum terkirim tetap tersimpan di perangkat dan akan terkirim otomatis.'; le.classList.remove('hidden'); }
-}
-/* Keep-alive: ask the server every few minutes and whenever the phone wakes up,
-   so a lost session is noticed immediately instead of at the next tap. */
-function checkSession(){
-  if(!STATE.user || !navigator.onLine) return;
-  apiFetch('/auth_me.php').then(function(r){ if(!r.user) sessionLost(); }).catch(function(){});
-}
-setInterval(checkSession, 5*60*1000);
-document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkSession(); });
 
 /* ---------------- offline support (Admin Lapangan) ----------------
    Input saved while there is no signal waits in a local outbox and is sent
@@ -595,7 +573,6 @@ apiFetch('/auth_me.php').then(function(res){ if(res.user){ saveUser(res.user); b
 
 function boot(user){
   STATE.user = user;
-  _sessionLostShown = false;
   document.getElementById('loginScreen').classList.add('hidden');
   if(user.role==='lapangan'){
     document.getElementById('desktopShell').classList.add('hidden');

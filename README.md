@@ -116,7 +116,7 @@ scripts/
 - Tidak ada data yang saling menimpa: dua HP yang mengedit absen yang sama tidak saling menimpa (yang
   terlambat ditolak dan layar dimuat ulang), dan persetujuan/pembayaran dikunci per periode sehingga tidak bisa
   terbayar dua kali walau ditekan bersamaan.
-- Keamanan: sesi tetap aktif (30 hari, di tabel database `php_sessions`, tidak hilang saat file sesi hosting dibersihkan; folder `backend/sessions` hanya cadangan), cookie HttpOnly + SameSite,
+- Keamanan: sesi tetap aktif (1 tahun sejak pemakaian terakhir, di tabel database `php_sessions`, tidak hilang saat file sesi hosting dibersihkan; folder `backend/sessions` hanya cadangan), cookie HttpOnly + SameSite,
   tolak permintaan lintas-situs (CSRF: wajib JSON & Origin sama), pertanyaan SQL terparameter, teks pengguna
   selalu di-escape, waktu login sama untuk user dikenal/tidak (anti-enumerasi), penguncian akun setelah 5 kali
   salah, file internal (`helpers.php`, `payroll_lib.php`, `bin/`, `sessions/`) diblokir dari akses web.
