@@ -17,6 +17,15 @@ $role = $user['role'];
 
 if ($method === 'GET') {
     $projectId = (string)($_GET['project_id'] ?? '');
+    if ($projectId === '' && in_array($role, ['admin', 'akuntan', 'owner'], true)) {
+        // Pusat view: which weeks are waiting (e.g. status=diajukan -> ready to be paid). No money here.
+        $status = (string)($_GET['status'] ?? '');
+        $st = db()->prepare('SELECT p.id, p.project_id, pr.nama AS project_nama, p.tgl_mulai, p.tgl_akhir, p.status, p.pj_nama, p.grup_nama
+                               FROM payroll_periods p JOIN projects pr ON pr.id = p.project_id'
+                           . ($status !== '' ? ' WHERE p.status = ?' : '') . ' ORDER BY p.tgl_mulai DESC, pr.nama LIMIT 200');
+        $st->execute($status !== '' ? [$status] : []);
+        json_response($st->fetchAll());
+    }
     if ($projectId === '') json_error('Proyek wajib dipilih.', 422);
     require_project_access($user, $projectId);
     $tgl = !empty($_GET['tgl']) ? require_valid_date($_GET['tgl']) : date('Y-m-d');

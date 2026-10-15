@@ -603,41 +603,48 @@ function boot(user){
    ============================================================ */
 var NAV=[
   {id:'dashboard', label:'Dashboard', icon:'layout-dashboard'},
-  {id:'proyek', label:'Master Proyek', icon:'briefcase'},
-  {id:'bahan', label:'Master Bahan', icon:'box'},
-  {id:'pekerjaan', label:'Master Pekerjaan (opsional)', icon:'hammer'},
-  {id:'rap_proyek', label:'RAP per Proyek', icon:'file-spreadsheet'},
-  {id:'rap', label:'RAP per Pekerjaan (detail)', icon:'file-spreadsheet'},
-  {id:'riwayat', label:'Riwayat Transaksi', icon:'history'},
-  {id:'stock', label:'Monitor Stok', icon:'layers'},
-  {id:'rap_proyek_report', label:'Analisis RAP per Proyek', icon:'trending-up'},
-  {id:'rap_report', label:'Analisis RAP per Pekerjaan (detail)', icon:'trending-up'},
-  {id:'rekap_gaji', label:'Rekap Gaji', icon:'wallet'},
-  {id:'pekerja', label:'Pekerja & Tarif', icon:'hard-hat'},
-  {id:'kasbon', label:'Kasbon', icon:'banknote'},
-  {id:'users', label:'Kelola User', icon:'users'},
+  {id:'proyek', label:'Master Proyek', icon:'briefcase', group:'Data Master'},
+  {id:'bahan', label:'Master Bahan', icon:'box', group:'Data Master'},
+  {id:'pekerjaan', label:'Master Pekerjaan (opsional)', icon:'hammer', group:'Data Master'},
+  {id:'rap_proyek', label:'RAP per Proyek', icon:'file-spreadsheet', group:'Data Master'},
+  {id:'rap', label:'RAP per Pekerjaan (detail)', icon:'file-spreadsheet', group:'Data Master'},
+  {id:'riwayat', label:'Riwayat Transaksi', icon:'history', group:'Laporan Material'},
+  {id:'stock', label:'Monitor Stok', icon:'layers', group:'Laporan Material'},
+  {id:'rap_proyek_report', label:'Analisis RAP per Proyek', icon:'trending-up', group:'Laporan Material'},
+  {id:'rap_report', label:'Analisis RAP per Pekerjaan (detail)', icon:'trending-up', group:'Laporan Material'},
+  {id:'rekap_gaji', label:'Rekap Gaji', icon:'wallet', group:'Tenaga Kerja'},
+  {id:'kasbon', label:'Kasbon', icon:'banknote', group:'Tenaga Kerja'},
+  {id:'pekerja', label:'Pekerja & Tarif', icon:'hard-hat', group:'Tenaga Kerja'},
+  {id:'users', label:'Kelola User', icon:'users', group:'Pengaturan'},
 ];
-/* Akuntan keeps it simple: only the pay menus. */
-var NAV_AKUNTAN = ['rekap_gaji','pekerja','kasbon'];
+/* Akuntan keeps it simple: only the pay menus, no group headings. */
+var NAV_AKUNTAN = ['rekap_gaji','kasbon','pekerja'];
 function renderNav(){
   var role = STATE.user && STATE.user.role;
   var navItems = role==='akuntan' ? NAV.filter(function(n){ return NAV_AKUNTAN.indexOf(n.id)>-1; }) : NAV.filter(function(n){ return role==='admin' || n.id!=='users'; });
+  var lastGroup = null;
   document.getElementById('navList').innerHTML = navItems.map(function(n){
-    return '<a data-page="'+n.id+'" class="nav-link flex items-center gap-2.5 mx-3 my-0.5 px-3 py-2.5 rounded-xl text-[13.5px] font-medium cursor-pointer transition-colors">'+
+    var head = '';
+    if(role!=='akuntan' && n.group && n.group!==lastGroup) head = '<div class="mx-6 mt-4 mb-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">'+esc(n.group)+'</div>';
+    lastGroup = n.group || lastGroup;
+    return head + '<a data-page="'+n.id+'" class="nav-link flex items-center gap-2.5 mx-3 my-0.5 px-3 py-2.5 rounded-xl text-[13.5px] font-medium cursor-pointer transition-colors">'+
       '<i data-lucide="'+n.icon+'" class="w-4 h-4"></i>'+esc(n.label)+'</a>';
   }).join('');
   document.querySelectorAll('.nav-link').forEach(function(a){
     a.onclick=function(){ go(a.getAttribute('data-page')); closeSidebar(); };
   });
 }
-/* Small count next to "Kasbon" in the menu when field requests wait for review. */
+/* Small counts in the menu: kasbon requests waiting for review, and weeks the
+   field has submitted that are ready to be paid. */
+function setNavBadge(page, n){
+  var a = document.querySelector('.nav-link[data-page="'+page+'"]'); if(!a) return;
+  var old = a.querySelector('.nav-badge'); if(old) old.remove();
+  if(n > 0){ var b = document.createElement('span'); b.className = 'nav-badge ml-auto text-[11px] font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5'; b.textContent = n; a.appendChild(b); }
+}
 function refreshKasbonBadge(){
   if(!STATE.user || (STATE.user.role!=='admin' && STATE.user.role!=='akuntan')) return;
-  apiFetch('/kasbon_requests.php?status=diajukan').then(function(list){
-    var a = document.querySelector('.nav-link[data-page="kasbon"]'); if(!a) return;
-    var old = a.querySelector('.kb-badge'); if(old) old.remove();
-    if(list.length){ var b = document.createElement('span'); b.className = 'kb-badge ml-auto text-[11px] font-bold bg-amber-400 text-slate-900 rounded-full px-2 py-0.5'; b.textContent = list.length; a.appendChild(b); }
-  }).catch(function(){});
+  apiFetch('/kasbon_requests.php?status=diajukan').then(function(l){ setNavBadge('kasbon', l.length); }).catch(function(){});
+  apiFetch('/payroll_periods.php?status=diajukan').then(function(l){ setNavBadge('rekap_gaji', l.length); }).catch(function(){});
 }
 function openSidebar(){
   document.getElementById('sidebar').classList.remove('-translate-x-full');
@@ -2146,6 +2153,8 @@ PAGES.rekap_gaji = function(c){
   enhanceSelect(document.getElementById('gjBayar'));
   enhanceSelect(document.getElementById('gjPreset'));
   document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to;
+  // The accountant pays the week that just closed, so start there.
+  if(STATE.user.role==='akuntan'){ G.preset = 'lalu'; var w0 = weekOf(addDays(today(), -7)); G.from = w0.from; G.to = w0.to; document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to; document.getElementById('gjPreset').value = 'lalu'; }
 
   function setPreset(v){
     var t = today();
@@ -2431,7 +2440,18 @@ PAGES.rekap_gaji = function(c){
     document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+projects.map(function(x){ return '<option value="'+esc(x.id)+'">'+esc(x.nama)+'</option>'; }).join('');
     enhanceSelect(document.getElementById('fProj'));
     var pend = STATE.pendingFilter; STATE.pendingFilter = null;
-    return load();
+    if(STATE.user.role !== 'akuntan') return load();
+    // Accountant lands on the oldest week that is submitted and waiting to be paid.
+    return apiFetch('/payroll_periods.php?status=diajukan').then(function(l){
+      if(l.length){
+        var oldest = l.slice().sort(function(a,b){ return a.tgl_mulai < b.tgl_mulai ? -1 : 1; })[0];
+        G.from = oldest.tgl_mulai; G.to = oldest.tgl_akhir;
+        document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to;
+        var sel = document.getElementById('gjPreset'); sel.value = 'kustom'; sel.dispatchEvent(new Event('ss-refresh'));
+        toast('Menampilkan minggu yang menunggu pembayaran ('+l.length+' periode diajukan).');
+      }
+      return load();
+    }).catch(function(){ return load(); });
   });
   document.getElementById('q').addEventListener('input', function(){ G.PG.page=1; if(G.data) draw(); });
   document.getElementById('gjBayar').addEventListener('change', function(){ G.PG.page=1; if(G.data) draw(); });
@@ -3135,7 +3155,7 @@ function renderAbsen(c){
     if(STATE.projectId !== pid || ABSEN.tgl !== tgl || STATE.section !== 'absen') return; // user moved on while loading
     ABSEN.workers = r[0]; ABSEN.period = r[2]; ABSEN.offline = offline;
     ABSEN.kreq = (r[3]||[]).filter(function(k){ return k.project_id === pid; }).slice(0, 5);
-    ABSEN.cur = {}; ABSEN.orig = {};
+    ABSEN.cur = {}; ABSEN.orig = {}; ABSEN.q = ''; ABSEN.filter = 'all'; ABSEN.open = {};
     ABSEN.workers.forEach(function(w){ ABSEN.cur[w.id] = {h:null, l:0}; ABSEN.orig[w.id] = {h:null, l:0}; });
     r[1].forEach(function(a){
       if(!ABSEN.cur[a.worker_id]) return;
@@ -3177,131 +3197,208 @@ function absenDirty(){
 }
 function fmtJam(n){ return String(n).replace('.', ','); }
 
+/* Built for crews of 30-50: the usual day is "almost everyone present with the
+   same overtime", so the screen starts from that and only asks for exceptions.
+   - "Pola kemarin" copies yesterday's entries; "Semua hadir" fills the rest.
+   - "Lembur standar" applies one overtime value to everyone present.
+   - Rows are one line each; search + filter (Belum / Hadir / ½ / Absen) find people fast. */
+var ABSEN_FILTERS = [['all','Semua'],['belum','Belum'],['hadir','Hadir'],['setengah','½'],['absen','Absen']];
+var LEMBUR_CHIPS = [0, 1.5, 2, 3];
+
+function absenRowMatch(w){
+  var x = ABSEN.cur[w.id], f = ABSEN.filter, q = (ABSEN.q||'').toLowerCase();
+  if(q && (w.nama+' '+(w.tim||'')).toLowerCase().indexOf(q) === -1) return false;
+  if(f==='belum') return x.h===null;
+  if(f==='hadir') return x.h===1;
+  if(f==='setengah') return x.h===0.5;
+  if(f==='absen') return x.h===0;
+  return true;
+}
+function setHadir(w, v){
+  var x = ABSEN.cur[w.id];
+  if(x.h === v){ x.h = null; x.l = 0; return; }
+  x.h = v; x.l = v===0 ? 0 : (ABSEN.defL || 0);
+}
+
 function drawAbsen(c){
-  var tgl = ABSEN.tgl, ed = ABSEN.editable, n = absenCounts();
+  var tgl = ABSEN.tgl, ed = ABSEN.editable;
   var wk = weekOf(tgl), st = ABSEN.period ? ABSEN.period.status : 'draft';
   var ps = PERIOD_STATUS[st] || PERIOD_STATUS.draft;
-  var canPrev = true, canNext = tgl < today();
+  var canNext = tgl < today();
+  if(ABSEN.q == null) ABSEN.q = '';
+  if(!ABSEN.filter) ABSEN.filter = 'all';
+  if(ABSEN.defL == null) ABSEN.defL = Number(lsGet('ms_def_lembur', 0)) || 0;
+  ABSEN.open = ABSEN.open || {};
 
-  // group by tim, keeping the server's order (tim, status, name)
-  var groups = [], idx = {};
-  ABSEN.workers.forEach(function(w){
-    var k = w.tim || '';
-    if(!(k in idx)){ idx[k] = groups.length; groups.push({tim:k, list:[]}); }
-    groups[idx[k]].list.push(w);
-  });
+  var banner = '';
+  if(ABSEN.offline) banner += '<div class="text-xs text-slate-600 bg-slate-100 rounded-xl px-3 py-2 mb-3">Tidak ada sinyal. Memakai daftar pekerja yang tersimpan; absen akan dikirim saat sinyal kembali.</div>';
+  if(!ed) banner += '<div class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-3">'+esc(ABSEN.reason)+'</div>';
 
-  var tile = function(label, val, cls){ return '<div class="rounded-xl px-2 py-2.5 text-center '+cls+'"><div class="text-xl font-extrabold leading-none tabular-nums">'+val+'</div><div class="text-[11px] font-semibold mt-1 opacity-80">'+label+'</div></div>'; };
+  var btn3 = function(id, icon, label, attr){ return '<button type="button" '+(id?'id="'+id+'"':'')+' '+(attr||'')+' class="h-12 rounded-xl bg-white border border-slate-200 text-[13px] font-bold text-slate-700 flex flex-col items-center justify-center gap-0.5 leading-tight"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+label+'</button>'; };
+  var tools = '<div class="grid '+(ed?'grid-cols-3':'grid-cols-1')+' gap-2 mb-3">'+
+      (ed ? btn3('', 'user-plus', 'Pekerja', 'data-ab-add')+btn3('abRain', 'cloud-rain', 'Libur / hujan') : '')+btn3('abKasbon', 'banknote', 'Kasbon')+'</div>';
+
   var head =
     '<div class="flex items-center justify-between gap-2 mb-3">'+
       '<button type="button" id="abPrev" class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>'+
       '<div class="text-center min-w-0"><div class="font-extrabold text-[16px] leading-tight">'+esc(fmtTglPanjang(tgl))+'</div>'+
       '<div class="text-xs text-slate-400 mt-0.5">Minggu '+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+' · '+badge(ps[0], ps[1])+'</div></div>'+
       '<button type="button" id="abNext" '+(canNext?'':'disabled')+' class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center disabled:opacity-30"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>'+
-    '</div>'+
-    '<div class="grid grid-cols-4 gap-2">'+
-      tile('Hadir', n.hadir, 'bg-emerald-50 text-emerald-700')+tile('½ Hari', n.setengah, 'bg-amber-50 text-amber-700')+
-      tile('Absen', n.absen, 'bg-red-50 text-red-600')+tile('Belum', n.belum, n.belum? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500')+
-    '</div>'+
-    (n.lembur>0 ? '<div class="text-xs text-slate-500 mt-2 text-center">Total lembur hari ini: <b class="text-slate-700">'+fmtJam(n.lembur)+' jam</b></div>' : '');
+    '</div><div id="abTiles"></div>';
 
-  var banner = '';
-  if(ABSEN.offline) banner += '<div class="text-xs text-slate-600 bg-slate-100 rounded-xl px-3 py-2 mb-3">Tidak ada sinyal. Memakai daftar pekerja yang tersimpan; absen akan dikirim saat sinyal kembali.</div>';
-  if(!ed) banner += '<div class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-3">'+esc(ABSEN.reason)+'</div>';
+  var quick = ed && ABSEN.workers.length ?
+    '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 mb-3">'+
+      '<div class="grid grid-cols-2 gap-2 mb-3">'+
+        '<button type="button" id="abCopy" class="h-12 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 text-[14px] font-bold">Pola kemarin</button>'+
+        '<button type="button" id="abAll" class="h-12 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 text-[14px] font-bold">Semua hadir</button></div>'+
+      '<div class="flex items-center gap-2"><span class="text-xs font-bold text-slate-500 shrink-0">Lembur standar</span>'+
+        '<div class="grid grid-cols-4 gap-1.5 flex-1" id="abDefL">'+LEMBUR_CHIPS.map(function(v){
+          return '<button type="button" data-defl="'+v+'" class="h-10 rounded-lg text-[13px] font-bold '+(ABSEN.defL===v?'bg-indigo-600 text-white':'bg-slate-100 text-slate-500')+'">'+(v===0?'Tidak':fmtJam(v)+' j')+'</button>';
+        }).join('')+'</div></div>'+
+      '<div class="text-[11px] text-slate-400 mt-2">Berlaku untuk semua yang hadir. Ubah per orang dengan mengetuk namanya.</div></div>' : '';
 
-  var list = '';
-  if(!ABSEN.workers.length){
-    list = card('<div class="text-center py-6"><div class="text-slate-500 text-sm mb-4">Belum ada pekerja di proyek ini.</div>'+
-      (ed?'<button type="button" data-ab-add class="px-5 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm">+ Tambah pekerja pertama</button>':'')+'</div>');
-  } else {
-    groups.forEach(function(g, gi){
-      var open = g.list.filter(function(w){ return ABSEN.cur[w.id].h===null; }).length;
-      list += '<div class="mb-4">'+
-        '<div class="flex items-center justify-between px-1 mb-2"><div class="text-xs font-extrabold uppercase tracking-wide text-slate-500">'+esc(g.tim||'Tanpa tim')+
-        ' <span class="font-semibold text-slate-400 normal-case">· '+g.list.length+' orang'+(open?' · '+open+' belum':'')+'</span></div>'+
-        (ed ? '<button type="button" data-ab-all="'+gi+'" class="text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg px-3 py-1.5">Semua hadir</button>' : '')+'</div>'+
-        g.list.map(function(w){
-          var x = ABSEN.cur[w.id], seg = function(v, lab, on, cls){
-            return '<button type="button" '+(ed?'':'disabled')+' data-ab="'+esc(w.id)+'|'+v+'" class="h-11 flex-1 rounded-lg text-[14px] font-bold transition '+(on?cls:'bg-slate-100 text-slate-400')+'">'+lab+'</button>';
-          };
-          return '<div class="bg-white rounded-2xl border '+(x.h===null?'border-slate-200':'border-slate-100')+' shadow-sm px-3.5 py-3 mb-2">'+
-            '<div class="flex items-center justify-between gap-2 mb-2.5"><div class="font-bold text-[15px] leading-tight min-w-0 truncate">'+esc(w.nama)+'</div>'+
-            '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap '+(GRADE_CLS[w.grade]||GRADE_CLS.LAIN)+'">'+esc(GRADE_NAMA[w.grade]||w.grade)+'</span></div>'+
-            '<div class="flex gap-1.5">'+seg(1,'Hadir',x.h===1,'bg-emerald-600 text-white')+seg(0.5,'½',x.h===0.5,'bg-amber-500 text-white')+seg(0,'Absen',x.h===0,'bg-red-500 text-white')+'</div>'+
-            (x.h>0 ? '<div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-slate-100"><span class="text-xs font-semibold text-slate-500">Lembur</span>'+
-              '<div class="flex items-center gap-2"><button type="button" '+(ed?'':'disabled')+' data-ab-l="'+esc(w.id)+'|-" class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 text-lg font-bold flex items-center justify-center"><i data-lucide="minus" class="w-4 h-4"></i></button>'+
-              '<span class="w-20 whitespace-nowrap text-center font-extrabold tabular-nums '+(x.l>0?'text-indigo-600':'text-slate-400')+'">'+fmtJam(x.l)+' jam</span>'+
-              '<button type="button" '+(ed?'':'disabled')+' data-ab-l="'+esc(w.id)+'|+" class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><i data-lucide="plus" class="w-4 h-4"></i></button></div></div>' : '')+
-          '</div>';
-        }).join('')+'</div>';
-    });
-  }
+  var filters = ABSEN.workers.length > 8 ?
+    '<div class="mb-3"><div class="relative mb-2"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute z-[2] pointer-events-none left-3.5 top-1/2 -translate-y-1/2"></i>'+
+      '<input type="search" id="abQ" placeholder="Cari nama pekerja…" value="'+esc(ABSEN.q)+'" autocomplete="off" class="w-full pl-10 pr-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-100"></div>'+
+      '<div id="abFilters" class="grid grid-cols-5 gap-1 bg-slate-200/70 rounded-xl p-1"></div></div>' : '';
 
-  var btn3 = function(id, icon, label, attr){ return '<button type="button" '+(id?'id="'+id+'"':'')+' '+(attr||'')+' class="h-12 rounded-xl bg-white border border-slate-200 text-[13px] font-bold text-slate-700 flex flex-col items-center justify-center gap-0.5 leading-tight"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+label+'</button>'; };
-  var tools = '<div class="grid '+(ed?'grid-cols-3':'grid-cols-1')+' gap-2 mb-3">'+
-      (ed ? btn3('', 'user-plus', 'Pekerja', 'data-ab-add')+btn3('abRain', 'cloud-rain', 'Libur / hujan') : '')+btn3('abKasbon', 'banknote', 'Kasbon')+'</div>';
+  var ajukan = (!ABSEN.period || ABSEN.period.status==='draft')
+    ? '<button type="button" id="abAjukan" class="w-full h-12 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-sm flex items-center justify-center gap-2 mb-3"><i data-lucide="send" class="w-4 h-4"></i>Ajukan absen minggu ini ke pusat</button>' : '';
+
+  var empty = !ABSEN.workers.length ? card('<div class="text-center py-6"><div class="text-slate-500 text-sm mb-4">Belum ada pekerja di proyek ini.</div>'+
+      (ed?'<button type="button" data-ab-add class="px-5 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm">+ Tambah pekerja pertama</button>':'')+'</div>') : '';
+
+  c.innerHTML = card(head) + banner + tools + '<div id="abKasbonBox"></div>' + quick + filters + empty + '<div id="abList"></div>' + ajukan + '<div id="abBar"></div>';
+  document.getElementById('abKasbonBox').innerHTML = kasbonBoxHtml();
+  icons();
+  renderAbSummary(); renderAbList();
+  bindAbsen(c);
+}
+
+function kasbonBoxHtml(){
   var kStat = {diajukan:['bg-amber-50 text-amber-700','Menunggu dicek'], disetujui:['bg-emerald-50 text-emerald-700','Disetujui'], ditolak:['bg-red-50 text-red-600','Ditolak']};
   var pendingK = outboxGet().filter(function(o){ return o.endpoint==='/kasbon_requests.php' && o.payload.project_id===STATE.projectId; })
     .map(function(o){ return {jumlah:o.payload.jumlah, worker_nama:(ABSEN.workers.find(function(w){ return w.id===o.payload.worker_id; })||{}).nama||'', status:'_antre', ket:o.payload.ket}; });
-  var kreqList = (pendingK.concat(ABSEN.kreq||[])).map(function(k){
+  var list = (pendingK.concat(ABSEN.kreq||[])).map(function(k){
     var st = k.status==='_antre' ? ['bg-slate-100 text-slate-600','Menunggu sinyal'] : kStat[k.status];
     return '<div class="flex items-center justify-between gap-3 py-2.5 border-t border-slate-100 first:border-0"><div class="min-w-0"><div class="text-sm font-bold truncate">'+esc(k.worker_nama||'Grup / penanggung jawab')+'</div>'+
       '<div class="text-xs text-slate-400 truncate">'+esc(k.ket||'')+(k.status==='ditolak'&&k.catatan?' · '+esc(k.catatan):'')+'</div></div>'+
       '<div class="text-right shrink-0"><div class="text-sm font-extrabold tabular-nums">'+fmtIdNum(k.jumlah)+'</div><span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+st[0]+'">'+st[1]+'</span></div></div>';
   }).join('');
-  var kasbonBox = kreqList ? '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2 mb-3"><div class="text-[11px] font-extrabold uppercase tracking-wide text-slate-400 pt-1.5">Pengajuan kasbon</div>'+kreqList+'</div>' : '';
-  var ajukan = ABSEN.period && ABSEN.period.status==='draft' || !ABSEN.period
-    ? '<button type="button" id="abAjukan" class="w-full h-12 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 font-bold text-sm flex items-center justify-center gap-2 mb-3"><i data-lucide="send" class="w-4 h-4"></i>Ajukan absen minggu ini ke pusat</button>' : '';
-  var bar = ed && ABSEN.workers.length ? '<div class="sticky bottom-20 z-10"><button type="button" id="abSave" '+(absenDirty()?'':'disabled')+
-      ' class="w-full h-14 rounded-2xl text-white font-extrabold text-[16px] shadow-lg shadow-emerald-200 transition '+(absenDirty()?'bg-emerald-600':'bg-slate-300 shadow-none')+'">'+
-      (absenDirty() ? 'Simpan Absen'+(n.belum?' · '+n.belum+' belum diisi':'') : (n.belum? n.belum+' pekerja belum diisi' : 'Tersimpan ✓'))+'</button></div>' : '';
+  return list ? '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2 mb-3"><div class="text-[11px] font-extrabold uppercase tracking-wide text-slate-400 pt-1.5">Pengajuan kasbon</div>'+list+'</div>' : '';
+}
 
-  c.innerHTML = card(head) + banner + tools + kasbonBox + list + ajukan + bar;
+function renderAbSummary(){
+  var n = absenCounts(), ed = ABSEN.editable;
+  var tile = function(label, val, cls){ return '<div class="rounded-xl px-2 py-2.5 text-center '+cls+'"><div class="text-xl font-extrabold leading-none tabular-nums">'+val+'</div><div class="text-[11px] font-semibold mt-1 opacity-80">'+label+'</div></div>'; };
+  var tiles = document.getElementById('abTiles');
+  if(tiles) tiles.innerHTML = '<div class="grid grid-cols-4 gap-2">'+
+      tile('Hadir', n.hadir, 'bg-emerald-50 text-emerald-700')+tile('½ Hari', n.setengah, 'bg-amber-50 text-amber-700')+
+      tile('Absen', n.absen, 'bg-red-50 text-red-600')+tile('Belum', n.belum, n.belum? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500')+'</div>'+
+      (n.lembur>0 ? '<div class="text-xs text-slate-500 mt-2 text-center">Total lembur hari ini: <b class="text-slate-700">'+fmtJam(n.lembur)+' jam</b></div>' : '');
+  var f = document.getElementById('abFilters');
+  if(f){
+    var cnt = {all:ABSEN.workers.length, belum:n.belum, hadir:n.hadir, setengah:n.setengah, absen:n.absen};
+    f.innerHTML = ABSEN_FILTERS.map(function(x){
+      var on = ABSEN.filter===x[0];
+      return '<button type="button" data-flt="'+x[0]+'" class="h-10 rounded-lg text-[12.5px] font-bold '+(on?'bg-white text-emerald-700 shadow-sm':'text-slate-500')+'">'+x[1]+(x[0]==='all'?'':' <span class="opacity-60">'+cnt[x[0]]+'</span>')+'</button>';
+    }).join('');
+    f.querySelectorAll('[data-flt]').forEach(function(b){ b.onclick = function(){ ABSEN.filter = b.getAttribute('data-flt'); renderAbSummary(); renderAbList(); }; });
+  }
+  var bar = document.getElementById('abBar');
+  if(bar){
+    var dirty = absenDirty();
+    bar.innerHTML = ed && ABSEN.workers.length ? '<div class="sticky bottom-20 z-10"><button type="button" id="abSave" '+(dirty?'':'disabled')+
+      ' class="w-full h-14 rounded-2xl text-white font-extrabold text-[16px] shadow-lg shadow-emerald-200 transition '+(dirty?'bg-emerald-600':'bg-slate-300 shadow-none')+'">'+
+      (dirty ? 'Simpan Absen'+(n.belum?' · '+n.belum+' belum diisi':'') : (n.belum? n.belum+' pekerja belum diisi' : 'Tersimpan ✓'))+'</button></div>' : '';
+    var sv = document.getElementById('abSave'); if(sv) sv.onclick = function(){ saveAbsen(document.getElementById('mContent')); };
+  }
+}
+
+function renderAbList(){
+  var host = document.getElementById('abList'); if(!host) return;
+  var ed = ABSEN.editable, groups = [], idx = {};
+  ABSEN.workers.filter(absenRowMatch).forEach(function(w){
+    var k = w.tim || '';
+    if(!(k in idx)){ idx[k] = groups.length; groups.push({tim:k, list:[]}); }
+    groups[idx[k]].list.push(w);
+  });
+  if(!groups.length && ABSEN.workers.length){ host.innerHTML = '<div class="text-center text-sm text-slate-400 py-8">Tidak ada pekerja yang cocok.</div>'; return; }
+  var sq = function(w, v, active, cls, inner){
+    return '<button type="button" '+(ed?'':'disabled')+' data-ab="'+esc(w.id)+'|'+v+'" aria-label="'+v+'" class="w-11 h-11 rounded-xl flex items-center justify-center text-[16px] font-extrabold transition '+(active?cls:'bg-slate-100 text-slate-300')+'">'+inner+'</button>';
+  };
+  host.innerHTML = groups.map(function(g){
+    var all = ABSEN.workers.filter(function(w){ return (w.tim||'')===g.tim; });
+    var open = all.filter(function(w){ return ABSEN.cur[w.id].h===null; }).length;
+    return '<div class="mb-4"><div class="flex items-center justify-between px-1 mb-2"><div class="text-xs font-extrabold uppercase tracking-wide text-slate-500">'+esc(g.tim||'Tanpa tim')+
+      ' <span class="font-semibold text-slate-400 normal-case">· '+all.length+' orang'+(open?' · '+open+' belum':'')+'</span></div>'+
+      (ed ? '<button type="button" data-ab-tim="'+esc(g.tim)+'" class="text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">Semua hadir</button>' : '')+'</div>'+
+      g.list.map(function(w){
+        var x = ABSEN.cur[w.id], isOpen = !!ABSEN.open[w.id] && x.h>0;
+        return '<div class="bg-white rounded-xl border '+(x.h===null?'border-slate-200':'border-slate-100')+' shadow-sm mb-1.5 overflow-hidden">'+
+          '<div class="flex items-center gap-2 pl-3 pr-2 py-1.5">'+
+            '<button type="button" data-ab-exp="'+esc(w.id)+'" class="min-w-0 flex-1 text-left py-1"><div class="font-bold text-[15px] leading-tight truncate">'+esc(w.nama)+'</div>'+
+            '<div class="text-[11.5px] text-slate-400 leading-tight mt-0.5 truncate">'+esc(GRADE_NAMA[w.grade]||w.grade)+(x.h>0 && x.l>0 ? ' · <b class="text-indigo-600">lembur '+fmtJam(x.l)+' j</b>' : '')+'</div></button>'+
+            '<div class="flex gap-1.5 shrink-0">'+sq(w,1,x.h===1,'bg-emerald-600 text-white','✓')+sq(w,0.5,x.h===0.5,'bg-amber-500 text-white','½')+sq(w,0,x.h===0,'bg-red-500 text-white','✕')+'</div></div>'+
+          (isOpen ? '<div class="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-100"><span class="text-xs font-semibold text-slate-500">Lembur</span>'+
+            '<div class="flex items-center gap-2"><button type="button" '+(ed?'':'disabled')+' data-ab-l="'+esc(w.id)+'|-" class="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-600 flex items-center justify-center"><i data-lucide="minus" class="w-4 h-4"></i></button>'+
+            '<span class="w-20 whitespace-nowrap text-center font-extrabold tabular-nums '+(x.l>0?'text-indigo-600':'text-slate-400')+'">'+fmtJam(x.l)+' jam</span>'+
+            '<button type="button" '+(ed?'':'disabled')+' data-ab-l="'+esc(w.id)+'|+" class="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-600 flex items-center justify-center"><i data-lucide="plus" class="w-4 h-4"></i></button></div></div>' : '')+
+          '</div>';
+      }).join('')+'</div>';
+  }).join('');
   icons();
-  bindAbsen(c);
+  var byId = function(id){ return ABSEN.workers.find(function(w){ return w.id===id; }); };
+  var upd = function(){ renderAbSummary(); renderAbList(); };
+  host.querySelectorAll('[data-ab]').forEach(function(b){ b.onclick = function(){ var p = b.getAttribute('data-ab').split('|'); setHadir(byId(p[0]), Number(p[1])); upd(); }; });
+  host.querySelectorAll('[data-ab-l]').forEach(function(b){ b.onclick = function(){
+    var p = b.getAttribute('data-ab-l').split('|'), x = ABSEN.cur[p[0]];
+    x.l = Math.min(16, Math.max(0, x.l + (p[1]==='+' ? 0.5 : -0.5))); upd(); }; });
+  host.querySelectorAll('[data-ab-exp]').forEach(function(b){ b.onclick = function(){
+    var id = b.getAttribute('data-ab-exp'); if(ABSEN.cur[id].h>0 && ABSEN.editable){ ABSEN.open[id] = !ABSEN.open[id]; renderAbList(); } }; });
+  host.querySelectorAll('[data-ab-tim]').forEach(function(b){ b.onclick = function(){
+    var tim = b.getAttribute('data-ab-tim');
+    ABSEN.workers.forEach(function(w){ if((w.tim||'')===tim && ABSEN.cur[w.id].h===null){ ABSEN.cur[w.id].h = 1; ABSEN.cur[w.id].l = ABSEN.defL||0; } });
+    upd(); }; });
 }
 
 function bindAbsen(c){
-  var redraw = function(){ var y = window.scrollY; drawAbsen(c); window.scrollTo(0, y); };
   document.getElementById('abPrev').onclick = function(){ ABSEN.tgl = addDays(ABSEN.tgl, -1); renderTab(); };
   document.getElementById('abNext').onclick = function(){ if(ABSEN.tgl < today()){ ABSEN.tgl = addDays(ABSEN.tgl, 1); renderTab(); } };
-  c.querySelectorAll('[data-ab]').forEach(function(b){
-    b.onclick = function(){
-      var p = b.getAttribute('data-ab').split('|'), x = ABSEN.cur[p[0]], v = Number(p[1]);
-      if(x.h === v){ x.h = null; x.l = 0; }
-      else { x.h = v; if(v===0) x.l = 0; }
-      redraw();
-    };
-  });
-  c.querySelectorAll('[data-ab-l]').forEach(function(b){
-    b.onclick = function(){
-      var p = b.getAttribute('data-ab-l').split('|'), x = ABSEN.cur[p[0]];
-      x.l = Math.min(16, Math.max(0, x.l + (p[1]==='+' ? 0.5 : -0.5)));
-      redraw();
-    };
-  });
-  var groups = {};
-  ABSEN.workers.forEach(function(w){ var k = w.tim||''; (groups[k] = groups[k] || []).push(w); });
-  var keys = Object.keys(groups);
-  // keep the same tim order as drawAbsen (first-seen order)
-  var order = []; ABSEN.workers.forEach(function(w){ var k=w.tim||''; if(order.indexOf(k)<0) order.push(k); });
-  c.querySelectorAll('[data-ab-all]').forEach(function(b){
-    b.onclick = function(){
-      var list = groups[order[Number(b.getAttribute('data-ab-all'))]] || [];
-      list.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null) x.h = 1; });
-      redraw();
-    };
-  });
   c.querySelectorAll('[data-ab-add]').forEach(function(b){ b.onclick = function(){ openAddWorker(c); }; });
+  var upd = function(){ renderAbSummary(); renderAbList(); };
+  var q = document.getElementById('abQ'); if(q) q.oninput = function(){ ABSEN.q = q.value; renderAbList(); };
+  var all = document.getElementById('abAll');
+  if(all) all.onclick = function(){
+    ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null){ x.h = 1; x.l = ABSEN.defL||0; } });
+    toast('Semua yang belum diisi ditandai Hadir. Ubah yang berbeda saja.'); upd();
+  };
+  document.querySelectorAll('#abDefL [data-defl]').forEach(function(b){ b.onclick = function(){
+    ABSEN.defL = Number(b.getAttribute('data-defl')); lsSet('ms_def_lembur', ABSEN.defL);
+    ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h>0) x.l = ABSEN.defL; });
+    document.querySelectorAll('#abDefL [data-defl]').forEach(function(o){ var on = Number(o.getAttribute('data-defl'))===ABSEN.defL; o.className = 'h-10 rounded-lg text-[13px] font-bold '+(on?'bg-indigo-600 text-white':'bg-slate-100 text-slate-500'); });
+    upd(); }; });
+  var copy = document.getElementById('abCopy');
+  if(copy) copy.onclick = function(){
+    var prev = addDays(ABSEN.tgl, -1);
+    apiFetch('/attendance.php?project_id='+encodeURIComponent(STATE.projectId)+'&tgl_from='+prev+'&tgl_to='+prev).then(function(rows){
+      var n = 0;
+      rows.forEach(function(a){
+        var x = ABSEN.cur[a.worker_id];
+        if(x && x.h===null){ x.h = Number(a.hari); x.l = Number(a.lembur_jam)||0; n++; }
+      });
+      if(!n) toast(rows.length ? 'Semua pekerja sudah terisi.' : 'Kemarin belum ada absen yang bisa disalin.', !rows.length);
+      else toast('Pola kemarin disalin ('+n+' pekerja). Cek yang berbeda hari ini.');
+      upd();
+    }).catch(function(e){ toast(e.network ? 'Salin pola kemarin butuh sinyal.' : e.message, true); });
+  };
   var rain = document.getElementById('abRain');
   if(rain) rain.onclick = function(){
     confirmModal('Libur / hujan', 'Tandai SEMUA pekerja yang belum diisi sebagai <b>Absen</b> pada '+esc(fmtTglPanjang(ABSEN.tgl))+'?', function(){
       ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null) x.h = 0; });
-      redraw();
+      upd();
     });
   };
-  var save = document.getElementById('abSave');
-  if(save) save.onclick = function(){ saveAbsen(c); };
   var aj = document.getElementById('abAjukan');
   if(aj) aj.onclick = function(){ openAjukan(c); };
   var kb = document.getElementById('abKasbon');

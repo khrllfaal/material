@@ -94,7 +94,7 @@ scripts/
 
 ## Absensi & Rekap Gaji
 
-- Admin Lapangan: tab **Absen** di HP — satu ketukan per pekerja (Hadir / ½ / Absen),
+- Admin Lapangan: menu **Absen** di bar bawah HP (untuk tim besar: *Pola kemarin*, *Semua hadir*, *Lembur standar*, cari nama, filter Belum/Hadir/½/Absen) — satu ketukan per pekerja (Hadir / ½ / Absen),
   lembur dalam jam, tambah pekerja baru, lalu **Ajukan** absen mingguan (Jumat–Kamis).
   Tidak pernah melihat nominal gaji. Tombol **Kasbon** untuk mengajukan kasbon; statusnya
   (Menunggu dicek / Disetujui / Ditolak) terlihat di layar yang sama.
