@@ -6,7 +6,7 @@ require_once __DIR__ . '/payroll_lib.php';
  * Pengajuan kasbon.
  *   Admin Lapangan  POST {id, project_id, worker_id?, jumlah, ket}   -> status "diajukan"
  *                   GET                                              -> pengajuan proyeknya sendiri
- *   Akuntan / Admin POST {action:'setujui', id, jumlah?, tgl?, catatan?} -> dicatat ke buku kasbon
+ *   Akuntan         POST {action:'setujui', id, jumlah?, tgl?, catatan?} -> dicatat ke buku kasbon
  *                   POST {action:'tolak',   id, catatan}             -> ditolak dengan alasan
  *   Owner           GET only.
  * Lapangan can only create requests; it can never approve or touch the kasbon book.
@@ -62,10 +62,11 @@ if ($role === 'lapangan' || $action === '') {
     json_response(['ok' => true, 'id' => $id]);
 }
 
-// review: akuntan / admin only
-if (!in_array($role, ['admin', 'akuntan'], true)) json_error('Anda tidak punya akses untuk aksi ini.', 403);
+// review: Akuntan only (Admin Pusat edits/deletes, it does not approve)
+if ($role !== 'akuntan') json_error('Hanya Akuntan yang memeriksa pengajuan kasbon.', 403);
 $id = (string)($b['id'] ?? '');
-$st = db()->prepare('SELECT * FROM kasbon_requests WHERE id = ?'); $st->execute([$id]);
+db()->beginTransaction();
+$st = db()->prepare('SELECT * FROM kasbon_requests WHERE id = ? FOR UPDATE'); $st->execute([$id]);
 $r = $st->fetch();
 if (!$r) json_error('Pengajuan tidak ditemukan.', 404);
 if ($r['status'] !== 'diajukan') json_error('Pengajuan ini sudah diproses.', 409);
@@ -74,6 +75,7 @@ $catatan = mb_substr(trim((string)($b['catatan'] ?? '')), 0, 255);
 if ($action === 'tolak') {
     if ($catatan === '') json_error('Alasan penolakan wajib diisi.', 422);
     db()->prepare("UPDATE kasbon_requests SET status='ditolak', catatan=?, diproses_by=?, diproses_at=NOW() WHERE id=?")->execute([$catatan, $user['id'], $id]);
+    db()->commit();
     audit('update', 'kasbon_requests', $id, 'ditolak: ' . $catatan);
     json_response(['ok' => true, 'status' => 'ditolak']);
 }
@@ -82,7 +84,6 @@ if ($action === 'setujui') {
     if ($jumlah <= 0) json_error('Jumlah harus lebih dari 0.', 422);
     $tgl = require_valid_date($b['tgl'] ?? date('Y-m-d'), 'Tanggal kasbon');
     $kid = new_id('ksb_');
-    db()->beginTransaction();
     db()->prepare('INSERT INTO kasbon (id, project_id, worker_id, tgl, jumlah, ket, created_by) VALUES (?,?,?,?,?,?,?)')
         ->execute([$kid, $r['project_id'], $r['worker_id'], $tgl, $jumlah, mb_substr('Pengajuan lapangan' . ($r['ket'] !== '' ? ': ' . $r['ket'] : ''), 0, 255), $user['id']]);
     db()->prepare("UPDATE kasbon_requests SET status='disetujui', catatan=?, kasbon_id=?, diproses_by=?, diproses_at=NOW() WHERE id=?")

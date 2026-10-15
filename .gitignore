@@ -5,3 +5,6 @@ node_modules/
 # real credentials — copy backend/api/config.sample.php to config.php
 backend/api/config.php
 backend/backups/*.sql.gz
+
+# PHP session files (created at runtime)
+backend/sessions/sess_*

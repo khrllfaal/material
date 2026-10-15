@@ -644,10 +644,9 @@ function setNavBadge(page, n){
 }
 function refreshKasbonBadge(){
   var role = STATE.user && STATE.user.role;
-  if(role!=='admin' && role!=='akuntan') return;
+  if(role!=='akuntan') return;   // only the Akuntan checks and pays
   apiFetch('/kasbon_requests.php?status=diajukan').then(function(l){ setNavBadge('kasbon', l.length); }).catch(function(){});
-  // Admin Pusat approves submitted weeks; Akuntan pays approved ones.
-  apiFetch('/payroll_periods.php?status='+(role==='admin' ? 'diajukan' : 'disetujui')).then(function(l){ setNavBadge('rekap_gaji', l.length); }).catch(function(){});
+  apiFetch('/payroll_periods.php').then(function(l){ setNavBadge('rekap_gaji', l.filter(function(x){ return x.status==='diajukan' || x.status==='disetujui'; }).length); }).catch(function(){});
 }
 function openSidebar(){
   document.getElementById('sidebar').classList.remove('-translate-x-full');
@@ -1507,27 +1506,91 @@ PAGES.dashboard = function(c){
   loadDashLabor();
 };
 
+/* Pembukuan per proyek: one simple table per project — wage cost (beban upah) and what
+   was actually paid out, with the kasbon repayment shown on its own line because it is
+   not a cost. Built from the same payroll data the Rekap Gaji screen shows. */
+function bookkeepingTable(d){
+  var proj = {}, order = [];
+  d.rows.forEach(function(r){
+    var k = r.project_id;
+    if(!proj[k]){ proj[k] = {nama:r.project_nama, ids:{}, hari:0, gaji:0, lembur:0, tambah:0, potong:0, kasbon:0, grades:{}}; order.push(k); }
+    var x = proj[k], g = x.grades[r.grade_nama] = x.grades[r.grade_nama] || {ids:{}, hari:0, gaji:0, lembur:0};
+    if(r.hari>0){ x.ids[r.worker_id] = 1; g.ids[r.worker_id] = 1; }
+    x.hari += r.hari; x.gaji += r.gaji; x.lembur += r.lembur_rp; g.hari += r.hari; g.gaji += r.gaji; g.lembur += r.lembur_rp;
+  });
+  d.periods.forEach(function(p){
+    var x = proj[p.project_id]; if(!x) return;
+    p.adjustments.forEach(function(a){
+      if(a.jenis==='tambah') x.tambah += a.jumlah;
+      else if(a.kategori==='kasbon') x.kasbon += a.jumlah;
+      else x.potong += a.jumlah;
+    });
+  });
+  var rows = [], T = {n:0, hari:0, gaji:0, lembur:0, tambah:0, potong:0, beban:0, kasbon:0, bayar:0};
+  order.sort(function(a,b){ return proj[a].nama.localeCompare(proj[b].nama); }).forEach(function(k){
+    var x = proj[k], beban = x.gaji + x.lembur + x.tambah - x.potong, bayar = beban - x.kasbon, n = Object.keys(x.ids).length;
+    Object.keys(x.grades).forEach(function(gn){ var g = x.grades[gn];
+      rows.push([x.nama, gn, Object.keys(g.ids).length, g.hari, Math.round(g.gaji), Math.round(g.lembur), '', '', '', '', '']); });
+    rows.push([x.nama, 'TOTAL PROYEK', n, x.hari, Math.round(x.gaji), Math.round(x.lembur), Math.round(x.tambah), Math.round(x.potong), Math.round(beban), Math.round(x.kasbon), Math.round(bayar)]);
+    T.n += n; T.hari += x.hari; T.gaji += x.gaji; T.lembur += x.lembur; T.tambah += x.tambah; T.potong += x.potong; T.beban += beban; T.kasbon += x.kasbon; T.bayar += bayar;
+  });
+  if(order.length > 1) rows.push(['SEMUA PROYEK', 'TOTAL', T.n, T.hari, Math.round(T.gaji), Math.round(T.lembur), Math.round(T.tambah), Math.round(T.potong), Math.round(T.beban), Math.round(T.kasbon), Math.round(T.bayar)]);
+  return {headers:['Proyek','Status pekerja','Pekerja','Hari kerja','Gaji pokok','Lembur','Tambahan','Potongan','Beban upah','Potong kasbon','Total dibayarkan'], rows:rows};
+}
+var PEMBUKUAN_NOTE = 'Beban upah = gaji pokok + lembur + tambahan − potongan. Potong kasbon bukan biaya (itu pengembalian pinjaman), jadi ditampilkan terpisah. Total dibayarkan = beban upah − potong kasbon.';
+function exportPembukuan(d, from, to, kind){
+  var t = bookkeepingTable(d), sub = 'Periode '+from+' s/d '+to+' · '+PEMBUKUAN_NOTE.replace('−','-');
+  if(kind==='pdf') exportPdf('Pembukuan Upah per Proyek', sub, t.headers, t.rows, {});
+  else exportExcel('Pembukuan_Upah_per_Proyek_'+from+'_sd_'+to, 'Pembukuan Upah per Proyek', t.headers, t.rows, {sub:sub, sheetName:'Pembukuan'});
+}
+
 /* Tenaga kerja minggu ini for Admin Pusat / Owner: money out, who is waiting on whom. */
+var DL = {preset:'minggu', from:null, to:null, data:null};
 function loadDashLabor(){
   var host = document.getElementById('dLabor'); if(!host) return;
-  var wk = weekOf(today());
-  Promise.all([apiFetch('/payroll.php?tgl_from='+wk.from+'&tgl_to='+wk.to), apiFetch('/payroll_periods.php?status=diajukan')]).then(function(r){
-    var d = r[0], waiting = r[1].length;
-    if(!d.rows.length && !waiting){ host.innerHTML = ''; return; }
-    var by = {};
-    d.rows.forEach(function(x){ by[x.project_nama] = (by[x.project_nama]||0) + x.net; });
-    var top = Object.keys(by).map(function(k){ return [k, by[k]]; }).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
-    var max = top.length ? top[0][1] : 1;
-    var mini = function(l, v, cls){ return '<div><div class="text-[11px] font-semibold text-slate-400">'+l+'</div><div class="text-xl font-extrabold tabular-nums '+(cls||'text-slate-800')+'">'+v+'</div></div>'; };
-    host.innerHTML = '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">'+
-      '<div class="flex items-center justify-between gap-3 flex-wrap mb-4"><div class="font-extrabold text-slate-800">Tenaga kerja minggu ini <span class="text-xs font-semibold text-slate-400">'+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+'</span></div>'+
-      '<button class="'+btnGhostSm+'" onclick="go(\'rekap_gaji\')">Buka Rekap Gaji →</button></div>'+
-      '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b border-slate-100">'+
-        mini('Total gaji berjalan', rp(d.totals.total_bayar), 'text-indigo-700')+mini('Pekerja aktif', d.totals.pekerja)+
-        mini('Menunggu persetujuan', waiting, waiting?'text-amber-600':'')+mini('Perlu dicek', d.totals.perlu_dicek, d.totals.perlu_dicek?'text-orange-600':'')+'</div>'+
-      (top.length ? '<div class="mt-4 space-y-2.5">'+top.map(function(t){ return '<div><div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600 truncate">'+esc(t[0])+'</span><span class="tabular-nums text-slate-500">'+rp(t[1])+'</span></div><div class="h-2 rounded-full bg-slate-100"><div class="h-2 rounded-full bg-indigo-500" style="width:'+Math.max(3, Math.round(t[1]/max*100))+'%"></div></div></div>'; }).join('')+'</div>' : '')+
-    '</div>';
-  }).catch(function(){ host.innerHTML = ''; });
+  if(!DL.from){ var w0 = weekOf(today()); DL.from = w0.from; DL.to = w0.to; }
+  var selCls = 'px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100';
+  host.innerHTML = '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">'+
+    '<div class="flex items-center justify-between gap-3 flex-wrap mb-4"><div class="font-extrabold text-slate-800">Tenaga kerja &amp; gaji</div>'+
+    '<div class="flex items-center gap-2 flex-wrap justify-end"><button class="'+btnGhostSm+' flex items-center gap-1" id="dlXls"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Pembukuan Excel</button>'+
+    '<button class="'+btnGhostSm+' flex items-center gap-1" id="dlPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button>'+
+    '<button class="'+btnGhostSm+'" onclick="go(\'rekap_gaji\')">Buka Rekap Gaji →</button></div></div>'+
+    '<div class="flex items-center gap-3 flex-wrap mb-4"><select id="dlPreset" class="'+selCls+' font-semibold"><option value="minggu">Minggu ini (Jum–Kam)</option><option value="lalu">Minggu lalu</option><option value="bulan">Bulan ini</option><option value="kustom">Rentang manual</option></select>'+
+    '<span class="text-xs text-slate-400">Dari</span><input type="date" id="dlFrom" class="'+selCls+'"><span class="text-xs text-slate-400">Sampai</span><input type="date" id="dlTo" class="'+selCls+'"></div>'+
+    '<div id="dlBody"><div class="text-sm text-slate-400 py-4 text-center">Memuat…</div></div></div>';
+  icons();
+  document.getElementById('dlPreset').value = DL.preset; document.getElementById('dlFrom').value = DL.from; document.getElementById('dlTo').value = DL.to;
+  var setPreset = function(v){
+    var t = today();
+    if(v==='minggu'){ var w=weekOf(t); DL.from=w.from; DL.to=w.to; }
+    else if(v==='lalu'){ var w2=weekOf(addDays(t,-7)); DL.from=w2.from; DL.to=w2.to; }
+    else if(v==='bulan'){ var d=parseISO(t); DL.from=localISO(new Date(d.getFullYear(), d.getMonth(), 1)); DL.to=t; }
+    document.getElementById('dlFrom').value = DL.from; document.getElementById('dlTo').value = DL.to;
+  };
+  function draw(){
+    var body = document.getElementById('dlBody'); if(!body) return;
+    Promise.all([apiFetch('/payroll.php?tgl_from='+DL.from+'&tgl_to='+DL.to), apiFetch('/payroll_periods.php?status=diajukan')]).then(function(r){
+      var d = r[0], waiting = r[1].length; DL.data = d;
+      var by = {};
+      d.rows.forEach(function(x){ by[x.project_nama] = (by[x.project_nama]||0) + x.net; });
+      var top = Object.keys(by).map(function(k){ return [k, by[k]]; }).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+      var max = top.length ? top[0][1] : 1;
+      var mini = function(l, v, cls){ return '<div><div class="text-[11px] font-semibold text-slate-400">'+l+'</div><div class="text-xl font-extrabold tabular-nums '+(cls||'text-slate-800')+'">'+v+'</div></div>'; };
+      body.innerHTML = '<div class="grid grid-cols-2 md:grid-cols-5 gap-4 pb-4 border-b border-slate-100">'+
+          mini('Harus dibayar', rp(d.totals.sisa), d.totals.sisa>0.5?'text-red-600':'text-emerald-600')+mini('Total gaji', rp(d.totals.total_bayar), 'text-indigo-700')+mini('Pekerja aktif', d.totals.pekerja)+
+          mini('Menunggu pemeriksaan', waiting, waiting?'text-amber-600':'')+mini('Perlu dicek', d.totals.perlu_dicek, d.totals.perlu_dicek?'text-orange-600':'')+'</div>'+
+        (top.length ? '<div class="mt-4 space-y-2.5">'+top.map(function(t){ return '<div><div class="flex justify-between text-xs mb-1"><span class="font-semibold text-slate-600 truncate">'+esc(t[0])+'</span><span class="tabular-nums text-slate-500">'+rp(t[1])+'</span></div><div class="h-2 rounded-full bg-slate-100"><div class="h-2 rounded-full bg-indigo-500" style="width:'+Math.max(3, Math.round(t[1]/max*100))+'%"></div></div></div>'; }).join('')+'</div>'
+          : '<div class="text-sm text-slate-400 py-4 text-center">Belum ada absen pada rentang ini.</div>');
+    }).catch(function(e){ body.innerHTML = '<div class="text-sm text-red-500 py-3 text-center">Gagal memuat: '+esc(e.message)+'</div>'; });
+  }
+  draw();
+  document.getElementById('dlPreset').addEventListener('change', function(){ DL.preset = this.value; if(this.value!=='kustom') setPreset(this.value); draw(); });
+  ['dlFrom','dlTo'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){
+    var f = fv('dlFrom'), t = fv('dlTo'); if(!f || !t) return;
+    if(t < f){ toast('Tanggal sampai harus setelah tanggal dari.', true); return; }
+    DL.from = f; DL.to = t; DL.preset = 'kustom'; document.getElementById('dlPreset').value = 'kustom'; draw(); }); });
+  document.getElementById('dlXls').onclick = function(){ if(DL.data) exportPembukuan(DL.data, DL.from, DL.to, 'xlsx'); };
+  document.getElementById('dlPdf').onclick = function(){ if(DL.data) exportPembukuan(DL.data, DL.from, DL.to, 'pdf'); };
 }
 
 PAGES.proyek = masterPage({
@@ -2157,7 +2220,8 @@ PAGES.rekap_gaji = function(c){
   var projects = [];
   var selCls = 'px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100';
   c.innerHTML = pageHead('Rekap Gaji', 'Absen dari lapangan langsung menjadi rekap gaji. Pilih periode, cek angkanya, lalu catat pembayaran.',
-      '<div class="flex items-center gap-2 flex-wrap justify-end"><button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button>'+
+      '<div class="flex items-center gap-2 flex-wrap justify-end"><button class="'+btnGhostSm+' flex items-center gap-1" id="btnBukuX" title="Beban upah per proyek, mudah dibaca untuk pembukuan"><i data-lucide="book-open" class="w-3.5 h-3.5"></i>Pembukuan</button>'+
+      '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button>'+
       '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button></div>')+
     '<div id="gjCards" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5"></div>'+
     '<div class="mb-6"><div class="text-sm font-extrabold text-slate-700 mb-3 px-1">Periode, persetujuan &amp; pembayaran</div><div id="gjPeriods"></div></div>'+
@@ -2216,20 +2280,20 @@ PAGES.rekap_gaji = function(c){
   }
   function drawCards(){
     var t = G.data.totals;
-    var card = function(icon, color, label, val, sub, attr, on){
-      return '<'+(attr?'button type="button" '+attr:'div')+' class="flex flex-col items-start text-left bg-white rounded-2xl border p-4 shadow-sm transition-all '+(attr?'hover:shadow-md ':'')+(on?'border-indigo-400 ring-2 ring-indigo-100':'border-slate-200')+'">'+
-        '<div class="flex items-center gap-2 text-sm font-semibold text-slate-600 leading-snug"><i data-lucide="'+icon+'" class="w-4 h-4 '+color+'"></i>'+esc(label)+'</div>'+
-        '<div class="text-2xl font-extrabold text-slate-900 mt-3 leading-none tabular-nums">'+val+'</div>'+
-        '<div class="text-xs text-slate-400 mt-2">'+sub+'</div></'+(attr?'button':'div')+'>';
+    var card = function(icon, color, label, val, sub, attr, on, hero){
+      return '<'+(attr?'button type="button" '+attr:'div')+' class="flex flex-col items-start text-left rounded-2xl border p-4 shadow-sm transition-all '+(attr?'hover:shadow-md ':'')+(hero?'md:col-span-3 col-span-2 bg-gradient-to-r from-indigo-600 to-indigo-500 border-indigo-600 text-white ':'bg-white ')+(on?'border-indigo-400 ring-2 ring-indigo-100':(hero?'':'border-slate-200'))+'">'+
+        '<div class="flex items-center gap-2 text-sm font-semibold '+(hero?'text-indigo-100':'text-slate-600')+' leading-snug"><i data-lucide="'+icon+'" class="w-4 h-4 '+(hero?'text-white':color)+'"></i>'+esc(label)+'</div>'+
+        '<div class="'+(hero?'text-4xl text-white':'text-2xl text-slate-900')+' font-extrabold mt-3 leading-none tabular-nums">'+val+'</div>'+
+        '<div class="text-xs '+(hero?'text-indigo-100':'text-slate-400')+' mt-2">'+sub+'</div></'+(attr?'button':'div')+'>';
     };
     var net = t.tambah + t.grup_tambah - t.potong - t.grup_potong;
     document.getElementById('gjCards').innerHTML =
+      card('send','text-red-500','HARUS DIBAYAR', rp(t.sisa), (t.sisa>0.5 ? t.belum_dibayar+' pekerja belum dibayar · klik untuk menyaring' : 'Semua sudah dibayar')+' · sudah dibayar '+rp(t.dibayar), 'data-gj-card="bayar"', !!G.bayarCard, true)+
       card('wallet','text-indigo-500','Total Pembayaran', rp(t.total_bayar), t.pekerja+' pekerja · '+num0(t.hari)+' hari kerja')+
       card('calendar-check','text-emerald-500','Gaji Pokok', rp(t.gaji), num0(t.hari)+' hari × tarif harian')+
       card('history','text-sky-500','Lembur', rp(t.lembur_rp), num0(t.lembur_jam)+' jam lembur')+
       card('banknote','text-amber-500','Tambahan & Potongan', (net<0?'−':(net>0?'+':''))+rp(Math.abs(net)).replace('Rp ','Rp '), '+'+rp(t.tambah+t.grup_tambah).replace('Rp ','')+' / −'+rp(t.potong+t.grup_potong).replace('Rp ',''))+
-      card('send','text-red-500','Belum Dibayar', rp(t.sisa), t.belum_dibayar+' pekerja · klik untuk menyaring', 'data-gj-card="bayar"', !!G.bayarCard)+
-      card('alert-triangle','text-orange-500','Perlu Dicek', String(t.perlu_dicek), 'absen kosong, tarif 0, lembur tinggi', 'data-gj-card="flag"', G.flagOnly);
+      card('alert-triangle','text-orange-500','Perlu Dicek', String(t.perlu_dicek), 'absen kosong, tarif 0, pekerja belum diverifikasi', 'data-gj-card="flag"', G.flagOnly);
     document.querySelectorAll('[data-gj-card]').forEach(function(b){
       b.onclick = function(){
         if(b.getAttribute('data-gj-card')==='bayar') G.bayarCard = !G.bayarCard; else G.flagOnly = !G.flagOnly;
@@ -2305,6 +2369,7 @@ PAGES.rekap_gaji = function(c){
     };
     var sub = 'Periode '+G.from+' s/d '+G.to;
     bindExportBtns('Rekap_Gaji_'+G.from+'_sd_'+G.to, 'Rekap Gaji Pekerja', sub, headers, rowsFn, null, null);
+    var bk = document.getElementById('btnBukuX'); if(bk) bk.onclick = function(){ exportPembukuan(G.data, G.from, G.to, 'xlsx'); };
   }
 
   /* ---- periods ---- */
@@ -2321,13 +2386,13 @@ PAGES.rekap_gaji = function(c){
           '<td class="py-2 text-right">'+(write && !locked?'<button class="text-xs text-slate-300 hover:text-red-600 font-bold" data-adj-del="'+esc(x.id)+'" title="Hapus">✕</button>':'')+'</td></tr>';
       }).join('');
       var btn = function(attr, icon, label, primary){ return '<button type="button" '+attr+' class="'+(primary?btnPrimary:btnGhostSm+' flex items-center gap-1')+'">'+(icon?'<i data-lucide="'+icon+'" class="w-3.5 h-3.5"></i>':'')+label+'</button>'; };
-      var acts = '', isAdmin = STATE.user.role==='admin';
-      var stepNote = {draft:'Menunggu lapangan mengajukan absen minggu ini.', diajukan:'Menunggu pemeriksaan dan persetujuan Admin Pusat.', disetujui:'Sudah disetujui — Akuntan bisa mencatat pembayaran.', dibayar:'Sudah dibayar dan terkunci.'}[p.status]||'';
-      if(isAdmin && p.status==='diajukan') acts += btn('data-pj-setuju="'+esc(p.id)+'"','check','Periksa & Setujui', true);
-      if(write && p.status==='disetujui') acts += btn('data-pj-bayar="'+esc(p.id)+'"','banknote','Catat Pembayaran', true);
+      var acts = '', isAk = STATE.user.role==='akuntan';
+      var stepNote = {draft:'Menunggu lapangan mengajukan absen minggu ini.', diajukan:'Menunggu pemeriksaan dan persetujuan Akuntan.', disetujui:'Sudah disetujui — siap dibayar.', dibayar:'Sudah dibayar dan terkunci.'}[p.status]||'';
+      if(isAk && p.status==='diajukan') acts += btn('data-pj-setuju="'+esc(p.id)+'"','check','Periksa & Setujui', true);
+      if(isAk && p.status==='disetujui') acts += btn('data-pj-bayar="'+esc(p.id)+'"','banknote','Catat Pembayaran', true);
       if(write && !locked) acts += btn('data-pj-adj="'+esc(p.id)+'"','plus','Tambahan / Potongan');
-      if(write && p.status==='draft') acts += btn('data-pj-ajukan="'+esc(p.id)+'"','send','Ajukan (atas nama lapangan)');
-      if(write && (p.status==='diajukan' || p.status==='disetujui') && !p.payments.length) acts += btn('data-pj-kembali="'+esc(p.id)+'"','','Kembalikan ke lapangan');
+      if(isAk && p.status==='draft') acts += btn('data-pj-ajukan="'+esc(p.id)+'"','send','Ajukan (atas nama lapangan)');
+      if(isAk && (p.status==='diajukan' || p.status==='disetujui') && !p.payments.length) acts += btn('data-pj-kembali="'+esc(p.id)+'"','','Kembalikan ke lapangan');
       if(write && !locked) acts += btn('data-pj-head="'+esc(p.id)+'"','','Ubah PJ / grup');
       acts += btn('data-pj-xls="'+esc(p.id)+'"','file-down','Absen Upah (Excel)');
       acts += btn('data-pj-pdf="'+esc(p.id)+'"','file-text','Daftar Bayar (PDF)');
@@ -2336,7 +2401,8 @@ PAGES.rekap_gaji = function(c){
         '<div class="flex items-start justify-between gap-3 flex-wrap mb-4"><div><div class="font-extrabold text-slate-800">'+esc(p.project_nama)+'</div>'+
           '<div class="text-xs text-slate-500 mt-0.5">'+esc(fmtTglPendek(p.tgl_mulai))+' – '+esc(fmtTglPendek(p.tgl_akhir))+' '+p.tgl_akhir.slice(0,4)+
           (p.pj_nama?' · PJ <b class="text-slate-700">'+esc(p.pj_nama)+'</b>':'')+(p.grup_nama?' · '+esc(p.grup_nama):'')+'</div>'+
-          '<div class="text-xs text-slate-400 mt-1">'+esc(stepNote)+'</div></div>'+periodStatusBadge(p.status)+'</div>'+
+          '<div class="text-xs text-slate-400 mt-1">'+esc(stepNote)+'</div>'+
+          (p.catatan && !/^Dikembalikan:/.test(p.catatan) ? '<div class="text-xs text-slate-600 mt-1.5"><span class="font-semibold text-slate-500">Keterangan lapangan:</span> '+esc(p.catatan)+'</div>' : '')+'</div>'+periodStatusBadge(p.status)+'</div>'+
         '<div class="grid grid-cols-2 md:grid-cols-6 gap-4 pb-4 border-b border-slate-100">'+
           mini('Pekerja', p.pekerja)+mini('Hari kerja', num0(p.hari))+mini('Gaji + lembur', rp(p.gaji+p.lembur_rp))+
           mini('Tambahan / potongan', (p.adj_tambah-p.adj_potong===0?'–':(p.adj_tambah-p.adj_potong>0?'+':'')+rp(p.adj_tambah-p.adj_potong)))+
@@ -2396,7 +2462,7 @@ PAGES.rekap_gaji = function(c){
             '<div class="text-xs text-orange-700 mb-2">'+unv.slice(0,12).map(function(r){ return esc(r.nama)+' ('+esc(r.grade_nama)+', '+num0(r.hari)+' hari)'; }).join(' · ')+'</div>'+
             '<label class="flex items-start gap-2 text-xs font-semibold text-orange-900"><input type="checkbox" id="sj_verif" class="w-4 h-4 mt-0.5"> Saya sudah memastikan mereka benar-benar bekerja di proyek ini</label></div>' : '')+
           (other.length ? '<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><b>'+other.length+' pekerja ditandai perlu dicek</b> (lembur tinggi, absen kosong, atau hadir di 2 proyek). Buka rincian per pekerja untuk melihatnya.</div>' : '')+
-          '<div class="text-xs text-slate-400">Setelah disetujui, Akuntan bisa mencatat pembayaran. Jika absen diubah lagi, persetujuan ini otomatis dibatalkan.</div>'+
+          '<div class="text-xs text-slate-400">Setelah disetujui, Anda bisa mencatat pembayaran. Jika absen diubah lagi oleh siapa pun, persetujuan ini otomatis dibatalkan.</div>'+
         '</div>',
         function(){
           if(unv.length && !document.getElementById('sj_verif').checked){ toast('Centang konfirmasi verifikasi pekerja baru dulu.', true); return; }
@@ -2511,13 +2577,14 @@ PAGES.rekap_gaji = function(c){
     var pend = STATE.pendingFilter; STATE.pendingFilter = null;
     if(STATE.user.role !== 'akuntan') return load();
     // Accountant lands on the oldest week that is submitted and waiting to be paid.
-    return apiFetch('/payroll_periods.php?status=disetujui').then(function(l){
+    return apiFetch('/payroll_periods.php').then(function(l){
+      l = l.filter(function(x){ return x.status==='diajukan' || x.status==='disetujui'; });
       if(l.length){
         var oldest = l.slice().sort(function(a,b){ return a.tgl_mulai < b.tgl_mulai ? -1 : 1; })[0];
         G.from = oldest.tgl_mulai; G.to = oldest.tgl_akhir;
         document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to;
         var sel = document.getElementById('gjPreset'); sel.value = 'kustom'; sel.dispatchEvent(new Event('ss-refresh'));
-        toast('Menampilkan minggu yang siap dibayar ('+l.length+' periode disetujui).');
+        toast('Menampilkan minggu yang perlu diperiksa/dibayar ('+l.length+' periode).');
       }
       return load();
     }).catch(function(){ return load(); });
@@ -2624,7 +2691,7 @@ PAGES.log = function(c){
       var cols = ['Waktu','User','Kegiatan','Rincian','IP'];
       document.getElementById('tbl').innerHTML = '<thead><tr>'+cols.map(function(h){ return '<th class="'+TH_CLS+'">'+h+'</th>'; }).join('')+'</tr></thead><tbody>'+
         (d.rows.length ? d.rows.map(function(r){
-          var a = ACT[r.action]||['neutral',r.action], risky = /SETELAH DIAJUKAN|orang yang sama|dikembalikan/i.test(r.detail||'');
+          var a = ACT[r.action]||['neutral',r.action], risky = /SETELAH DIAJUKAN|dikembalikan/i.test(r.detail||'');
           return '<tr class="border-b border-slate-100 align-top '+(risky?'bg-amber-50/60':'')+'"><td class="py-3 pr-4 whitespace-nowrap text-xs text-slate-500 tabular-nums">'+esc(r.created_at)+'</td>'+
             '<td class="py-3 pr-4 font-semibold">'+esc(r.user_username||'—')+'</td>'+
             '<td class="py-3 pr-4 whitespace-nowrap">'+badge(a[0],a[1])+' <span class="text-sm text-slate-600">'+esc(ENT[r.entity]||r.entity)+'</span></td>'+
@@ -2709,7 +2776,7 @@ PAGES.pekerja = function(c){
     var bn = document.getElementById('wkBanner');
     if(bn) bn.innerHTML = unvAll.length ? '<div class="rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4 mb-5 flex items-center justify-between gap-3 flex-wrap"><div><div class="font-bold text-orange-900">'+unvAll.length+' pekerja baru dari lapangan belum diverifikasi</div>'+
       '<div class="text-xs text-orange-700 mt-0.5">Pastikan mereka benar-benar bekerja di proyek. Pekerja yang belum diverifikasi menahan persetujuan gaji.</div></div>'+
-      (write?'<button class="'+btnPrimary+'" id="wkVerAll">Verifikasi semua ('+unvAll.length+')</button>':'')+'</div>' : '';
+      (STATE.user.role==='akuntan'?'<button class="'+btnPrimary+'" id="wkVerAll">Verifikasi semua ('+unvAll.length+')</button>':'<div class="text-xs text-orange-700 font-semibold">Diverifikasi oleh Akuntan</div>')+'</div>' : '';
     var va = document.getElementById('wkVerAll');
     if(va) va.onclick = function(){ apiFetch('/workers.php', {method:'POST', body:JSON.stringify({action:'verifikasi', ids:unvAll.map(function(w){ return w.id; })})}).then(function(r){ toast(r.diverifikasi+' pekerja diverifikasi ✓'); return load(); }).catch(function(e){ toast(e.message, true); }); };
     document.getElementById('tbl').innerHTML = '<thead><tr>'+cols.map(function(h){ return '<th class="'+TH_CLS+'">'+h+'</th>'; }).join('')+'</tr></thead><tbody>'+
@@ -2720,7 +2787,7 @@ PAGES.pekerja = function(c){
           '<td class="py-3 pr-4 text-slate-600">'+esc(w.tim||'–')+'</td><td class="py-3 pr-4 text-slate-600">'+esc(pn(w.project_id))+'</td>'+
           '<td class="py-3 pr-4 tabular-nums">'+(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>')+(e[2]?' <span class="text-[10px] font-bold text-indigo-500">khusus</span>':'')+'</td>'+
           '<td class="py-3 pr-4 tabular-nums">'+(e[1]?rp(e[1]):'–')+'</td><td class="py-3 pr-4 text-xs text-slate-500">'+esc(w.no_rek||'–')+'</td>'+
-          (write?'<td class="py-3 whitespace-nowrap">'+(w.diverifikasi?'':'<button class="'+btnGhostSm+' !text-orange-700 !bg-orange-50" data-w-ver="'+esc(w.id)+'">Verifikasi</button> ')+'<button class="'+btnGhostSm+'" data-w-edit="'+esc(w.id)+'">Edit</button></td>':'')+'</tr>';
+          (write?'<td class="py-3 whitespace-nowrap">'+(w.diverifikasi||STATE.user.role!=='akuntan'?'':'<button class="'+btnGhostSm+' !text-orange-700 !bg-orange-50" data-w-ver="'+esc(w.id)+'">Verifikasi</button> ')+'<button class="'+btnGhostSm+'" data-w-edit="'+esc(w.id)+'">Edit</button></td>':'')+'</tr>';
       }).join('') : '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada pekerja. Admin Lapangan bisa menambahkannya dari HP, atau tambahkan di sini.</td></tr>')+'</tbody>';
     renderPager(list.length, D.PG, drawWorkers);
     document.querySelectorAll('[data-w-edit]').forEach(function(b){ b.onclick = function(){ openWorker(b.getAttribute('data-w-edit')); }; });
@@ -2786,7 +2853,7 @@ PAGES.kasbon = function(c){
       (pend.length ? '<table class="w-full"><tbody>'+pend.map(function(r){
         return '<tr class="border-t border-slate-100"><td class="py-3 pr-3"><b>'+esc(r.worker_nama||'Grup / penanggung jawab')+'</b><div class="text-xs text-slate-400">'+esc(r.project_nama)+' · '+esc((r.created_at||'').slice(0,10))+(r.ket?' · '+esc(r.ket):'')+'</div></td>'+
           '<td class="py-3 pr-3 text-right font-extrabold tabular-nums">'+rp(r.jumlah)+'</td>'+
-          '<td class="py-3 text-right whitespace-nowrap">'+(write?'<button class="'+btnPrimary+' !py-1.5 !px-3 !text-xs" data-kr-ok="'+esc(r.id)+'">Setujui</button> <button class="'+btnDangerSm+'" data-kr-no="'+esc(r.id)+'">Tolak</button>':'')+'</td></tr>';
+          '<td class="py-3 text-right whitespace-nowrap">'+(STATE.user.role==='akuntan'?'<button class="'+btnPrimary+' !py-1.5 !px-3 !text-xs" data-kr-ok="'+esc(r.id)+'">Setujui</button> <button class="'+btnDangerSm+'" data-kr-no="'+esc(r.id)+'">Tolak</button>':'<span class="text-xs text-slate-400">diperiksa Akuntan</span>')+'</td></tr>';
       }).join('')+'</tbody></table>' : '<div class="text-sm text-slate-400 py-2">Tidak ada pengajuan yang menunggu.</div>')+
       (done.length ? '<div class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-4 mb-1">Terakhir diproses</div>'+done.map(function(r){
         return '<div class="flex items-center justify-between gap-3 py-1.5 text-sm"><span class="truncate">'+esc(r.worker_nama||'Grup')+' · '+esc(r.project_nama)+(r.catatan?' · <span class="text-slate-400">'+esc(r.catatan)+'</span>':'')+'</span><span class="flex items-center gap-2 shrink-0"><b class="tabular-nums">'+rp(r.jumlah)+'</b>'+chip(r.status)+'</span></div>'; }).join('') : ''));
@@ -3271,19 +3338,25 @@ function renderAbsen(c){
     apiFetch('/attendance.php?project_id='+encodeURIComponent(pid)+'&tgl_from='+tgl+'&tgl_to='+tgl).catch(function(e){ if(e.network){ offline = true; return []; } throw e; }),
     apiFetch('/payroll_periods.php?project_id='+encodeURIComponent(pid)+'&tgl='+tgl).catch(function(e){ if(e.network){ offline = true; return null; } throw e; }),
     apiFetch('/kasbon_requests.php').catch(function(){ return []; }),
-    // yesterday's entries: used only to remind the field admin when a day was skipped
-    apiFetch('/attendance.php?project_id='+encodeURIComponent(pid)+'&tgl_from='+addDays(tgl,-1)+'&tgl_to='+addDays(tgl,-1)).catch(function(){ return null; }),
+    // this week's entries so far: used to remind the field admin about days that were skipped
+    apiFetch('/attendance.php?project_id='+encodeURIComponent(pid)+'&tgl_from='+weekOf(tgl).from+'&tgl_to='+weekOf(tgl).to).catch(function(){ return null; }),
   ]).then(function(r){
     if(STATE.projectId !== pid || ABSEN.tgl !== tgl || STATE.section !== 'absen') return; // user moved on while loading
     ABSEN.workers = r[0]; ABSEN.period = r[2]; ABSEN.offline = offline;
-    ABSEN.missingYesterday = (tgl === today() && r[0].length > 0 && Array.isArray(r[4]) && r[4].length === 0);
+    ABSEN.missing = [];
+    if(r[0].length && Array.isArray(r[4])){
+      var filled = {}; r[4].forEach(function(a){ filled[a.tgl] = true; });
+      var lastDay = tgl < today() ? weekOf(tgl).to : today(); if(lastDay > weekOf(tgl).to) lastDay = weekOf(tgl).to;
+      datesBetween(weekOf(tgl).from, lastDay, 7).forEach(function(d){ if(!filled[d] && d !== tgl && d <= today()) ABSEN.missing.push(d); });
+    }
     ABSEN.kreq = (r[3]||[]).filter(function(k){ return k.project_id === pid; }).slice(0, 5);
-    ABSEN.cur = {}; ABSEN.orig = {}; ABSEN.q = ''; ABSEN.filter = 'all'; ABSEN.open = {};
+    ABSEN.cur = {}; ABSEN.orig = {}; ABSEN.rev = {}; ABSEN.q = ''; ABSEN.filter = 'all'; ABSEN.open = {};
     ABSEN.workers.forEach(function(w){ ABSEN.cur[w.id] = {h:null, l:0}; ABSEN.orig[w.id] = {h:null, l:0}; });
     r[1].forEach(function(a){
       if(!ABSEN.cur[a.worker_id]) return;
       ABSEN.cur[a.worker_id] = {h:Number(a.hari), l:Number(a.lembur_jam)||0};
       ABSEN.orig[a.worker_id] = {h:Number(a.hari), l:Number(a.lembur_jam)||0};
+      ABSEN.rev[a.worker_id] = Number(a.rev)||0;
     });
     // Anything still waiting in the outbox for this day is shown as already entered.
     outboxGet().forEach(function(o){
@@ -3294,10 +3367,10 @@ function renderAbsen(c){
         ABSEN.orig[e.worker_id] = {h: ABSEN.cur[e.worker_id].h, l: ABSEN.cur[e.worker_id].l};
       });
     });
-    var earliest = addDays(today(), -3);
+    var earliest = addDays(today(), -7);
     ABSEN.editable = true; ABSEN.reason = '';
     if(tgl > today()){ ABSEN.editable = false; ABSEN.reason = 'Tanggal ini belum tiba.'; }
-    else if(tgl < earliest){ ABSEN.editable = false; ABSEN.reason = 'Lebih dari 3 hari lalu — hanya Admin Pusat yang bisa mengubah.'; }
+    else if(tgl < earliest){ ABSEN.editable = false; ABSEN.reason = 'Lebih dari 7 hari lalu — hanya Admin Pusat yang bisa mengubah.'; }
     else if(ABSEN.period && ABSEN.period.status !== 'draft'){ ABSEN.editable = false; ABSEN.reason = 'Minggu ini sudah '+(ABSEN.period.status==='dibayar'?'dibayar':'diajukan')+'. Hubungi Admin Pusat untuk koreksi.'; }
     drawAbsen(c);
   }).catch(function(e){ c.innerHTML = card('<div class="text-center text-sm text-red-500 py-4">Gagal memuat: '+esc(e.message)+'</div>'); });
@@ -3356,7 +3429,9 @@ function drawAbsen(c){
   var banner = '';
   if(ABSEN.offline) banner += '<div class="text-xs text-slate-600 bg-slate-100 rounded-xl px-3 py-2 mb-3">Tidak ada sinyal. Memakai daftar pekerja yang tersimpan; absen akan dikirim saat sinyal kembali.</div>';
   if(!ed) banner += '<div class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-3">'+esc(ABSEN.reason)+'</div>';
-  if(ABSEN.missingYesterday && ed) banner += '<div class="flex items-center justify-between gap-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3"><span><b>Kemarin belum diisi.</b> Isi dulu agar gaji tidak terlewat.</span><button type="button" id="abYest" class="shrink-0 h-9 px-3 rounded-lg bg-amber-500 text-white font-bold">Isi kemarin</button></div>';
+  if(ABSEN.period && ABSEN.period.status==='draft' && /^Dikembalikan:/.test(ABSEN.period.catatan||'')) banner += '<div class="text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-3"><b>Absen minggu ini dikembalikan oleh Akuntan.</b><br>'+esc((ABSEN.period.catatan||'').replace(/^Dikembalikan:\s*/,''))+'<br><span class="text-red-600">Perbaiki lalu ajukan lagi.</span></div>';
+  if(ed && ABSEN.missing && ABSEN.missing.length) banner += '<div class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3"><div class="mb-2"><b>Ada hari yang belum diisi minggu ini.</b> Isi sekarang agar gaji tidak terlewat:</div><div class="flex flex-wrap gap-2">'+
+    ABSEN.missing.slice(0,6).map(function(d){ return '<button type="button" data-ab-goto="'+d+'" class="h-9 px-3 rounded-lg bg-amber-500 text-white font-bold">'+esc(HARI_NAMA[parseISO(d).getDay()].slice(0,3)+' '+parseISO(d).getDate())+'</button>'; }).join('')+'</div></div>';
 
   var btn3 = function(id, icon, label, attr){ return '<button type="button" '+(id?'id="'+id+'"':'')+' '+(attr||'')+' class="h-12 rounded-xl bg-white border border-slate-200 text-[13px] font-bold text-slate-700 flex flex-col items-center justify-center gap-0.5 leading-tight"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+label+'</button>'; };
   var tools = '<div class="grid '+(ed?'grid-cols-3':'grid-cols-1')+' gap-2 mb-3">'+
@@ -3492,7 +3567,7 @@ function bindAbsen(c){
   c.querySelectorAll('[data-ab-add]').forEach(function(b){ b.onclick = function(){ openAddWorker(c); }; });
   var upd = function(){ renderAbSummary(); renderAbList(); };
   var q = document.getElementById('abQ'); if(q) q.oninput = function(){ ABSEN.q = q.value; renderAbList(); };
-  var yb = document.getElementById('abYest'); if(yb) yb.onclick = function(){ ABSEN.tgl = addDays(ABSEN.tgl, -1); renderTab(); };
+  c.querySelectorAll('[data-ab-goto]').forEach(function(b){ b.onclick = function(){ ABSEN.tgl = b.getAttribute('data-ab-goto'); renderTab(); }; });
   var all = document.getElementById('abAll');
   if(all) all.onclick = function(){
     ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null){ x.h = 1; x.l = ABSEN.defL||0; } });
@@ -3534,8 +3609,9 @@ function saveAbsen(c){
   var pid = STATE.projectId, tgl = ABSEN.tgl, entries = [];
   ABSEN.workers.forEach(function(w){
     var x = ABSEN.cur[w.id], o = ABSEN.orig[w.id];
-    if(x.h !== null) entries.push({worker_id:w.id, hari:x.h, lembur_jam: x.h>0 ? x.l : 0});
-    else if(o.h !== null) entries.push({worker_id:w.id, hari:null});
+    var ver = (ABSEN.rev && ABSEN.rev[w.id] !== undefined) ? ABSEN.rev[w.id] : null;
+    if(x.h !== null) entries.push({worker_id:w.id, hari:x.h, lembur_jam: x.h>0 ? x.l : 0, ver:ver});
+    else if(o.h !== null) entries.push({worker_id:w.id, hari:null, ver:ver});
   });
   if(!entries.length){ toast('Belum ada yang diisi.', true); return; }
   var payload = {project_id:pid, tgl:tgl, entries:entries};
@@ -3545,12 +3621,13 @@ function saveAbsen(c){
   };
   var btn = document.getElementById('abSave'); if(btn){ btn.disabled = true; btn.textContent = 'Menyimpan…'; }
   apiFetch('/attendance.php', {method:'POST', body:JSON.stringify(payload)})
-    .then(function(){ done('Absen '+fmtTglPendek(tgl)+' tersimpan ✓'); })
+    .then(function(){ toast('Absen '+fmtTglPendek(tgl)+' tersimpan ✓'); renderTab(); /* reload so every row carries its new version */ })
     .catch(function(e){
       if(e.network){
         outboxAdd({endpoint:'/attendance.php', payload:payload, label:'Absen '+fmtTglPendek(tgl)});
         done('Tidak ada sinyal. Absen disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
-      } else { toast(e.message, true); drawAbsen(c); }
+      } else if(e.status === 409 && /diubah orang lain/.test(e.message)){ toast(e.message, true); renderTab(); }
+      else { toast(e.message, true); drawAbsen(c); }
     });
 }
 
@@ -3609,11 +3686,12 @@ function openAjukan(c){
       '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">Periode <b>'+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+'</b>. Setelah diajukan, absen minggu ini dikunci untuk Anda dan diteruskan ke pusat untuk dibayar.</div>'+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Penanggung jawab *</label><input id="aj_pj" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(p.pj_nama||'')+'" placeholder="mis. Arya"></div>'+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Nama grup</label><input id="aj_grup" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(p.grup_nama||'')+'" placeholder="mis. Upah Harian"></div>'+
+      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Keterangan pekerjaan <span class="font-normal text-slate-400">(opsional)</span></label><input id="aj_cat" type="text" autocomplete="off" maxlength="200" class="'+inputCls+'" placeholder="mis. cor lantai 2, bongkar gudang"></div>'+
     '</div>',
     function(){
       var pj = fv('aj_pj');
       if(!pj){ toast('Nama penanggung jawab wajib diisi.', true); return; }
-      apiFetch('/payroll_periods.php', {method:'POST', body:JSON.stringify({action:'ajukan', project_id:STATE.projectId, tgl:ABSEN.tgl, pj_nama:pj, grup_nama:fv('aj_grup')})})
+      apiFetch('/payroll_periods.php', {method:'POST', body:JSON.stringify({action:'ajukan', project_id:STATE.projectId, tgl:ABSEN.tgl, pj_nama:pj, grup_nama:fv('aj_grup'), catatan:fv('aj_cat')})})
         .then(function(){ closeModal(); toast('Absen minggu ini sudah diajukan ✓'); renderTab(); })
         .catch(function(e){ toast(e.network ? 'Mengajukan butuh sinyal.' : e.message, true); });
     });

@@ -9,8 +9,4 @@ ALTER TABLE payroll_periods
   MODIFY status ENUM('draft','diajukan','disetujui','dibayar') NOT NULL DEFAULT 'draft',
   ADD COLUMN disetujui_at DATETIME NULL,
   ADD COLUMN disetujui_by VARCHAR(40) NULL;
-CREATE TABLE IF NOT EXISTS login_attempts (
-  ip VARCHAR(45) NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_login_ip (ip, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE attendance ADD COLUMN rev INT NOT NULL DEFAULT 0;

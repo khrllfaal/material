@@ -68,11 +68,11 @@ scripts/
   Pemakaian, dibatasi ke proyek yang ditugaskan (menu "Kelola User").
   Tidak bisa mengakses data proyek lain sama sekali. Setelah login
   otomatis melihat tampilan tab HP, bukan sidebar desktop.
-- **Admin Pusat** (`admin`) — akses penuh: kelola Master Proyek,
+- **Admin Pusat** (`admin`) — akses penuh untuk mengelola dan mengoreksi data: kelola Master Proyek,
   Master Bahan, Master Pekerjaan, Konfigurasi RAP, lihat semua
   laporan, dan kelola user.
-- **Akuntan** (`akuntan`) — hanya menu gaji: Rekap Gaji, Pekerja & Tarif, Kasbon.
-  Bisa mengubah tarif, mencatat tambahan/potongan/kasbon, dan membayar; tidak
+- **Akuntan** (`akuntan`) — hanya menu gaji: Rekap Gaji, Kasbon, Pekerja & Tarif. Memeriksa dan menyetujui
+  absen yang diajukan, memverifikasi pekerja baru, memeriksa pengajuan kasbon, dan membayar; tidak
   bisa mengubah absen, dan seluruh endpoint stok/bahan/user ditolak (403).
 - **Owner** (`owner`) — bisa melihat semua menu, tapi setiap endpoint
   menolak permintaan tulis (POST/DELETE) dari role ini dengan HTTP
@@ -107,14 +107,19 @@ scripts/
 - Database yang sudah berjalan: jalankan `backend/mysql/migrations_2026-10-payroll.sql` sekali,
   lalu (opsional) `backend/mysql/seed_absensi_percobaan.sql` untuk 2 proyek percobaan.
 
-### Pengendalian (anti-kecurangan)
-- Alur gaji tiga pihak: **Lapangan mengajukan → Admin Pusat memeriksa & menyetujui → Akuntan membayar.**
-  Akuntan tidak bisa membayar sebelum disetujui; Admin Pusat yang mengubah absen setelah disetujui
-  otomatis membatalkan persetujuan.
-- Pekerja baru dari lapangan berstatus *belum diverifikasi* dan menahan persetujuan sampai Admin Pusat
-  memastikan orangnya nyata. Tarif kosong juga menahan persetujuan.
-- **Log Aktivitas** (Admin Pusat & Owner): siapa mengubah apa — termasuk perubahan absen (sebelum → sesudah)
-  dan penandaan "SETELAH DIAJUKAN" atau "disetujui & dibayar oleh orang yang sama".
-- Sesi Admin Pusat/Akuntan/Owner berakhir setelah 60 menit tanpa aktivitas; login dibatasi per alamat IP.
-- Kolom/tabel baru dibuat otomatis saat pertama dipakai; file `migrations_2026-10-payroll-controls.sql`
-  tersedia bila hak ALTER database dibatasi.
+### Pengendalian (anti-kecurangan & keamanan)
+- Alur gaji: **Lapangan mengajukan → Akuntan memeriksa & menyetujui → Akuntan membayar.**
+  **Admin Pusat** hanya mengoreksi dan menghapus data (absen, pekerja, tarif, penyesuaian) — tidak menyetujui
+  atau membayar. Absen yang diubah setelah disetujui otomatis membatalkan persetujuan.
+- Pekerja baru dari lapangan berstatus *belum diverifikasi* dan menahan persetujuan sampai Akuntan memastikan
+  orangnya nyata. Tarif kosong juga menahan persetujuan.
+- **Log Aktivitas** (Admin Pusat & Owner): siapa mengubah apa, sebelum → sesudah, dan penanda "SETELAH DIAJUKAN".
+- Tidak ada data yang saling menimpa: dua HP yang mengedit absen yang sama tidak saling menimpa (yang
+  terlambat ditolak dan layar dimuat ulang), dan persetujuan/pembayaran dikunci per periode sehingga tidak bisa
+  terbayar dua kali walau ditekan bersamaan.
+- Keamanan: sesi tetap aktif (30 hari, di folder sesi privat `backend/sessions`), cookie HttpOnly + SameSite,
+  tolak permintaan lintas-situs (CSRF: wajib JSON & Origin sama), pertanyaan SQL terparameter, teks pengguna
+  selalu di-escape, waktu login sama untuk user dikenal/tidak (anti-enumerasi), penguncian akun setelah 5 kali
+  salah, file internal (`helpers.php`, `payroll_lib.php`, `bin/`, `sessions/`) diblokir dari akses web.
+- Kolom/tabel baru dibuat otomatis saat pertama dipakai; `migrations_2026-10-payroll-controls.sql` tersedia bila
+  hak ALTER database dibatasi.

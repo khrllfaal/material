@@ -13,7 +13,11 @@ $user = require_role(['admin', 'akuntan']);
 $method = $_SERVER['REQUEST_METHOD'];
 
 function adj_period_or_fail(string $projectId, string $tgl): array {
-    $p = payroll_period($projectId, $tgl);
+    payroll_period($projectId, $tgl);
+    db()->beginTransaction(); // released by commit() after the insert; locks the week against a concurrent payment
+    $st = db()->prepare('SELECT * FROM payroll_periods WHERE project_id = ? AND tgl_mulai = ? FOR UPDATE');
+    $st->execute([$projectId, payroll_week($tgl)[0]]);
+    $p = $st->fetch();
     if ($p['status'] === 'dibayar') json_error('Periode ini sudah dibayar dan terkunci. Buat penyesuaian di periode berikutnya.', 409);
     return $p;
 }
@@ -47,18 +51,21 @@ if ($method === 'POST') {
     $id = new_id('adj_');
     db()->prepare('INSERT INTO payroll_adjustments (id, period_id, worker_id, jenis, kategori, label, qty, harga, jumlah, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
         ->execute([$id, $p['id'], $workerId, $jenis, $kategori, $label, $qty, $harga, $jumlah, $user['id']]);
+    db()->commit();
     audit('create', 'payroll_adjustments', $id, "$jenis $kategori $jumlah — $label");
     json_response(['ok' => true, 'id' => $id, 'jumlah' => $jumlah]);
 }
 
 if ($method === 'DELETE') {
     $id = (string)($_GET['id'] ?? '');
-    $st = db()->prepare('SELECT x.*, p.status FROM payroll_adjustments x JOIN payroll_periods p ON p.id = x.period_id WHERE x.id = ?');
+    db()->beginTransaction();
+    $st = db()->prepare('SELECT x.*, p.status FROM payroll_adjustments x JOIN payroll_periods p ON p.id = x.period_id WHERE x.id = ? FOR UPDATE');
     $st->execute([$id]);
     $x = $st->fetch();
     if (!$x) json_error('Data tidak ditemukan.', 404);
     if ($x['status'] === 'dibayar') json_error('Periode ini sudah dibayar dan terkunci.', 409);
     db()->prepare('DELETE FROM payroll_adjustments WHERE id = ?')->execute([$id]);
+    db()->commit();
     audit('delete', 'payroll_adjustments', $id, "{$x['jenis']} {$x['kategori']} {$x['jumlah']} — {$x['label']}");
     json_response(['ok' => true]);
 }

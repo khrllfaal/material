@@ -2,9 +2,14 @@
 <FilesMatch "\.(sql|md|sample)$">
     Require all denied
 </FilesMatch>
-<Files "config.php">
+<FilesMatch "^(config|helpers|db|payroll_lib|resource_crud|scoped_resource)\.php$">
     Require all denied
-</Files>
+</FilesMatch>
+# CLI tools and session files are never served over HTTP.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(bin|sessions)/ - [F,L]
+</IfModule>
 
 # Never let Apache list this directory's contents.
 Options -Indexes

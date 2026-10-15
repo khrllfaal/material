@@ -2,6 +2,7 @@
    Mimics lucide.createIcons(): replaces <i data-lucide="name"> with inline SVG,
    carrying over the placeholder classNAME so existing size/color utility classes still apply. */
 window.lucide = { icons: {
+  "book-open": "<path d=\"M12 7v14\" /><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\" />",
   "minus": "<path d=\"M5 12h14\" />",
   "chevron-left": "<path d=\"m15 18-6-6 6-6\" />",
   "wallet": "<path d=\"M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1\" /><path d=\"M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4\" />",

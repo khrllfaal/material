@@ -240,6 +240,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   tarif_harian  DECIMAL(14,2) NOT NULL DEFAULT 0,    -- snapshot
   tarif_lembur  DECIMAL(14,2) NOT NULL DEFAULT 0,    -- snapshot
   ket           VARCHAR(255) NOT NULL DEFAULT '',
+  rev           INT NOT NULL DEFAULT 0,               -- bertambah tiap diubah: mencegah dua perangkat saling menimpa
   created_by    VARCHAR(40) NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -339,9 +340,3 @@ CREATE TABLE IF NOT EXISTS kasbon_requests (
   FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Pembatas percobaan login per alamat IP (melengkapi penguncian per akun).
-CREATE TABLE IF NOT EXISTS login_attempts (
-  ip          VARCHAR(45) NOT NULL,
-  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_login_ip (ip, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

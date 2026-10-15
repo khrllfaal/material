@@ -43,8 +43,18 @@ function cfg(): array {
 
 function start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
+    $lifetime = 60 * 60 * 24 * 30; // signed in for 30 days unless the user logs out
+    // Keep session files in a private folder of our own: on shared hosting the
+    // default temp folder is cleaned by other sites' (shorter) lifetimes, which
+    // would sign people out after ~24 minutes of inactivity.
+    $dir = __DIR__ . '/../sessions';
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    if (is_dir($dir) && is_writable($dir)) session_save_path($dir);
+    ini_set('session.gc_maxlifetime', (string)$lifetime);
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => $lifetime,
         'path' => '/',
         'httponly' => true,
         'samesite' => 'Lax',
@@ -58,7 +68,6 @@ function start_session(): void {
     session_start();
 }
 
-/** Baseline browser-hardening headers for every API response. */
 function send_security_headers(): void {
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
@@ -82,8 +91,26 @@ function require_valid_date($v, string $label = 'Tanggal'): string {
     return $v;
 }
 
+/** Cross-site request forgery defence on top of SameSite cookies: a browser can
+ *  only send a *cross-site* form/beacon as a "simple" request, never as JSON,
+ *  and a foreign page's Origin never matches ours. Both are rejected here. */
+function guard_cross_site(): void {
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    if (in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) return;
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origin !== '') {
+        $oh = parse_url($origin, PHP_URL_HOST);
+        $host = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? ''));
+        $allowed = cfg()['cors_origins'] ?? [];
+        if ($oh !== $host && !in_array($origin, $allowed, true)) json_error('Permintaan ditolak.', 403);
+    }
+    $ct = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+    if (strpos($ct, 'application/json') !== 0) json_error('Permintaan ditolak.', 415);
+}
+
 function send_cors_headers(): void {
     send_security_headers();
+    guard_cross_site();
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     if ($origin && in_array($origin, cfg()['cors_origins'], true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
@@ -125,22 +152,9 @@ function read_json_body(?array $override = null): array {
 
 /** Returns the logged-in user's session row, or null. Never trusts the
  *  client for identity — always re-derived from the server-side session. */
-/** Office roles (they can see or move money) are signed out after 60 minutes
- *  without activity; field accounts stay signed in for the work day. */
-const IDLE_LIMIT_SECONDS = 3600;
-
 function current_user(): ?array {
     start_session();
-    $u = $_SESSION['user'] ?? null;
-    if ($u && $u['role'] !== 'lapangan') {
-        $now = time();
-        if ($now - (int)($_SESSION['last_seen'] ?? $now) > IDLE_LIMIT_SECONDS) {
-            unset($_SESSION['user'], $_SESSION['last_seen']);
-            return null;
-        }
-        $_SESSION['last_seen'] = $now;
-    }
-    return $u;
+    return $_SESSION['user'] ?? null;
 }
 
 /** Endpoints an 'akuntan' (accountant) account may call. Everything else —
@@ -326,7 +340,9 @@ function ensure_payroll_controls(): void {
         if (!$has('payroll_periods', 'disetujui_at')) {
             $db->exec("ALTER TABLE payroll_periods MODIFY status ENUM('draft','diajukan','disetujui','dibayar') NOT NULL DEFAULT 'draft', ADD COLUMN disetujui_at DATETIME NULL, ADD COLUMN disetujui_by VARCHAR(40) NULL");
         }
-        $db->exec('CREATE TABLE IF NOT EXISTS login_attempts (ip VARCHAR(45) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_login_ip (ip, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        if (!$has('attendance', 'rev')) {
+            $db->exec('ALTER TABLE attendance ADD COLUMN rev INT NOT NULL DEFAULT 0');
+        }
         $_SESSION['controls_ok'] = 1;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());

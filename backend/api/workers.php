@@ -45,7 +45,7 @@ if ($method === 'POST') {
     $b = read_json_body();
     // Pusat confirms that workers added from the field are real people (ghost-worker control).
     if (($b['action'] ?? '') === 'verifikasi') {
-        if ($isField) json_error('Anda tidak punya akses untuk aksi ini.', 403);
+        if ($user['role'] !== 'akuntan') json_error('Hanya Akuntan yang memverifikasi pekerja baru.', 403);
         $ids = array_values(array_filter(array_map('strval', (array)($b['ids'] ?? []))));
         if (!empty($b['project_id']) && !empty($b['semua'])) {
             $st = db()->prepare('SELECT id FROM workers WHERE project_id = ? AND diverifikasi = 0');
