@@ -72,7 +72,7 @@ scripts/
   Master Bahan, Master Pekerjaan, Konfigurasi RAP, lihat semua
   laporan, dan kelola user.
 - **Akuntan** (`akuntan`) — hanya menu gaji: Rekap Gaji, Kasbon, Pekerja & Tarif. Memeriksa dan menyetujui
-  absen yang diajukan, memverifikasi pekerja baru, memeriksa pengajuan kasbon, dan membayar; tidak
+  absen yang diajukan, memeriksa pengajuan kasbon, dan membayar; tidak
   bisa mengubah absen, dan seluruh endpoint stok/bahan/user ditolak (403).
 - **Owner** (`owner`) — bisa melihat semua menu, tapi setiap endpoint
   menolak permintaan tulis (POST/DELETE) dari role ini dengan HTTP
@@ -111,13 +111,12 @@ scripts/
 - Alur gaji: **Lapangan mengajukan → Akuntan memeriksa & menyetujui → Akuntan membayar.**
   **Admin Pusat** hanya mengoreksi dan menghapus data (absen, pekerja, tarif, penyesuaian) — tidak menyetujui
   atau membayar. Absen yang diubah setelah disetujui otomatis membatalkan persetujuan.
-- Pekerja baru dari lapangan berstatus *belum diverifikasi* dan menahan persetujuan sampai Akuntan memastikan
-  orangnya nyata. Tarif kosong juga menahan persetujuan.
+- Pekerja baru yang ditambah lapangan langsung aktif (tanpa verifikasi, agar sederhana). Tarif kosong menahan persetujuan.
 - **Log Aktivitas** (Admin Pusat & Owner): siapa mengubah apa, sebelum → sesudah, dan penanda "SETELAH DIAJUKAN".
 - Tidak ada data yang saling menimpa: dua HP yang mengedit absen yang sama tidak saling menimpa (yang
   terlambat ditolak dan layar dimuat ulang), dan persetujuan/pembayaran dikunci per periode sehingga tidak bisa
   terbayar dua kali walau ditekan bersamaan.
-- Keamanan: sesi tetap aktif (30 hari, di folder sesi privat `backend/sessions`), cookie HttpOnly + SameSite,
+- Keamanan: sesi tetap aktif (30 hari, di tabel database `php_sessions`, tidak hilang saat file sesi hosting dibersihkan; folder `backend/sessions` hanya cadangan), cookie HttpOnly + SameSite,
   tolak permintaan lintas-situs (CSRF: wajib JSON & Origin sama), pertanyaan SQL terparameter, teks pengguna
   selalu di-escape, waktu login sama untuk user dikenal/tidak (anti-enumerasi), penguncian akun setelah 5 kali
   salah, file internal (`helpers.php`, `payroll_lib.php`, `bin/`, `sessions/`) diblokir dari akses web.

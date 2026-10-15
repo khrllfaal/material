@@ -41,31 +41,87 @@ function cfg(): array {
     return $cfg;
 }
 
+/**
+ * Sessions live in the database, not in PHP's session files. Files are what
+ * get a user "thrown out" on shared hosting: the temp folder is purged by
+ * whichever site's (short) garbage-collection setting runs first, restarts
+ * wipe it, and several PHP workers do not always see the same folder. A row in
+ * MySQL survives all of that, and its lifetime is ours to decide: 30 days from
+ * the last request (sliding). If the database cannot be used for sessions the
+ * code quietly falls back to files.
+ */
+class DbSessionHandler implements SessionHandlerInterface, SessionUpdateTimestampHandlerInterface {
+    private int $lifetime;
+    public function __construct(int $lifetime) { $this->lifetime = $lifetime; }
+    public static function ensureTable(): void {
+        db()->exec('CREATE TABLE IF NOT EXISTS php_sessions (
+            id VARCHAR(128) NOT NULL PRIMARY KEY, data MEDIUMBLOB NOT NULL, last_activity INT UNSIGNED NOT NULL,
+            INDEX idx_sess_activity (last_activity)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    }
+    public function open(string $path, string $name): bool { return true; }
+    public function close(): bool { return true; }
+    /** Runs a statement; if the sessions table does not exist yet, creates it once and retries. */
+    private function run(string $sql, array $params): PDOStatement {
+        for ($try = 0; ; $try++) {
+            try { $st = db()->prepare($sql); $st->execute($params); return $st; }
+            catch (PDOException $e) {
+                if ($try === 0 && ($e->getCode() === '42S02' || stripos($e->getMessage(), "doesn't exist") !== false)) { self::ensureTable(); continue; }
+                throw $e;
+            }
+        }
+    }
+    public function read(string $id): string|false {
+        $d = $this->run('SELECT data FROM php_sessions WHERE id = ? AND last_activity > ?', [$id, time() - $this->lifetime])->fetchColumn();
+        return $d === false ? '' : (string)$d;
+    }
+    public function write(string $id, string $data): bool {
+        $this->run('INSERT INTO php_sessions (id, data, last_activity) VALUES (?,?,?) ON DUPLICATE KEY UPDATE data = VALUES(data), last_activity = VALUES(last_activity)', [$id, $data, time()]);
+        return true;
+    }
+    public function updateTimestamp(string $id, string $data): bool {
+        $this->run('UPDATE php_sessions SET last_activity = ? WHERE id = ?', [time(), $id]);
+        return true;
+    }
+    public function validateId(string $id): bool {
+        return (bool)$this->run('SELECT 1 FROM php_sessions WHERE id = ? AND last_activity > ?', [$id, time() - $this->lifetime])->fetchColumn();
+    }
+    public function destroy(string $id): bool { $this->run('DELETE FROM php_sessions WHERE id = ?', [$id]); return true; }
+    public function gc(int $max_lifetime): int|false {
+        return $this->run('DELETE FROM php_sessions WHERE last_activity < ?', [time() - $this->lifetime])->rowCount();
+    }
+}
+
 function start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
-    $lifetime = 60 * 60 * 24 * 30; // signed in for 30 days unless the user logs out
-    // Keep session files in a private folder of our own: on shared hosting the
-    // default temp folder is cleaned by other sites' (shorter) lifetimes, which
-    // would sign people out after ~24 minutes of inactivity.
-    $dir = __DIR__ . '/../sessions';
-    if (!is_dir($dir)) @mkdir($dir, 0700, true);
-    if (is_dir($dir) && is_writable($dir)) session_save_path($dir);
+    $lifetime = 60 * 60 * 24 * 30; // signed in for 30 days after the last use, unless the user logs out
+    $secure = !empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
     ini_set('session.gc_maxlifetime', (string)$lifetime);
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
     session_set_cookie_params([
-        'lifetime' => $lifetime,
-        'path' => '/',
-        'httponly' => true,
-        'samesite' => 'Lax',
-        // Plain $_SERVER['HTTPS'] isn't set when TLS is terminated by a
-        // reverse proxy/load balancer in front of PHP (common on shared
-        // hosting) — fall back to the standard forwarded-proto header so
-        // the cookie still gets marked secure on a real HTTPS deploy.
-        'secure' => !empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'),
+        'lifetime' => $lifetime, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax',
+        // Plain $_SERVER['HTTPS'] isn't set when TLS is terminated by a reverse proxy in
+        // front of PHP (common on shared hosting) — also honour the forwarded-proto header.
+        'secure' => $secure,
     ]);
     session_name('material_session');
+    $usedDb = false;
+    try {
+        db(); // fail here (and fall back to files) if the database is unreachable
+        session_set_save_handler(new DbSessionHandler($lifetime), true);
+        $usedDb = true;
+    } catch (Throwable $e) {
+        error_log('[material] DB sessions unavailable, using files: ' . $e->getMessage());
+        $dir = __DIR__ . '/../sessions';
+        if (!is_dir($dir)) @mkdir($dir, 0700, true);
+        if (is_dir($dir) && is_writable($dir)) session_save_path($dir);
+    }
     session_start();
+    // Sliding window: every request pushes the cookie's expiry out again, so an active
+    // phone never reaches the end of its 30 days.
+    if (PHP_SAPI !== 'cli' && !headers_sent() && session_id() !== '') {
+        setcookie(session_name(), session_id(), ['expires' => time() + $lifetime, 'path' => '/', 'secure' => $secure, 'httponly' => true, 'samesite' => 'Lax']);
+    }
 }
 
 function send_security_headers(): void {
@@ -98,11 +154,14 @@ function guard_cross_site(): void {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     if (in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) return;
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if ($origin !== '') {
-        $oh = parse_url($origin, PHP_URL_HOST);
-        $host = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? ''));
+    if ($origin !== '' && $origin !== 'null') {
+        // Compare host names only, ignoring port and a leading "www.", and accept the
+        // host the proxy forwarded — a real user behind a CDN/redirect must never be refused.
+        $norm = fn($h) => preg_replace('/^www\./', '', strtolower(preg_replace('/:\d+$/', '', trim((string)$h))));
+        $oh = $norm(parse_url($origin, PHP_URL_HOST));
+        $hosts = [$norm($_SERVER['HTTP_HOST'] ?? ''), $norm(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? ''))[0]), $norm($_SERVER['SERVER_NAME'] ?? '')];
         $allowed = cfg()['cors_origins'] ?? [];
-        if ($oh !== $host && !in_array($origin, $allowed, true)) json_error('Permintaan ditolak.', 403);
+        if (!in_array($oh, array_filter($hosts), true) && !in_array($origin, $allowed, true)) json_error('Permintaan ditolak.', 403);
     }
     $ct = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
     if (strpos($ct, 'application/json') !== 0) json_error('Permintaan ditolak.', 415);

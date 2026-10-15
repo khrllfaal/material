@@ -10,3 +10,7 @@ ALTER TABLE payroll_periods
   ADD COLUMN disetujui_at DATETIME NULL,
   ADD COLUMN disetujui_by VARCHAR(40) NULL;
 ALTER TABLE attendance ADD COLUMN rev INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS php_sessions (
+  id VARCHAR(128) NOT NULL PRIMARY KEY, data MEDIUMBLOB NOT NULL, last_activity INT UNSIGNED NOT NULL,
+  INDEX idx_sess_activity (last_activity)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

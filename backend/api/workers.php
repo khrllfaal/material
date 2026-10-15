@@ -31,7 +31,7 @@ if ($method === 'GET') {
     $st->execute($params);
     $rows = array_map(function ($r) use ($isField) {
         $r['aktif'] = (int)$r['aktif'];
-        $r['diverifikasi'] = (int)$r['diverifikasi'];
+        $r['diverifikasi'] = 1; // verifikasi pekerja baru dinonaktifkan
         if (!$isField) {
             $r['tarif_harian'] = $r['tarif_harian'] === null ? null : (float)$r['tarif_harian'];
             $r['tarif_lembur'] = $r['tarif_lembur'] === null ? null : (float)$r['tarif_lembur'];
@@ -91,7 +91,7 @@ if ($method === 'POST') {
     $aktif = array_key_exists('aktif', $b) ? ((int)(bool)$b['aktif']) : 1;
     if ($isField) {
         $id = $id !== '' ? $id : new_id('wrk_');
-        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, aktif, diverifikasi, created_by) VALUES (?,?,?,?,?,1,0,?)')
+        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, aktif, diverifikasi, created_by) VALUES (?,?,?,?,?,1,1,?)')
             ->execute([$id, $projectId, $nama, $grade, $tim, $user['id']]);
         audit('create', 'workers', $id, "$nama ($grade)");
         json_response(['ok' => true, 'id' => $id]);

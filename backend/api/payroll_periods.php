@@ -105,17 +105,7 @@ if ($action === 'setujui') {
     $zero->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
     $zn = array_column($zero->fetchAll(), 'nama');
     if ($zn) json_error('Tarif belum diisi untuk: ' . implode(', ', $zn) . '. Isi dulu di Pekerja & Tarif.', 409);
-    $unv = $db->prepare("SELECT w.id, w.nama FROM attendance a JOIN workers w ON w.id = a.worker_id
-                           WHERE a.project_id = ? AND a.tgl BETWEEN ? AND ? AND a.hari > 0 AND w.diverifikasi = 0 GROUP BY w.id, w.nama");
-    $unv->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
-    $unvRows = $unv->fetchAll();
-    if ($unvRows) {
-        if (empty($b['verifikasi_semua'])) {
-            json_error(count($unvRows) . ' pekerja baru dari lapangan belum diverifikasi: ' . implode(', ', array_slice(array_column($unvRows, 'nama'), 0, 5)) . '. Pastikan mereka benar-benar bekerja dulu.', 409);
-        }
-        $vup = $db->prepare('UPDATE workers SET diverifikasi = 1, diverifikasi_by = ?, diverifikasi_at = NOW() WHERE id = ?');
-        foreach ($unvRows as $w) $vup->execute([$user['id'], $w['id']]);
-    }
+    $unvRows = []; // verifikasi pekerja baru dinonaktifkan (disederhanakan)
     $db->prepare("UPDATE payroll_periods SET status='disetujui', disetujui_at=NOW(), disetujui_by=? WHERE id=?")->execute([$user['id'], $p['id']]);
     $db->commit();
     if ($unvRows) audit('update', 'workers', 'verifikasi', count($unvRows) . ' pekerja diverifikasi saat persetujuan ' . $p['id']);

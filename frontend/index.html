@@ -196,6 +196,7 @@ function apiFetch(path, opts){
     if(!res.ok){
       var err = new Error(data.error || ('HTTP '+res.status));
       err.status = res.status;
+      if(res.status === 401 && !/auth_login|auth_me|auth_logout/.test(path)){ err.auth = true; sessionLost(); }
       throw err;
     }
     return data;
@@ -205,6 +206,28 @@ function apiFetch(path, opts){
     throw err;
   });
 }
+
+/* If the server ever stops recognising the session, nobody is left staring at a
+   broken screen: the login page comes back with a clear message, anything still
+   waiting in the offline outbox stays on the device, and it is sent right after
+   the next login. */
+var _sessionLostShown = false;
+function sessionLost(){
+  if(_sessionLostShown || !STATE.user) return;
+  _sessionLostShown = true;
+  ['desktopShell','mobileShell'].forEach(function(id){ var el = document.getElementById(id); if(el){ el.classList.add('hidden'); } });
+  var ls = document.getElementById('loginScreen'); if(ls) ls.classList.remove('hidden');
+  var le = document.getElementById('loginErr');
+  if(le){ le.textContent = 'Sesi Anda berakhir. Silakan masuk lagi — data yang belum terkirim tetap tersimpan di perangkat dan akan terkirim otomatis.'; le.classList.remove('hidden'); }
+}
+/* Keep-alive: ask the server every few minutes and whenever the phone wakes up,
+   so a lost session is noticed immediately instead of at the next tap. */
+function checkSession(){
+  if(!STATE.user || !navigator.onLine) return;
+  apiFetch('/auth_me.php').then(function(r){ if(!r.user) sessionLost(); }).catch(function(){});
+}
+setInterval(checkSession, 5*60*1000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkSession(); });
 
 /* ---------------- offline support (Admin Lapangan) ----------------
    Input saved while there is no signal waits in a local outbox and is sent
@@ -572,6 +595,7 @@ apiFetch('/auth_me.php').then(function(res){ if(res.user){ saveUser(res.user); b
 
 function boot(user){
   STATE.user = user;
+  _sessionLostShown = false;
   document.getElementById('loginScreen').classList.add('hidden');
   if(user.role==='lapangan'){
     document.getElementById('desktopShell').classList.add('hidden');
@@ -2231,6 +2255,7 @@ PAGES.rekap_gaji = function(c){
         '<div class="relative flex-1 min-w-[200px] max-w-xs"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute z-[2] pointer-events-none left-3 top-1/2 -translate-y-1/2"></i>'+
         '<input type="text" id="q" placeholder="Cari nama pekerja / tim…" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"></div>'+
         '<select id="fProj" class="'+selCls+' min-w-[180px]"><option value="">Semua Proyek</option></select>'+
+        '<select id="gjTim" class="'+selCls+' min-w-[140px]"><option value="">Semua tim</option></select>'+
         '<select id="gjBayar" class="'+selCls+' min-w-[150px]"><option value="">Semua status bayar</option><option value="belum">Belum dibayar</option><option value="sebagian">Sebagian</option><option value="lunas">Lunas</option></select>'+
         '<span class="text-xs text-slate-400 ml-auto" id="cnt"></span>'+
       '</div>'+
@@ -2245,6 +2270,7 @@ PAGES.rekap_gaji = function(c){
   icons();
   enhanceClearable(document.getElementById('q'));
   enhanceSelect(document.getElementById('gjBayar'));
+  enhanceSelect(document.getElementById('gjTim'));
   enhanceSelect(document.getElementById('gjPreset'));
   document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to;
   // The accountant pays the week that just closed, so start there.
@@ -2260,7 +2286,14 @@ PAGES.rekap_gaji = function(c){
   function load(){
     var qs = 'tgl_from='+G.from+'&tgl_to='+G.to+(fv('fProj')?'&project_id='+encodeURIComponent(fv('fProj')):'');
     document.getElementById('gjRangeNote').textContent = G.from===G.to ? fmtTglPanjang(G.from) : fmtTglPendek(G.from)+' – '+fmtTglPendek(G.to)+' '+G.to.slice(0,4);
-    return apiFetch('/payroll.php?'+qs).then(function(d){ G.data = d; draw(); })
+    return apiFetch('/payroll.php?'+qs).then(function(d){
+        G.data = d;
+        var tims = Array.from(new Set(d.rows.map(function(r){ return r.tim||''; }))).filter(function(x){ return x; }).sort(), sel = document.getElementById('gjTim'), cur = sel.value;
+        sel.innerHTML = '<option value="">Semua tim</option>'+tims.map(function(x){ return '<option value="'+esc(x)+'"'+(x===cur?' selected':'')+'>'+esc(x)+'</option>'; }).join('');
+        if(cur && tims.indexOf(cur)<0) sel.value = '';
+        sel.style.display = tims.length>1 ? '' : 'none';
+        if(sel._enhanced){ sel.dispatchEvent(new Event('ss-refresh')); var w = sel.parentNode; if(w && w.classList.contains('relative')) w.style.display = tims.length>1 ? '' : 'none'; }
+        draw(); })
       .catch(function(e){
         toast('Gagal memuat: '+e.message, true);
         document.getElementById('gjCards').innerHTML='';
@@ -2269,8 +2302,9 @@ PAGES.rekap_gaji = function(c){
       });
   }
   function filtered(){
-    var q = fv('q').toLowerCase(), by = fv('gjBayar');
+    var q = fv('q').toLowerCase(), by = fv('gjBayar'), tim = fv('gjTim');
     return G.data.rows.filter(function(r){
+      if(tim && (r.tim||'')!==tim) return false;
       if(q && (r.nama+' '+r.tim+' '+r.grade_nama).toLowerCase().indexOf(q)===-1) return false;
       if(by && r.status_bayar!==by) return false;
       if(G.bayarCard && r.status_bayar!=='belum' && r.status_bayar!=='sebagian') return false;
@@ -2279,7 +2313,14 @@ PAGES.rekap_gaji = function(c){
     });
   }
   function drawCards(){
-    var t = G.data.totals;
+    var t = G.data.totals, timSel = fv('gjTim');
+    if(timSel){
+      var rs = G.data.rows.filter(function(r){ return (r.tim||'')===timSel; });
+      var sum = function(k){ return rs.reduce(function(a,r){ return a+(r[k]||0); },0); };
+      t = {pekerja:rs.filter(function(r){ return r.hari>0; }).length, hari:sum('hari'), lembur_jam:sum('lembur_jam'), gaji:sum('gaji'), lembur_rp:sum('lembur_rp'),
+        tambah:sum('tambah'), potong:sum('potong'), grup_tambah:0, grup_potong:0, total_bayar:sum('net'), dibayar:sum('dibayar'), sisa:Math.max(0, sum('net')-sum('dibayar')),
+        perlu_dicek:rs.filter(function(r){ return r.flags.length; }).length, belum_dibayar:rs.filter(function(r){ return r.status_bayar==='belum'||r.status_bayar==='sebagian'; }).length};
+    }
     var card = function(icon, color, label, val, sub, attr, on, hero){
       return '<'+(attr?'button type="button" '+attr:'div')+' class="flex flex-col items-start text-left rounded-2xl border p-4 shadow-sm transition-all '+(attr?'hover:shadow-md ':'')+(hero?'md:col-span-3 col-span-2 bg-gradient-to-r from-indigo-600 to-indigo-500 border-indigo-600 text-white ':'bg-white ')+(on?'border-indigo-400 ring-2 ring-indigo-100':(hero?'':'border-slate-200'))+'">'+
         '<div class="flex items-center gap-2 text-sm font-semibold '+(hero?'text-indigo-100':'text-slate-600')+' leading-snug"><i data-lucide="'+icon+'" class="w-4 h-4 '+(hero?'text-white':color)+'"></i>'+esc(label)+'</div>'+
@@ -2288,7 +2329,7 @@ PAGES.rekap_gaji = function(c){
     };
     var net = t.tambah + t.grup_tambah - t.potong - t.grup_potong;
     document.getElementById('gjCards').innerHTML =
-      card('send','text-red-500','HARUS DIBAYAR', rp(t.sisa), (t.sisa>0.5 ? t.belum_dibayar+' pekerja belum dibayar · klik untuk menyaring' : 'Semua sudah dibayar')+' · sudah dibayar '+rp(t.dibayar), 'data-gj-card="bayar"', !!G.bayarCard, true)+
+      card('send','text-red-500','HARUS DIBAYAR', rp(t.sisa), (timSel?'Tim '+esc(timSel)+' · ':'')+(t.sisa>0.5 ? t.belum_dibayar+' pekerja belum dibayar · klik untuk menyaring' : 'Semua sudah dibayar')+' · sudah dibayar '+rp(t.dibayar), 'data-gj-card="bayar"', !!G.bayarCard, true)+
       card('wallet','text-indigo-500','Total Pembayaran', rp(t.total_bayar), t.pekerja+' pekerja · '+num0(t.hari)+' hari kerja')+
       card('calendar-check','text-emerald-500','Gaji Pokok', rp(t.gaji), num0(t.hari)+' hari × tarif harian')+
       card('history','text-sky-500','Lembur', rp(t.lembur_rp), num0(t.lembur_jam)+' jam lembur')+
@@ -2567,7 +2608,7 @@ PAGES.rekap_gaji = function(c){
         ['No','Nama','Status','Tim','Hari','Diterima (Rp)','Dibayar','Sisa','Tanda tangan'], rows, {});
     }).catch(function(e){ toast(e.message, true); });
   }
-  function exportAbsenUpah(p){ periodData(p).then(function(d){ exportAbsenUpahExcel(d.period, d.rows); }).catch(function(e){ toast(e.message, true); }); }
+  function exportAbsenUpah(p){ periodData(p).then(function(d){ var tim = fv('gjTim'); exportAbsenUpahExcel(d.period, tim ? d.rows.filter(function(r){ return (r.tim||'')===tim; }) : d.rows, tim); }).catch(function(e){ toast(e.message, true); }); }
 
   /* ---- wiring ---- */
   apiFetch('/projects.php').then(function(list){
@@ -2591,6 +2632,7 @@ PAGES.rekap_gaji = function(c){
   });
   document.getElementById('q').addEventListener('input', function(){ G.PG.page=1; if(G.data) draw(); });
   document.getElementById('gjBayar').addEventListener('change', function(){ G.PG.page=1; if(G.data) draw(); });
+  document.getElementById('gjTim').addEventListener('change', function(){ G.PG.page=1; if(G.data) draw(); });
   document.getElementById('fProj').addEventListener('change', function(){ G.PG.page=1; load(); });
   document.getElementById('gjPreset').addEventListener('change', function(){ if(this.value!=='kustom'){ setPreset(this.value); } G.PG.page=1; load(); });
   ['gjFrom','gjTo'].forEach(function(id){
@@ -2606,7 +2648,7 @@ PAGES.rekap_gaji = function(c){
 };
 
 /* Excel in the same layout as the paper "Absen Upah" sheet. */
-async function exportAbsenUpahExcel(period, rows){
+async function exportAbsenUpahExcel(period, rows, tim){
   try{ await loadExcelJS(); } catch(e){ toast('Gagal memuat modul Excel — cek koneksi lalu coba lagi.', true); return; }
   var wb = new ExcelJS.Workbook(); wb.creator = 'Material & Stok'; wb.created = new Date();
   var ws = wb.addWorksheet('Absen Upah');
@@ -2619,7 +2661,7 @@ async function exportAbsenUpahExcel(period, rows){
   ws.mergeCells(1,1,1,LAST); put(1,1,'ABSEN UPAH KERJA',{bold:true,size:14,h:'center'});
   ws.mergeCells(2,1,2,LAST); put(2,1,'Absensi Periode Tgl. '+fmtTglPendek(period.tgl_mulai)+' '+period.tgl_mulai.slice(0,4)+'  s/d  '+fmtTglPendek(period.tgl_akhir)+' '+period.tgl_akhir.slice(0,4),{h:'center'});
   put(3,1,'Penanggung jawab',{bold:true}); put(3,4,period.pj_nama||'-');
-  put(4,1,'Nama Grup',{bold:true}); put(4,4,period.grup_nama||'-'); put(4,LAST-6,'Jam Kerja :',{bold:true}); put(4,LAST-4,'07.00 - 16.00',{bold:true});
+  put(4,1,'Nama Grup',{bold:true}); put(4,4,tim ? tim+(period.grup_nama?' ('+period.grup_nama+')':'') : (period.grup_nama||'-')); put(4,LAST-6,'Jam Kerja :',{bold:true}); put(4,LAST-4,'07.00 - 16.00',{bold:true});
   put(4,2,'');
   var H1 = 6, H2 = 7, hdrFill = 'FFE2E8F0';
   ws.mergeCells(H1,1,H2,1); put(H1,1,'No',{bold:true,h:'center',fill:hdrFill,box:true});
@@ -2664,7 +2706,7 @@ async function exportAbsenUpahExcel(period, rows){
   ws.pageSetup = {orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9};
   var buf = await wb.xlsx.writeBuffer();
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-  a.download = 'Absen_Upah_'+filenameFromTitle(period.project_nama||'proyek')+'_'+period.tgl_mulai+'_sd_'+period.tgl_akhir+'.xlsx';
+  a.download = 'Absen_Upah_'+filenameFromTitle(period.project_nama||'proyek')+(tim?'_'+filenameFromTitle(tim):'')+'_'+period.tgl_mulai+'_sd_'+period.tgl_akhir+'.xlsx';
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
 }
 
@@ -3247,9 +3289,9 @@ function submitInput(mode){
       flushOutbox();
     })
     .catch(function(e){
-      if(e.network){
+      if(e.network || e.auth){
         outboxAdd({endpoint:endpoint, payload:payload, label:label, queuedAt:Date.now()});
-        toast('Tidak ada sinyal. Data disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
+        toast(e.auth ? 'Sesi berakhir. Data disimpan di perangkat dan terkirim otomatis setelah Anda masuk lagi.' : 'Tidak ada sinyal. Data disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
         renderTab();
       } else {
         toast('Gagal menyimpan: ' + e.message, true);
@@ -3350,7 +3392,7 @@ function renderAbsen(c){
       datesBetween(weekOf(tgl).from, lastDay, 7).forEach(function(d){ if(!filled[d] && d !== tgl && d <= today()) ABSEN.missing.push(d); });
     }
     ABSEN.kreq = (r[3]||[]).filter(function(k){ return k.project_id === pid; }).slice(0, 5);
-    ABSEN.cur = {}; ABSEN.orig = {}; ABSEN.rev = {}; ABSEN.q = ''; ABSEN.filter = 'all'; ABSEN.open = {};
+    ABSEN.cur = {}; ABSEN.orig = {}; ABSEN.rev = {}; ABSEN.q = ''; if(ABSEN.projKey !== pid){ ABSEN.tim = ''; ABSEN.projKey = pid; } ABSEN.filter = 'all'; ABSEN.open = {};
     ABSEN.workers.forEach(function(w){ ABSEN.cur[w.id] = {h:null, l:0}; ABSEN.orig[w.id] = {h:null, l:0}; });
     r[1].forEach(function(a){
       if(!ABSEN.cur[a.worker_id]) return;
@@ -3403,6 +3445,7 @@ var LEMBUR_CHIPS = [0, 1.5, 2, 3];
 
 function absenRowMatch(w){
   var x = ABSEN.cur[w.id], f = ABSEN.filter, q = (ABSEN.q||'').toLowerCase();
+  if(ABSEN.tim && (w.tim||'') !== ABSEN.tim) return false;
   if(q && (w.nama+' '+(w.tim||'')).toLowerCase().indexOf(q) === -1) return false;
   if(f==='belum') return x.h===null;
   if(f==='hadir') return x.h===1;
@@ -3449,13 +3492,21 @@ function drawAbsen(c){
     '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 mb-3">'+
       '<div class="grid grid-cols-2 gap-2 mb-3">'+
         '<button type="button" id="abCopy" class="h-12 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 text-[14px] font-bold">Pola kemarin</button>'+
-        '<button type="button" id="abAll" class="h-12 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 text-[14px] font-bold">Semua hadir</button></div>'+
+        '<button type="button" id="abAll" class="h-12 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 text-[14px] font-bold">Semua hadir'+(ABSEN.tim?' ('+esc(ABSEN.tim)+')':'')+'</button></div>'+
       '<div class="flex items-center gap-2"><span class="text-xs font-bold text-slate-500 shrink-0">Lembur standar</span>'+
         '<div class="grid grid-cols-4 gap-1.5 flex-1" id="abDefL">'+LEMBUR_CHIPS.map(function(v){
           return '<button type="button" data-defl="'+v+'" class="h-10 rounded-lg text-[13px] font-bold '+(ABSEN.defL===v?'bg-indigo-600 text-white':'bg-slate-100 text-slate-500')+'">'+(v===0?'Tidak':fmtJam(v)+' j')+'</button>';
         }).join('')+'</div></div>'+
       '<div class="text-[11px] text-slate-400 mt-2">Berlaku untuk semua yang hadir. Ubah per orang dengan mengetuk namanya.</div></div>' : '';
 
+  var tims = []; ABSEN.workers.forEach(function(w){ var k = w.tim||''; if(k && tims.indexOf(k)<0) tims.push(k); });
+  if(ABSEN.tim && tims.indexOf(ABSEN.tim)<0) ABSEN.tim = '';
+  var timChips = tims.length > 1 ?
+    '<div class="mb-3 -mx-1 px-1 overflow-x-auto tab-scroll"><div class="flex gap-2 w-max">'+
+    [['', 'Semua tim']].concat(tims.map(function(t){ return [t, t]; })).map(function(x){
+      var on = (ABSEN.tim||'')===x[0], open = ABSEN.workers.filter(function(w){ return (!x[0] || (w.tim||'')===x[0]) && ABSEN.cur[w.id].h===null; }).length;
+      return '<button type="button" data-tim-chip="'+esc(x[0])+'" class="h-11 px-4 rounded-xl text-[13.5px] font-bold whitespace-nowrap '+(on?'bg-emerald-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600')+'">'+esc(x[1])+(open?' <span class="'+(on?'bg-white/25':'bg-slate-800 text-white')+' rounded-full px-1.5 py-0.5 text-[11px] ml-1">'+open+'</span>':' ✓')+'</button>';
+    }).join('')+'</div></div>' : '';
   var filters = ABSEN.workers.length > 8 ?
     '<div class="mb-3"><div class="relative mb-2"><i data-lucide="search" class="w-4 h-4 text-slate-400 absolute z-[2] pointer-events-none left-3.5 top-1/2 -translate-y-1/2"></i>'+
       '<input type="search" id="abQ" placeholder="Cari nama pekerja…" value="'+esc(ABSEN.q)+'" autocomplete="off" class="w-full pl-10 pr-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-100"></div>'+
@@ -3467,7 +3518,7 @@ function drawAbsen(c){
   var empty = !ABSEN.workers.length ? card('<div class="text-center py-6"><div class="text-slate-500 text-sm mb-4">Belum ada pekerja di proyek ini.</div>'+
       (ed?'<button type="button" data-ab-add class="px-5 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm">+ Tambah pekerja pertama</button>':'')+'</div>') : '';
 
-  c.innerHTML = card(head) + banner + tools + '<div id="abKasbonBox"></div>' + quick + filters + empty + '<div id="abList"></div>' + ajukan + '<div id="abBar"></div>';
+  c.innerHTML = card(head) + banner + tools + '<div id="abKasbonBox"></div>' + quick + timChips + filters + empty + '<div id="abList"></div>' + ajukan + '<div id="abBar"></div>';
   document.getElementById('abKasbonBox').innerHTML = kasbonBoxHtml();
   icons();
   renderAbSummary(); renderAbList();
@@ -3566,12 +3617,13 @@ function bindAbsen(c){
   document.getElementById('abNext').onclick = function(){ if(ABSEN.tgl < today()){ ABSEN.tgl = addDays(ABSEN.tgl, 1); renderTab(); } };
   c.querySelectorAll('[data-ab-add]').forEach(function(b){ b.onclick = function(){ openAddWorker(c); }; });
   var upd = function(){ renderAbSummary(); renderAbList(); };
+  c.querySelectorAll('[data-tim-chip]').forEach(function(b){ b.onclick = function(){ ABSEN.tim = b.getAttribute('data-tim-chip'); drawAbsen(c); }; });
   var q = document.getElementById('abQ'); if(q) q.oninput = function(){ ABSEN.q = q.value; renderAbList(); };
   c.querySelectorAll('[data-ab-goto]').forEach(function(b){ b.onclick = function(){ ABSEN.tgl = b.getAttribute('data-ab-goto'); renderTab(); }; });
   var all = document.getElementById('abAll');
   if(all) all.onclick = function(){
-    ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null){ x.h = 1; x.l = ABSEN.defL||0; } });
-    toast('Semua yang belum diisi ditandai Hadir. Ubah yang berbeda saja.'); upd();
+    ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h===null && (!ABSEN.tim || (w.tim||'')===ABSEN.tim)){ x.h = 1; x.l = ABSEN.defL||0; } });
+    toast((ABSEN.tim ? ABSEN.tim+': ' : '')+'yang belum diisi ditandai Hadir. Ubah yang berbeda saja.'); upd();
   };
   document.querySelectorAll('#abDefL [data-defl]').forEach(function(b){ b.onclick = function(){
     ABSEN.defL = Number(b.getAttribute('data-defl')); lsSet('ms_def_lembur', ABSEN.defL);
@@ -3623,9 +3675,9 @@ function saveAbsen(c){
   apiFetch('/attendance.php', {method:'POST', body:JSON.stringify(payload)})
     .then(function(){ toast('Absen '+fmtTglPendek(tgl)+' tersimpan ✓'); renderTab(); /* reload so every row carries its new version */ })
     .catch(function(e){
-      if(e.network){
+      if(e.network || e.auth){
         outboxAdd({endpoint:'/attendance.php', payload:payload, label:'Absen '+fmtTglPendek(tgl)});
-        done('Tidak ada sinyal. Absen disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
+        done(e.auth ? 'Sesi berakhir. Absen disimpan di perangkat dan terkirim otomatis setelah Anda masuk lagi.' : 'Tidak ada sinyal. Absen disimpan di perangkat dan dikirim otomatis saat sinyal kembali.');
       } else if(e.status === 409 && /diubah orang lain/.test(e.message)){ toast(e.message, true); renderTab(); }
       else { toast(e.message, true); drawAbsen(c); }
     });
@@ -3672,7 +3724,7 @@ function openKasbonRequest(c){
       apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify(payload)})
         .then(function(){ closeModal(); toast('Pengajuan kasbon terkirim ✓'); renderTab(); })
         .catch(function(e){
-          if(e.network){ outboxAdd({endpoint:'/kasbon_requests.php', payload:payload, label:'Kasbon'}); closeModal(); toast('Tidak ada sinyal. Pengajuan disimpan dan dikirim otomatis saat sinyal kembali.'); renderTab(); }
+          if(e.network || e.auth){ outboxAdd({endpoint:'/kasbon_requests.php', payload:payload, label:'Kasbon'}); closeModal(); toast(e.auth ? 'Sesi berakhir. Pengajuan disimpan dan terkirim otomatis setelah Anda masuk lagi.' : 'Tidak ada sinyal. Pengajuan disimpan dan dikirim otomatis saat sinyal kembali.'); renderTab(); }
           else toast(e.message, true);
         });
     });

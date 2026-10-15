@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS workers (
   tarif_lembur  DECIMAL(14,2) NULL,
   no_rek        VARCHAR(80) NOT NULL DEFAULT '', -- rekening / e-wallet, opsional
   aktif         TINYINT(1) NOT NULL DEFAULT 1,
-  diverifikasi  TINYINT(1) NOT NULL DEFAULT 1,   -- pekerja baru dari lapangan = 0 sampai diperiksa pusat
+  diverifikasi  TINYINT(1) NOT NULL DEFAULT 1,   -- selalu 1 (verifikasi pekerja baru dinonaktifkan)
   diverifikasi_by VARCHAR(40) NULL,
   diverifikasi_at DATETIME NULL,
   created_by    VARCHAR(40) NULL,
@@ -340,3 +340,11 @@ CREATE TABLE IF NOT EXISTS kasbon_requests (
   FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Sesi login disimpan di database (bukan file) supaya pengguna tidak terlempar keluar
+-- akibat pembersihan file sesi di hosting. Berlaku 30 hari sejak pemakaian terakhir.
+CREATE TABLE IF NOT EXISTS php_sessions (
+  id            VARCHAR(128) NOT NULL PRIMARY KEY,
+  data          MEDIUMBLOB NOT NULL,
+  last_activity INT UNSIGNED NOT NULL,
+  INDEX idx_sess_activity (last_activity)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

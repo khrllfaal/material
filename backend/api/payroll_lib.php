@@ -39,7 +39,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
             $rows[$k] = [
                 'worker_id' => $a['worker_id'], 'nama' => $a['nama'], 'no_rek' => $a['no_rek'],
                 'grade' => $a['grade'], 'grade_nama' => WORKER_GRADES[$a['grade']] ?? $a['grade'], 'tim' => $a['tim'],
-                'project_id' => $a['project_id'], 'project_nama' => $a['project_nama'], 'diverifikasi' => (int)$a['diverifikasi'],
+                'project_id' => $a['project_id'], 'project_nama' => $a['project_nama'], 'diverifikasi' => 1,
                 'hari' => 0.0, 'lembur_jam' => 0.0, 'lembur_jam_bayar' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0,
                 'tarif_harian' => (float)$a['tarif_harian'], 'tarif_lembur' => (float)$a['tarif_lembur'],
                 'days' => [], 'flags' => [], 'tambah' => 0.0, 'potong' => 0.0,
@@ -54,7 +54,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         $r['days'][$a['tgl']] = [$h, $l];
         $r['tarif_harian'] = (float)$a['tarif_harian']; $r['tarif_lembur'] = (float)$a['tarif_lembur'];
         if ($h > 0 && (float)$a['tarif_harian'] <= 0 && !in_array('tarif_kosong', $r['flags'], true)) $r['flags'][] = 'tarif_kosong';
-        if ($h > 0 && !(int)$a['diverifikasi'] && !in_array('belum_verifikasi', $r['flags'], true)) $r['flags'][] = 'belum_verifikasi';
+        if ($h > 0 && false && !in_array('belum_verifikasi', $r['flags'], true)) $r['flags'][] = 'belum_verifikasi';
         if ($l > 8 && !in_array('lembur_tinggi', $r['flags'], true)) $r['flags'][] = 'lembur_tinggi';
         unset($r);
         $dates[$a['project_id'] . '|' . $a['tgl']] = true;
