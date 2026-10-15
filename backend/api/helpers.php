@@ -125,9 +125,22 @@ function read_json_body(?array $override = null): array {
 
 /** Returns the logged-in user's session row, or null. Never trusts the
  *  client for identity — always re-derived from the server-side session. */
+/** Office roles (they can see or move money) are signed out after 60 minutes
+ *  without activity; field accounts stay signed in for the work day. */
+const IDLE_LIMIT_SECONDS = 3600;
+
 function current_user(): ?array {
     start_session();
-    return $_SESSION['user'] ?? null;
+    $u = $_SESSION['user'] ?? null;
+    if ($u && $u['role'] !== 'lapangan') {
+        $now = time();
+        if ($now - (int)($_SESSION['last_seen'] ?? $now) > IDLE_LIMIT_SECONDS) {
+            unset($_SESSION['user'], $_SESSION['last_seen']);
+            return null;
+        }
+        $_SESSION['last_seen'] = $now;
+    }
+    return $u;
 }
 
 /** Endpoints an 'akuntan' (accountant) account may call. Everything else —
@@ -178,7 +191,7 @@ function audit(string $action, string $entity, string $entityId, string $detail 
         'INSERT INTO audit_log (user_id, user_username, action, entity, entity_id, detail, ip_address, user_agent) VALUES (?,?,?,?,?,?,?,?)'
     );
     $stmt->execute([
-        $u['id'] ?? null, $u['username'] ?? null, $action, $entity, $entityId, $detail,
+        $u['id'] ?? null, $u['username'] ?? null, $action, substr($entity, 0, 40), substr($entityId, 0, 40), $detail,
         $_SERVER['REMOTE_ADDR'] ?? null,
         substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255) ?: null,
     ]);
@@ -290,4 +303,32 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
         $n += $up->rowCount();
     }
     return $n;
+}
+
+
+/** Adds the columns/tables introduced by the payroll controls (approval step,
+ *  worker verification, login throttling) when a deployment has not run the
+ *  SQL migration yet. Checked once per session; needs ALTER/CREATE rights and
+ *  fails quietly otherwise. The SQL file backend/mysql/migrations_2026-10-payroll-controls.sql does the same. */
+function ensure_payroll_controls(): void {
+    start_session();
+    if (!empty($_SESSION['controls_ok'])) return;
+    try {
+        $db = db();
+        $has = function (string $table, string $col) use ($db): bool {
+            $q = $db->prepare('SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+            $q->execute([$table, $col]);
+            return (bool)$q->fetchColumn();
+        };
+        if (!$has('workers', 'diverifikasi')) {
+            $db->exec("ALTER TABLE workers ADD COLUMN diverifikasi TINYINT(1) NOT NULL DEFAULT 1, ADD COLUMN diverifikasi_by VARCHAR(40) NULL, ADD COLUMN diverifikasi_at DATETIME NULL");
+        }
+        if (!$has('payroll_periods', 'disetujui_at')) {
+            $db->exec("ALTER TABLE payroll_periods MODIFY status ENUM('draft','diajukan','disetujui','dibayar') NOT NULL DEFAULT 'draft', ADD COLUMN disetujui_at DATETIME NULL, ADD COLUMN disetujui_by VARCHAR(40) NULL");
+        }
+        $db->exec('CREATE TABLE IF NOT EXISTS login_attempts (ip VARCHAR(45) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_login_ip (ip, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $_SESSION['controls_ok'] = 1;
+    } catch (Throwable $e) {
+        error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
+    }
 }

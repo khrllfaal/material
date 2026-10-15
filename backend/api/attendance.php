@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/payroll_lib.php';
 
 /**
  * Absensi harian. One POST saves one project + one date for many workers
@@ -59,6 +59,12 @@ if ($period['status'] === 'dibayar') json_error('Periode ini sudah dibayar dan t
 if ($isField && $period['status'] !== 'draft') json_error('Absen minggu ini sudah diajukan. Hubungi Admin Pusat untuk koreksi.', 409);
 
 $db = db();
+// Before-state of this day, so the audit log can say exactly what changed and who changed it.
+$before = [];
+$bq = $db->prepare('SELECT worker_id, hari, lembur_jam FROM attendance WHERE project_id = ? AND tgl = ?');
+$bq->execute([$projectId, $tgl]);
+foreach ($bq->fetchAll() as $o) $before[$o['worker_id']] = [(float)$o['hari'], (float)$o['lembur_jam']];
+$changes = [];
 $getW = $db->prepare('SELECT * FROM workers WHERE id = ?');
 $getA = $db->prepare('SELECT tarif_harian, tarif_lembur FROM attendance WHERE worker_id=? AND project_id=? AND tgl=?');
 $up = $db->prepare(
@@ -80,7 +86,9 @@ try {
         // Field admins and normal flow: the worker must belong to this project.
         // Admin Pusat may also record someone who moved from another project.
         if ($w['project_id'] !== $projectId && $isField) json_error('Pekerja bukan bagian dari proyek ini.', 403);
+        $fmt = fn($v) => $v === null ? 'kosong' : (rtrim(rtrim(number_format($v[0], 1, ',', ''), '0'), ',') . 'h+' . rtrim(rtrim(number_format($v[1], 1, ',', ''), '0'), ',') . 'j');
         if ($e['hari'] === null) { // clear an entry
+            if (isset($before[$wid])) $changes[] = $w['nama'] . ': ' . $fmt($before[$wid]) . ' -> kosong';
             $del->execute([$wid, $projectId, $tgl]);
             $saved++;
             continue;
@@ -91,6 +99,8 @@ try {
         if ($lembur < 0 || $lembur > 16 || fmod($lembur * 2, 1.0) != 0.0) json_error('Jam lembur 0–16 dalam kelipatan 0,5 jam.', 422);
         if ($hari == 0.0 && $lembur > 0) json_error('Lembur hanya untuk pekerja yang hadir.', 422);
         $ket = mb_substr(trim((string)($e['ket'] ?? '')), 0, 255);
+        $now = [$hari, $lembur];
+        if (!isset($before[$wid]) || $before[$wid] !== $now) $changes[] = $w['nama'] . ': ' . (isset($before[$wid]) ? $fmt($before[$wid]) : 'baru') . ' -> ' . $fmt($now);
         [$harian, $lemburRate] = worker_rates($w);
         $up->execute([$wid, $projectId, $tgl, $hari, $lembur, $w['grade'], $w['tim'], $harian, $lemburRate, $ket, $user['id']]);
         $saved++;
@@ -100,5 +110,14 @@ try {
     if ($db->inTransaction()) $db->rollBack();
     throw $ex;
 }
-audit('update', 'attendance', $projectId . '/' . $tgl, "$saved pekerja");
-json_response(['ok' => true, 'saved' => $saved, 'periode_status' => $period['status']]);
+// An approved week that is edited loses its approval: pusat must look at it again.
+if ($period['status'] === 'disetujui' && $changes) {
+    $db->prepare("UPDATE payroll_periods SET status='diajukan', disetujui_at=NULL, disetujui_by=NULL WHERE id=?")->execute([$period['id']]);
+}
+$detail = "$tgl: $saved pekerja";
+if ($changes) {
+    $detail .= ' | ' . count($changes) . ' perubahan: ' . implode('; ', array_slice($changes, 0, 8)) . (count($changes) > 8 ? '; +' . (count($changes) - 8) . ' lainnya' : '');
+    if ($period['status'] !== 'draft') $detail .= ' | SETELAH DIAJUKAN (' . $period['status'] . ')';
+}
+audit('update', 'attendance', $projectId . '/' . $tgl, $detail);
+json_response(['ok' => true, 'saved' => $saved, 'periode_status' => ($period['status'] === 'disetujui' && $changes) ? 'diajukan' : $period['status']]);

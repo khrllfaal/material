@@ -7,8 +7,9 @@ require_once __DIR__ . '/payroll_lib.php';
  *   GET  ?project_id=&tgl=      status minggu itu (tanpa nominal, aman untuk lapangan)
  *   POST action=header          isi penanggung jawab / nama grup / catatan
  *   POST action=ajukan          lapangan/admin/akuntan mengajukan minggu ke pusat
- *   POST action=buka            admin membuka kembali pengajuan (belum ada pembayaran)
- *   POST action=bayar           akuntan/admin mencatat pembayaran (semua / per pekerja)
+ *   POST action=setujui         Admin Pusat memeriksa & menyetujui (syarat sebelum dibayar)
+ *   POST action=kembalikan      admin/akuntan mengembalikan ke lapangan dengan alasan (belum ada pembayaran)
+ *   POST action=bayar           akuntan/admin mencatat pembayaran — hanya periode yang sudah disetujui
  */
 send_cors_headers();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -73,21 +74,47 @@ if ($action === 'ajukan') {
     json_response(['ok' => true, 'status' => 'diajukan']);
 }
 
-if ($action === 'buka') {
-    if ($role !== 'admin') json_error('Hanya Admin Pusat yang bisa membuka kembali pengajuan.', 403);
-    if ($p['status'] !== 'diajukan') json_error('Hanya pengajuan yang belum dibayar yang bisa dibuka kembali.', 409);
+if ($action === 'setujui') {
+    if ($role !== 'admin') json_error('Hanya Admin Pusat yang bisa menyetujui absen untuk dibayar.', 403);
+    if ($p['status'] !== 'diajukan') json_error($p['status'] === 'draft' ? 'Periode belum diajukan oleh lapangan.' : 'Periode ini sudah disetujui.', 409);
+    $zero = db()->prepare("SELECT w.nama FROM attendance a JOIN workers w ON w.id = a.worker_id
+                            WHERE a.project_id = ? AND a.tgl BETWEEN ? AND ? AND a.hari > 0 AND a.tarif_harian <= 0 GROUP BY w.id, w.nama LIMIT 5");
+    $zero->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
+    $zn = array_column($zero->fetchAll(), 'nama');
+    if ($zn) json_error('Tarif belum diisi untuk: ' . implode(', ', $zn) . '. Isi dulu di Pekerja & Tarif.', 409);
+    $unv = db()->prepare("SELECT w.id, w.nama FROM attendance a JOIN workers w ON w.id = a.worker_id
+                           WHERE a.project_id = ? AND a.tgl BETWEEN ? AND ? AND a.hari > 0 AND w.diverifikasi = 0 GROUP BY w.id, w.nama");
+    $unv->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
+    $unvRows = $unv->fetchAll();
+    if ($unvRows) {
+        if (empty($b['verifikasi_semua'])) {
+            json_error(count($unvRows) . ' pekerja baru dari lapangan belum diverifikasi: ' . implode(', ', array_slice(array_column($unvRows, 'nama'), 0, 5)) . '. Verifikasi dulu bahwa mereka benar-benar bekerja.', 409);
+        }
+        $vup = db()->prepare('UPDATE workers SET diverifikasi = 1, diverifikasi_by = ?, diverifikasi_at = NOW() WHERE id = ?');
+        foreach ($unvRows as $w) $vup->execute([$user['id'], $w['id']]);
+        audit('update', 'workers', 'verifikasi', count($unvRows) . ' pekerja diverifikasi saat persetujuan ' . $pid);
+    }
+    db()->prepare("UPDATE payroll_periods SET status='disetujui', disetujui_at=NOW(), disetujui_by=? WHERE id=?")->execute([$user['id'], $pid]);
+    audit('update', 'payroll_periods', $pid, 'disetujui' . ($unvRows ? ' (+' . count($unvRows) . ' pekerja diverifikasi)' : ''));
+    json_response(['ok' => true, 'status' => 'disetujui']);
+}
+
+if ($action === 'kembalikan' || $action === 'buka') {
+    if (!in_array($role, ['admin', 'akuntan'], true)) json_error('Hanya Admin Pusat atau Akuntan yang bisa mengembalikan pengajuan.', 403);
+    if (!in_array($p['status'], ['diajukan', 'disetujui'], true)) json_error('Hanya pengajuan yang belum dibayar yang bisa dikembalikan.', 409);
     $c = db()->prepare('SELECT COUNT(*) FROM payroll_payments WHERE period_id = ?'); $c->execute([$pid]);
-    if ((int)$c->fetchColumn() > 0) json_error('Sudah ada pembayaran pada periode ini, tidak bisa dibuka. Buat penyesuaian di periode berikutnya.', 409);
+    if ((int)$c->fetchColumn() > 0) json_error('Sudah ada pembayaran pada periode ini, tidak bisa dikembalikan. Buat penyesuaian di periode berikutnya.', 409);
     $alasan = $clip($b['alasan'] ?? '', 200);
     if ($alasan === '') json_error('Alasan wajib diisi.', 422);
-    db()->prepare("UPDATE payroll_periods SET status='draft', diajukan_at=NULL, diajukan_by=NULL WHERE id=?")->execute([$pid]);
-    audit('update', 'payroll_periods', $pid, "dibuka kembali: $alasan");
+    db()->prepare("UPDATE payroll_periods SET status='draft', diajukan_at=NULL, diajukan_by=NULL, disetujui_at=NULL, disetujui_by=NULL, catatan=? WHERE id=?")->execute([$clip('Dikembalikan: ' . $alasan, 255), $pid]);
+    audit('update', 'payroll_periods', $pid, "dikembalikan ke lapangan: $alasan");
     json_response(['ok' => true, 'status' => 'draft']);
 }
 
 if ($action === 'bayar') {
     if (!in_array($role, ['admin', 'akuntan'], true)) json_error('Hanya Akuntan atau Admin Pusat yang bisa mencatat pembayaran.', 403);
     if ($p['status'] === 'draft') json_error('Periode belum diajukan oleh lapangan.', 409);
+    if ($p['status'] === 'diajukan') json_error('Periode belum diperiksa dan disetujui Admin Pusat.', 409);
     $tglBayar = require_valid_date($b['tgl_bayar'] ?? date('Y-m-d'), 'Tanggal bayar');
     $metode = (($b['metode'] ?? '') === 'transfer') ? 'transfer' : 'tunai';
     $res = payroll_compute([$projectId], $p['tgl_mulai'], $p['tgl_akhir']);
@@ -127,7 +154,7 @@ if ($action === 'bayar') {
     $open = $out > 0.005 || $neg < -0.005;
     if (!$open) db()->prepare("UPDATE payroll_periods SET status='dibayar', dibayar_at=NOW(), dibayar_by=? WHERE id=?")->execute([$user['id'], $pid]);
     db()->commit();
-    audit('update', 'payroll_payments', $pid, sprintf('%d baris, total %s, %s%s', count($items), $total, $metode, $open ? '' : ' — LUNAS'));
-    json_response(['ok' => true, 'dibayar' => $total, 'lunas' => !$open, 'status' => $open ? 'diajukan' : 'dibayar']);
+    audit('update', 'payroll_payments', $pid, sprintf('%d baris, total %s, %s%s%s', count($items), $total, $metode, $open ? '' : ' — LUNAS', ($p['disetujui_by'] ?? null) === $user['id'] ? ' [disetujui & dibayar oleh orang yang sama]' : ''));
+    json_response(['ok' => true, 'dibayar' => $total, 'lunas' => !$open, 'status' => $open ? 'disetujui' : 'dibayar']);
 }
 json_error('Aksi tidak dikenal.', 422);

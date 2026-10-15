@@ -219,6 +219,9 @@ CREATE TABLE IF NOT EXISTS workers (
   tarif_lembur  DECIMAL(14,2) NULL,
   no_rek        VARCHAR(80) NOT NULL DEFAULT '', -- rekening / e-wallet, opsional
   aktif         TINYINT(1) NOT NULL DEFAULT 1,
+  diverifikasi  TINYINT(1) NOT NULL DEFAULT 1,   -- pekerja baru dari lapangan = 0 sampai diperiksa pusat
+  diverifikasi_by VARCHAR(40) NULL,
+  diverifikasi_at DATETIME NULL,
   created_by    VARCHAR(40) NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_workers_project (project_id, aktif),
@@ -253,11 +256,12 @@ CREATE TABLE IF NOT EXISTS payroll_periods (
   project_id    VARCHAR(40) NOT NULL,
   tgl_mulai     DATE NOT NULL,
   tgl_akhir     DATE NOT NULL,
-  status        ENUM('draft','diajukan','dibayar') NOT NULL DEFAULT 'draft',
+  status        ENUM('draft','diajukan','disetujui','dibayar') NOT NULL DEFAULT 'draft',
   pj_nama       VARCHAR(120) NOT NULL DEFAULT '',  -- penanggung jawab
   grup_nama     VARCHAR(120) NOT NULL DEFAULT '',
   catatan       VARCHAR(255) NOT NULL DEFAULT '',
   diajukan_at   DATETIME NULL, diajukan_by VARCHAR(40) NULL,
+  disetujui_at  DATETIME NULL, disetujui_by VARCHAR(40) NULL,   -- diperiksa & disetujui Admin Pusat
   dibayar_at    DATETIME NULL, dibayar_by  VARCHAR(40) NULL,
   UNIQUE KEY uniq_period (project_id, tgl_mulai),
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -334,3 +338,10 @@ CREATE TABLE IF NOT EXISTS kasbon_requests (
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Pembatas percobaan login per alamat IP (melengkapi penguncian per akun).
+CREATE TABLE IF NOT EXISTS login_attempts (
+  ip          VARCHAR(45) NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_login_ip (ip, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

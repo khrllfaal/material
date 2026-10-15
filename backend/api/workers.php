@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/payroll_lib.php';
 
 /**
  * Master pekerja per proyek. Admin Lapangan can list the roster of their own
@@ -25,12 +25,13 @@ if ($method === 'GET') {
     }
     if (!empty($_GET['project_id'])) { $conds[] = 'project_id = ?'; $params[] = $_GET['project_id']; }
     if (empty($_GET['all'])) $conds[] = 'aktif = 1';
-    $cols = $isField ? 'id, project_id, nama, grade, tim, aktif'
-                     : 'id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif';
+    $cols = $isField ? 'id, project_id, nama, grade, tim, aktif, diverifikasi'
+                     : 'id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif, diverifikasi, created_at';
     $st = db()->prepare("SELECT $cols FROM workers" . ($conds ? ' WHERE ' . implode(' AND ', $conds) : '') . ' ORDER BY tim, FIELD(grade,\'KTK\',\'TK\',\'LD\',\'OBK\',\'SPR\',\'OMX\',\'LAIN\'), nama');
     $st->execute($params);
     $rows = array_map(function ($r) use ($isField) {
         $r['aktif'] = (int)$r['aktif'];
+        $r['diverifikasi'] = (int)$r['diverifikasi'];
         if (!$isField) {
             $r['tarif_harian'] = $r['tarif_harian'] === null ? null : (float)$r['tarif_harian'];
             $r['tarif_lembur'] = $r['tarif_lembur'] === null ? null : (float)$r['tarif_lembur'];
@@ -42,6 +43,22 @@ if ($method === 'GET') {
 
 if ($method === 'POST') {
     $b = read_json_body();
+    // Pusat confirms that workers added from the field are real people (ghost-worker control).
+    if (($b['action'] ?? '') === 'verifikasi') {
+        if ($isField) json_error('Anda tidak punya akses untuk aksi ini.', 403);
+        $ids = array_values(array_filter(array_map('strval', (array)($b['ids'] ?? []))));
+        if (!empty($b['project_id']) && !empty($b['semua'])) {
+            $st = db()->prepare('SELECT id FROM workers WHERE project_id = ? AND diverifikasi = 0');
+            $st->execute([(string)$b['project_id']]);
+            $ids = array_merge($ids, array_column($st->fetchAll(), 'id'));
+        }
+        if (!$ids) json_error('Tidak ada pekerja yang dipilih.', 422);
+        $up = db()->prepare('UPDATE workers SET diverifikasi = 1, diverifikasi_by = ?, diverifikasi_at = NOW() WHERE id = ? AND diverifikasi = 0');
+        $n = 0;
+        foreach (array_unique($ids) as $wid) { $up->execute([$user['id'], $wid]); $n += $up->rowCount(); }
+        audit('update', 'workers', 'verifikasi', "$n pekerja diverifikasi");
+        json_response(['ok' => true, 'diverifikasi' => $n]);
+    }
     $id = (string)($b['id'] ?? '');
     $projectId = (string)($b['project_id'] ?? '');
     $nama = trim(preg_replace('/\s+/u', ' ', (string)($b['nama'] ?? '')));
@@ -74,7 +91,7 @@ if ($method === 'POST') {
     $aktif = array_key_exists('aktif', $b) ? ((int)(bool)$b['aktif']) : 1;
     if ($isField) {
         $id = $id !== '' ? $id : new_id('wrk_');
-        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, aktif, created_by) VALUES (?,?,?,?,?,1,?)')
+        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, aktif, diverifikasi, created_by) VALUES (?,?,?,?,?,1,0,?)')
             ->execute([$id, $projectId, $nama, $grade, $tim, $user['id']]);
         audit('create', 'workers', $id, "$nama ($grade)");
         json_response(['ok' => true, 'id' => $id]);

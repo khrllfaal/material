@@ -5,6 +5,16 @@ send_cors_headers();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Method not allowed', 405);
 
+// Per-IP brake (on top of the per-account lockout): stops one address from
+// guessing across many usernames. Fails open if the table is unavailable.
+$ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
+ensure_payroll_controls();
+try {
+    $lim = db()->prepare('SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND created_at > (NOW() - INTERVAL 15 MINUTE)');
+    $lim->execute([$ip]);
+    if ((int)$lim->fetchColumn() >= 30) json_error('Terlalu banyak percobaan login dari perangkat ini. Coba lagi beberapa menit lagi.', 429);
+} catch (Throwable $e) { error_log('[material] login throttle: ' . $e->getMessage()); }
+
 $body = read_json_body();
 $username = trim(strtolower((string)($body['username'] ?? '')));
 $password = (string)($body['password'] ?? '');
@@ -18,6 +28,7 @@ $generic_error = 'Username atau password salah.';
 
 if (!$user) {
     // Don't reveal whether the username exists at all.
+    try { db()->prepare('INSERT INTO login_attempts (ip) VALUES (?)')->execute([$ip]); } catch (Throwable $e) {}
     json_error($generic_error, 401);
 }
 
@@ -28,6 +39,7 @@ if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) 
 if (!password_verify($password, $user['password_hash'])) {
     $attempts = (int)$user['failed_attempts'] + 1;
     $lockUntil = $attempts >= 5 ? date('Y-m-d H:i:s', time() + 15 * 60) : null;
+    try { db()->prepare('INSERT INTO login_attempts (ip) VALUES (?)')->execute([$ip]); } catch (Throwable $e) {}
     $upd = db()->prepare('UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?');
     $upd->execute([$attempts, $lockUntil, $user['id']]);
     json_error($generic_error, 401);
@@ -38,6 +50,7 @@ db()->prepare('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE i
 start_session();
 session_regenerate_id(true);
 $_SESSION['user'] = ['id' => $user['id'], 'username' => $user['username'], 'nama' => $user['nama'], 'role' => $user['role']];
+$_SESSION['last_seen'] = time();
 
 $out = $_SESSION['user'];
 if ($user['role'] === 'lapangan') $out['projectIds'] = user_project_ids($_SESSION['user']);

@@ -21,17 +21,8 @@ if ((strtotime($to) - strtotime($from)) / 86400 > 400) json_error('Rentang tangg
 $pids = !empty($_GET['project_id']) ? [(string)$_GET['project_id']] : null;
 $res = payroll_compute($pids, $from, $to);
 
-// Kasbon saldo per project/worker for rows shown (and group-level per project).
-$saldo = [];
-$seen = [];
-foreach ($res['rows'] as $r) {
-    $k = $r['project_id'] . '|' . $r['worker_id'];
-    if (!isset($seen[$k])) { $seen[$k] = 1; $s = kasbon_saldo($r['project_id'], $r['worker_id']); if (abs($s) > 0.005) $saldo[$k] = $s; }
-}
-foreach ($res['periods'] as $p) {
-    $k = $p['project_id'] . '|';
-    if (!isset($seen[$k])) { $seen[$k] = 1; $s = kasbon_saldo($p['project_id'], null); if (abs($s) > 0.005) $saldo[$k] = $s; }
-}
+// Kasbon saldo per project/worker (one grouped lookup, not one query per row).
+$saldo = kasbon_saldo_map($pids);
 $res['kasbon_saldo'] = (object)$saldo;
 $res['range'] = ['from' => $from, 'to' => $to];
 $res['grades'] = WORKER_GRADES;

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/helpers.php';
+ensure_payroll_controls();
 
 /**
  * One calculation used by Rekap Gaji, the payment endpoint and the exports,
@@ -23,7 +24,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
     }
     $st = $db->prepare(
         "SELECT a.worker_id, a.project_id, a.tgl, a.hari, a.lembur_jam, a.grade, a.tim, a.tarif_harian, a.tarif_lembur,
-                w.nama, w.no_rek, w.aktif, p.nama AS project_nama
+                w.nama, w.no_rek, w.aktif, w.diverifikasi, p.nama AS project_nama
            FROM attendance a JOIN workers w ON w.id = a.worker_id JOIN projects p ON p.id = a.project_id
           WHERE a.tgl BETWEEN ? AND ? $pc ORDER BY a.tgl");
     $st->execute(array_merge([$from, $to], $pp));
@@ -38,7 +39,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
             $rows[$k] = [
                 'worker_id' => $a['worker_id'], 'nama' => $a['nama'], 'no_rek' => $a['no_rek'],
                 'grade' => $a['grade'], 'grade_nama' => WORKER_GRADES[$a['grade']] ?? $a['grade'], 'tim' => $a['tim'],
-                'project_id' => $a['project_id'], 'project_nama' => $a['project_nama'],
+                'project_id' => $a['project_id'], 'project_nama' => $a['project_nama'], 'diverifikasi' => (int)$a['diverifikasi'],
                 'hari' => 0.0, 'lembur_jam' => 0.0, 'lembur_jam_bayar' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0,
                 'tarif_harian' => (float)$a['tarif_harian'], 'tarif_lembur' => (float)$a['tarif_lembur'],
                 'days' => [], 'flags' => [], 'tambah' => 0.0, 'potong' => 0.0,
@@ -53,6 +54,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         $r['days'][$a['tgl']] = [$h, $l];
         $r['tarif_harian'] = (float)$a['tarif_harian']; $r['tarif_lembur'] = (float)$a['tarif_lembur'];
         if ($h > 0 && (float)$a['tarif_harian'] <= 0 && !in_array('tarif_kosong', $r['flags'], true)) $r['flags'][] = 'tarif_kosong';
+        if ($h > 0 && !(int)$a['diverifikasi'] && !in_array('belum_verifikasi', $r['flags'], true)) $r['flags'][] = 'belum_verifikasi';
         if ($l > 8 && !in_array('lembur_tinggi', $r['flags'], true)) $r['flags'][] = 'lembur_tinggi';
         unset($r);
         $dates[$a['project_id'] . '|' . $a['tgl']] = true;
@@ -121,7 +123,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
             if ($wr) $rows[$x['worker_id'] . '|' . $p['project_id']] = [
                 'worker_id' => $x['worker_id'], 'nama' => $wr['nama'], 'no_rek' => $wr['no_rek'], 'grade' => $wr['grade'],
                 'grade_nama' => WORKER_GRADES[$wr['grade']] ?? $wr['grade'], 'tim' => $wr['tim'],
-                'project_id' => $p['project_id'], 'project_nama' => $p['project_nama'],
+                'project_id' => $p['project_id'], 'project_nama' => $p['project_nama'], 'diverifikasi' => 1,
                 'hari' => 0.0, 'lembur_jam' => 0.0, 'lembur_jam_bayar' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0, 'tarif_harian' => 0.0, 'tarif_lembur' => 0.0,
                 'days' => [], 'flags' => [], 'tambah' => 0.0, 'potong' => 0.0,
             ];
@@ -204,4 +206,26 @@ function kasbon_saldo(string $projectId, ?string $workerId): float {
                          WHERE p.project_id = ? AND x.kategori = 'kasbon' AND x.jenis = 'potong' AND $w2");
     $b->execute($workerId === null ? [$projectId] : [$projectId, $workerId]);
     return $given - (float)$b->fetchColumn();
+}
+
+/** Saldo kasbon for many (project, worker) at once — two grouped queries instead of two per row.
+ *  Keys: "projectId|workerId" (worker empty = grup). Only non-zero balances are returned. */
+function kasbon_saldo_map(?array $projectIds): array {
+    $cond = ''; $params = [];
+    if ($projectIds !== null) {
+        if (!$projectIds) return [];
+        $cond = ' WHERE project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')';
+        $params = $projectIds;
+    }
+    $map = [];
+    $g = db()->prepare("SELECT project_id, COALESCE(worker_id, '') AS w, SUM(jumlah) AS t FROM kasbon$cond GROUP BY project_id, w");
+    $g->execute($params);
+    foreach ($g->fetchAll() as $r) $map[$r['project_id'] . '|' . $r['w']] = (float)$r['t'];
+    $condP = $projectIds !== null ? ' AND p.project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')' : '';
+    $b = db()->prepare("SELECT p.project_id, COALESCE(x.worker_id, '') AS w, SUM(x.jumlah) AS t
+                          FROM payroll_adjustments x JOIN payroll_periods p ON p.id = x.period_id
+                         WHERE x.kategori = 'kasbon' AND x.jenis = 'potong'$condP GROUP BY p.project_id, w");
+    $b->execute($params);
+    foreach ($b->fetchAll() as $r) { $k = $r['project_id'] . '|' . $r['w']; $map[$k] = ($map[$k] ?? 0.0) - (float)$r['t']; }
+    return array_filter($map, fn($v) => abs($v) > 0.005);
 }

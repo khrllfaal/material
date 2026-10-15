@@ -106,3 +106,15 @@ scripts/
   per baris absen sehingga kenaikan tarif tidak mengubah periode yang sudah lewat.
 - Database yang sudah berjalan: jalankan `backend/mysql/migrations_2026-10-payroll.sql` sekali,
   lalu (opsional) `backend/mysql/seed_absensi_percobaan.sql` untuk 2 proyek percobaan.
+
+### Pengendalian (anti-kecurangan)
+- Alur gaji tiga pihak: **Lapangan mengajukan → Admin Pusat memeriksa & menyetujui → Akuntan membayar.**
+  Akuntan tidak bisa membayar sebelum disetujui; Admin Pusat yang mengubah absen setelah disetujui
+  otomatis membatalkan persetujuan.
+- Pekerja baru dari lapangan berstatus *belum diverifikasi* dan menahan persetujuan sampai Admin Pusat
+  memastikan orangnya nyata. Tarif kosong juga menahan persetujuan.
+- **Log Aktivitas** (Admin Pusat & Owner): siapa mengubah apa — termasuk perubahan absen (sebelum → sesudah)
+  dan penandaan "SETELAH DIAJUKAN" atau "disetujui & dibayar oleh orang yang sama".
+- Sesi Admin Pusat/Akuntan/Owner berakhir setelah 60 menit tanpa aktivitas; login dibatasi per alamat IP.
+- Kolom/tabel baru dibuat otomatis saat pertama dipakai; file `migrations_2026-10-payroll-controls.sql`
+  tersedia bila hak ALTER database dibatasi.
