@@ -227,6 +227,7 @@ const AKUNTAN_ENDPOINTS = [
 function require_login(): array {
     $u = current_user();
     if (!$u) json_error('Belum login.', 401);
+    ensure_payroll_controls();
     if ($u['role'] === 'akuntan' && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), AKUNTAN_ENDPOINTS, true)) {
         json_error('Anda tidak punya akses untuk aksi ini.', 403);
     }
@@ -393,6 +394,12 @@ function ensure_payroll_controls(): void {
             $q->execute([$table, $col]);
             return (bool)$q->fetchColumn();
         };
+        $tbl = $db->query("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'workers'")->fetchColumn();
+        if (!$tbl) { // database lama belum punya tabel Tenaga Kerja: buat otomatis dari file SQL
+            $sql = (string)@file_get_contents(__DIR__ . '/../mysql/tenaga_kerja_tabel.sql');
+            $sql = preg_replace('/^\s*--.*$/m', '', $sql);
+            foreach (preg_split('/;\s*(\r?\n|$)/', $sql) as $stmt) { if (trim($stmt) !== '') $db->exec($stmt); }
+        }
         if (!$has('workers', 'diverifikasi')) {
             $db->exec("ALTER TABLE workers ADD COLUMN diverifikasi TINYINT(1) NOT NULL DEFAULT 1, ADD COLUMN diverifikasi_by VARCHAR(40) NULL, ADD COLUMN diverifikasi_at DATETIME NULL");
         }

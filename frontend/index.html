@@ -2209,7 +2209,7 @@ function rp(n){ n = Number(n)||0; return (n<0?'−':'')+'Rp '+Math.abs(Math.roun
 function canWritePay(){ return !!(STATE.user && (STATE.user.role==='admin' || STATE.user.role==='akuntan')); }
 var HARI_ABBR = ['MG','SN','SL','RB','KM','JM','SB'];
 var PAY_BADGE = {lunas:['aman','Lunas'], sebagian:['warn','Sebagian'], belum:['danger','Belum dibayar'], nol:['neutral','—']};
-var FLAG_LABEL = {belum_verifikasi:'Pekerja baru dari lapangan belum diverifikasi', tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan'};
+var FLAG_LABEL = {tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan'};
 function fmtHariVal(v){ return v===1 ? '1' : (v===0.5 ? '½' : (v>0 ? String(v).replace('.',',') : '–')); }
 function datesBetween(from, to, max){ var out=[], d=from; while(d<=to && out.length<(max||62)){ out.push(d); d=addDays(d,1); } return out; }
 function periodStatusBadge(st){ var m = PERIOD_STATUS[st]||PERIOD_STATUS.draft; return badge(m[0], m[1]); }
@@ -2311,7 +2311,7 @@ PAGES.rekap_gaji = function(c){
       card('calendar-check','text-emerald-500','Gaji Pokok', rp(t.gaji), num0(t.hari)+' hari × tarif harian')+
       card('history','text-sky-500','Lembur', rp(t.lembur_rp), num0(t.lembur_jam)+' jam lembur')+
       card('banknote','text-amber-500','Tambahan & Potongan', (net<0?'−':(net>0?'+':''))+rp(Math.abs(net)).replace('Rp ','Rp '), '+'+rp(t.tambah+t.grup_tambah).replace('Rp ','')+' / −'+rp(t.potong+t.grup_potong).replace('Rp ',''))+
-      card('alert-triangle','text-orange-500','Perlu Dicek', String(t.perlu_dicek), 'absen kosong, tarif 0, pekerja belum diverifikasi', 'data-gj-card="flag"', G.flagOnly);
+      card('alert-triangle','text-orange-500','Perlu Dicek', String(t.perlu_dicek), 'absen kosong, tarif 0, lembur tinggi', 'data-gj-card="flag"', G.flagOnly);
     document.querySelectorAll('[data-gj-card]').forEach(function(b){
       b.onclick = function(){
         if(b.getAttribute('data-gj-card')==='bayar') G.bayarCard = !G.bayarCard; else G.flagOnly = !G.flagOnly;
