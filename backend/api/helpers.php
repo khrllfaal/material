@@ -398,7 +398,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
  *  fails quietly otherwise. The SQL file backend/mysql/migrations_2026-10-payroll-controls.sql does the same. */
 function ensure_payroll_controls(): void {
     start_session();
-    if ((int)($_SESSION['controls_ok'] ?? 0) >= 2) return; // bump the number whenever a new migration is added
+    if ((int)($_SESSION['controls_ok'] ?? 0) >= 3) return; // bump the number whenever a new migration is added
     try {
         $db = db();
         $has = function (string $table, string $col) use ($db): bool {
@@ -421,13 +421,17 @@ function ensure_payroll_controls(): void {
         if (!$has('attendance', 'rev')) {
             $db->exec('ALTER TABLE attendance ADD COLUMN rev INT NOT NULL DEFAULT 0');
         }
+        $roleType = (string)$db->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'")->fetchColumn();
+        if ($roleType !== '' && stripos($roleType, 'akuntan') === false) { // older databases: the Akuntan role did not exist yet
+            $db->exec("ALTER TABLE users MODIFY role ENUM('admin','owner','lapangan','akuntan') NOT NULL");
+        }
         if (!$has('labor_rates', 'tim')) {
             $db->exec("ALTER TABLE labor_rates ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER project_id, ADD INDEX idx_lr_project (project_id), DROP PRIMARY KEY, ADD PRIMARY KEY (project_id, tim, grade)");
         }
         if (!$has('kasbon_requests', 'tim')) {
             $db->exec("ALTER TABLE kasbon_requests ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER worker_id");
         }
-        $_SESSION['controls_ok'] = 2;
+        $_SESSION['controls_ok'] = 3;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
     }
