@@ -57,7 +57,13 @@ if ($isField) {
 payroll_period($projectId, $tgl); // make sure the week's period row exists
 
 $db = db();
-$getW = $db->prepare('SELECT * FROM workers WHERE id = ?');
+$wIds = array_values(array_unique(array_map(fn($e) => (string)($e['worker_id'] ?? ''), $entries)));
+$wMap = [];
+if ($wIds) {
+    $wq = $db->prepare('SELECT * FROM workers WHERE id IN (' . implode(',', array_fill(0, count($wIds), '?')) . ')');
+    $wq->execute($wIds);
+    foreach ($wq->fetchAll() as $wr) $wMap[$wr['id']] = $wr;
+}
 $up = $db->prepare(
     'INSERT INTO attendance (worker_id, project_id, tgl, hari, lembur_jam, grade, tim, tarif_harian, tarif_lembur, ket, created_by)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)
@@ -85,8 +91,7 @@ foreach ($bq->fetchAll() as $o) $before[$o['worker_id']] = ['v' => [(float)$o['h
 
 foreach ($entries as $e) {
     $wid = (string)($e['worker_id'] ?? '');
-    $getW->execute([$wid]);
-    $w = $getW->fetch();
+    $w = $wMap[$wid] ?? null;
     if (!$w) json_error('Pekerja tidak ditemukan. Muat ulang halaman.', 422);
     // Field admins: the worker must belong to this project. Admin Pusat may also
     // record someone who moved from another project.
@@ -139,4 +144,8 @@ if ($changes) {
     if ($period['status'] !== 'draft') $detail .= ' | SETELAH DIAJUKAN (' . $period['status'] . ')';
 }
 audit('update', 'attendance', $projectId . '/' . $tgl, $detail);
-json_response(['ok' => true, 'saved' => $saved, 'periode_status' => ($period['status'] === 'disetujui' && $changes) ? 'diajukan' : $period['status']]);
+$rq = $db->prepare('SELECT worker_id, rev FROM attendance WHERE project_id = ? AND tgl = ?');
+$rq->execute([$projectId, $tgl]);
+$revs = [];
+foreach ($rq->fetchAll() as $r) $revs[$r['worker_id']] = (int)$r['rev'];
+json_response(['ok' => true, 'saved' => $saved, 'revs' => $revs, 'periode_status' => ($period['status'] === 'disetujui' && $changes) ? 'diajukan' : $period['status']]);

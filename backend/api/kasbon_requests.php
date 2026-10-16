@@ -26,7 +26,7 @@ if ($method === 'GET') {
     }
     if (!empty($_GET['status'])) { $conds[] = 'r.status = ?'; $params[] = (string)$_GET['status']; }
     $st = db()->prepare(
-        "SELECT r.id, r.project_id, p.nama AS project_nama, r.worker_id, w.nama AS worker_nama, r.jumlah, r.ket, r.status, r.catatan, r.created_at, r.diproses_at
+        "SELECT r.id, r.project_id, p.nama AS project_nama, r.worker_id, w.nama AS worker_nama, r.tim, r.jumlah, r.ket, r.status, r.catatan, r.created_at, r.diproses_at
            FROM kasbon_requests r JOIN projects p ON p.id = r.project_id LEFT JOIN workers w ON w.id = r.worker_id"
         . ($conds ? ' WHERE ' . implode(' AND ', $conds) : '') . ' ORDER BY FIELD(r.status, \'diajukan\', \'disetujui\', \'ditolak\'), r.created_at DESC LIMIT 200');
     $st->execute($params);
@@ -52,14 +52,28 @@ if ($role === 'lapangan' || $action === '') {
         $w = db()->prepare('SELECT project_id FROM workers WHERE id = ?'); $w->execute([$workerId]);
         if ($w->fetchColumn() !== $projectId) json_error('Pekerja bukan bagian dari proyek ini.', 422);
     }
+    // Atas nama: pekerja, satu tim, atau grup/penanggung jawab (keduanya tanpa pekerja).
+    $tim = $workerId ? '' : mb_substr(trim((string)($b['tim'] ?? '')), 0, 80);
+    if ($tim !== '') {
+        $tq = db()->prepare('SELECT 1 FROM workers WHERE project_id = ? AND tim = ? LIMIT 1'); $tq->execute([$projectId, $tim]);
+        if (!$tq->fetchColumn()) json_error('Tim tidak ditemukan di proyek ini.', 422);
+    }
     $ex = db()->prepare('SELECT 1 FROM kasbon_requests WHERE id = ?'); $ex->execute([$id]);
     if ($ex->fetchColumn()) json_error('Pengajuan sudah tersimpan.', 403); // offline resend: treated as done
+    // Aturan: satu pengajuan kasbon per minggu untuk tiap nama (pekerja / tim / grup). Yang ditolak tidak dihitung.
+    if ($role === 'lapangan') {
+        [$wFrom, $wTo] = payroll_week(date('Y-m-d'));
+        $dup = db()->prepare("SELECT COUNT(*) FROM kasbon_requests WHERE project_id = ? AND status <> 'ditolak' AND DATE(created_at) BETWEEN ? AND ?
+                                AND " . ($workerId ? 'worker_id = ?' : 'worker_id IS NULL AND tim = ?'));
+        $dup->execute([$projectId, $wFrom, $wTo, $workerId ?: $tim]);
+        if ((int)$dup->fetchColumn() > 0) json_error('Kasbon untuk nama ini sudah diajukan minggu ini. Satu kali per minggu — hubungi Akuntan bila perlu tambahan.', 409);
+    }
     $open = db()->prepare("SELECT COUNT(*) FROM kasbon_requests WHERE project_id = ? AND status = 'diajukan'"); $open->execute([$projectId]);
     if ((int)$open->fetchColumn() >= 30) json_error('Terlalu banyak pengajuan yang belum diperiksa. Hubungi Akuntan.', 429);
-    db()->prepare('INSERT INTO kasbon_requests (id, project_id, worker_id, jumlah, ket, created_by) VALUES (?,?,?,?,?,?)')
-        ->execute([$id, $projectId, $workerId, $jumlah, mb_substr(trim((string)($b['ket'] ?? '')), 0, 255), $user['id']]);
+    db()->prepare('INSERT INTO kasbon_requests (id, project_id, worker_id, tim, jumlah, ket, created_by) VALUES (?,?,?,?,?,?,?)')
+        ->execute([$id, $projectId, $workerId, $tim, $jumlah, mb_substr(trim((string)($b['ket'] ?? '')), 0, 255), $user['id']]);
     audit('create', 'kasbon_requests', $id, (string)$jumlah);
-    json_response(['ok' => true, 'id' => $id]);
+    json_response(['ok' => true, 'id' => $id, 'tim' => $tim, 'status' => 'diajukan']);
 }
 
 // review: Akuntan only (Admin Pusat edits/deletes, it does not approve)
@@ -85,7 +99,7 @@ if ($action === 'setujui') {
     $tgl = require_valid_date($b['tgl'] ?? date('Y-m-d'), 'Tanggal kasbon');
     $kid = new_id('ksb_');
     db()->prepare('INSERT INTO kasbon (id, project_id, worker_id, tgl, jumlah, ket, created_by) VALUES (?,?,?,?,?,?,?)')
-        ->execute([$kid, $r['project_id'], $r['worker_id'], $tgl, $jumlah, mb_substr('Pengajuan lapangan' . ($r['ket'] !== '' ? ': ' . $r['ket'] : ''), 0, 255), $user['id']]);
+        ->execute([$kid, $r['project_id'], $r['worker_id'], $tgl, $jumlah, mb_substr('Pengajuan lapangan' . ($r['tim'] !== '' ? ' (' . $r['tim'] . ')' : '') . ($r['ket'] !== '' ? ': ' . $r['ket'] : ''), 0, 255), $user['id']]);
     db()->prepare("UPDATE kasbon_requests SET status='disetujui', catatan=?, kasbon_id=?, diproses_by=?, diproses_at=NOW() WHERE id=?")
         ->execute([$catatan, $kid, $user['id'], $id]);
     db()->commit();

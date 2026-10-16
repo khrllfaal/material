@@ -70,20 +70,31 @@ class DbSessionHandler implements SessionHandlerInterface, SessionUpdateTimestam
             }
         }
     }
+    /** One SELECT serves validateId() and read(); the sliding timestamp is only written every few minutes. */
+    private ?array $row = null;
+    private function fetchRow(string $id): ?array {
+        if ($this->row !== null && $this->row['id'] === $id) return $this->row;
+        $st = $this->run('SELECT data, last_activity FROM php_sessions WHERE id = ?', [$id]);
+        $r = $st->fetch();
+        $this->row = $r && (int)$r['last_activity'] > time() - $this->lifetime ? ['id' => $id, 'data' => (string)$r['data'], 'last' => (int)$r['last_activity']] : ['id' => $id, 'data' => null, 'last' => 0];
+        return $this->row;
+    }
     public function read(string $id): string|false {
-        $d = $this->run('SELECT data FROM php_sessions WHERE id = ? AND last_activity > ?', [$id, time() - $this->lifetime])->fetchColumn();
-        return $d === false ? '' : (string)$d;
+        $r = $this->fetchRow($id);
+        return $r['data'] ?? '';
     }
     public function write(string $id, string $data): bool {
         $this->run('INSERT INTO php_sessions (id, data, last_activity) VALUES (?,?,?) ON DUPLICATE KEY UPDATE data = VALUES(data), last_activity = VALUES(last_activity)', [$id, $data, time()]);
         return true;
     }
     public function updateTimestamp(string $id, string $data): bool {
+        $r = $this->fetchRow($id);
+        if ($r['data'] !== null && time() - $r['last'] < 300) return true; // touched within 5 min: skip the write
         $this->run('UPDATE php_sessions SET last_activity = ? WHERE id = ?', [time(), $id]);
         return true;
     }
     public function validateId(string $id): bool {
-        return (bool)$this->run('SELECT 1 FROM php_sessions WHERE id = ? AND last_activity > ?', [$id, time() - $this->lifetime])->fetchColumn();
+        return $this->fetchRow($id)['data'] !== null;
     }
     public function destroy(string $id): bool { $this->run('DELETE FROM php_sessions WHERE id = ?', [$id]); return true; }
     public function gc(int $max_lifetime): int|false {
@@ -408,6 +419,9 @@ function ensure_payroll_controls(): void {
         }
         if (!$has('attendance', 'rev')) {
             $db->exec('ALTER TABLE attendance ADD COLUMN rev INT NOT NULL DEFAULT 0');
+        }
+        if (!$has('kasbon_requests', 'tim')) {
+            $db->exec("ALTER TABLE kasbon_requests ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER worker_id");
         }
         $_SESSION['controls_ok'] = 1;
     } catch (Throwable $e) {

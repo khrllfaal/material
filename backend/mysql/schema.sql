@@ -324,7 +324,8 @@ CREATE TABLE IF NOT EXISTS kasbon (
 CREATE TABLE IF NOT EXISTS kasbon_requests (
   id            VARCHAR(40) PRIMARY KEY,
   project_id    VARCHAR(40) NOT NULL,
-  worker_id     VARCHAR(40) NULL,                 -- NULL = atas nama grup / penanggung jawab
+  worker_id     VARCHAR(40) NULL,                 -- NULL = atas nama tim / grup / penanggung jawab
+  tim           VARCHAR(80) NOT NULL DEFAULT '',   -- nama tim bila atas nama tim
   jumlah        DECIMAL(14,2) NOT NULL,
   ket           VARCHAR(255) NOT NULL DEFAULT '',
   status        ENUM('diajukan','disetujui','ditolak') NOT NULL DEFAULT 'diajukan',
