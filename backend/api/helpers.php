@@ -399,7 +399,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
  *  fails quietly otherwise. */
 function ensure_payroll_controls(): void {
     start_session();
-    if ((int)($_SESSION['controls_ok'] ?? 0) >= 3) return; // bump the number whenever a new migration is added
+    if ((int)($_SESSION['controls_ok'] ?? 0) >= 4) return; // bump the number whenever a new migration is added
     try {
         $db = db();
         $has = function (string $table, string $col) use ($db): bool {
@@ -426,13 +426,16 @@ function ensure_payroll_controls(): void {
         if ($roleType !== '' && stripos($roleType, 'akuntan') === false) { // older databases: the Akuntan role did not exist yet
             $db->exec("ALTER TABLE users MODIFY role ENUM('admin','owner','lapangan','akuntan') NOT NULL");
         }
+        if (!$has('kasbon', 'tim')) $db->exec("ALTER TABLE kasbon ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER worker_id");
+        if (!$has('payroll_adjustments', 'tim')) $db->exec("ALTER TABLE payroll_adjustments ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER worker_id");
+        if (!$has('kasbon_requests', 'batch_id')) $db->exec("ALTER TABLE kasbon_requests ADD COLUMN batch_id VARCHAR(40) NULL AFTER tim");
         if (!$has('labor_rates', 'tim')) {
             $db->exec("ALTER TABLE labor_rates ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER project_id, ADD INDEX idx_lr_project (project_id), DROP PRIMARY KEY, ADD PRIMARY KEY (project_id, tim, grade)");
         }
         if (!$has('kasbon_requests', 'tim')) {
             $db->exec("ALTER TABLE kasbon_requests ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER worker_id");
         }
-        $_SESSION['controls_ok'] = 3;
+        $_SESSION['controls_ok'] = 4;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
     }

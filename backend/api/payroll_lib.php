@@ -150,6 +150,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         $r['status_bayar'] = $r['net'] <= 0 ? 'nol' : ($r['dibayar'] >= $r['net'] - 0.005 ? 'lunas' : ($r['dibayar'] > 0 ? 'sebagian' : 'belum'));
         $r['kosong'] = $kosong[$k] ?? 0;
         if ($r['kosong'] > 0) $r['flags'][] = 'belum_diisi';
+        if ($r['net'] < -0.005) $r['flags'][] = 'net_minus'; // deductions larger than the pay
         ksort($r['days']);
     }
     unset($r);
@@ -195,21 +196,26 @@ function payroll_totals(array $rows, array $periods): array {
     return $t;
 }
 
-/** Saldo kasbon for (project, worker|null): given - deducted. */
-function kasbon_saldo(string $projectId, ?string $workerId): float {
-    $w = $workerId === null ? 'worker_id IS NULL' : 'worker_id = ?';
-    $a = db()->prepare("SELECT COALESCE(SUM(jumlah),0) FROM kasbon WHERE project_id = ? AND $w");
-    $a->execute($workerId === null ? [$projectId] : [$projectId, $workerId]);
+/** "Tim A" stays "Tim A"; a bare name such as "Pondasi" becomes "Tim Pondasi". */
+function tim_label(string $t): string { return preg_match('/^tim\b/i', $t) ? $t : 'Tim ' . $t; }
+
+/** Saldo kasbon for (project, worker | tim | grup): given - deducted. A kasbon is "atas nama" one worker, one tim
+ *  (worker empty, tim filled) or the whole group (both empty). Repayments (pelunasan) are negative kasbon rows. */
+function kasbon_saldo(string $projectId, ?string $workerId, string $tim = ''): float {
+    if ($workerId !== null) { $cond = 'worker_id = ?'; $p = [$projectId, $workerId]; $cond2 = 'x.worker_id = ?'; }
+    elseif ($tim !== '')    { $cond = 'worker_id IS NULL AND tim = ?'; $p = [$projectId, $tim]; $cond2 = 'x.worker_id IS NULL AND x.tim = ?'; }
+    else                    { $cond = "worker_id IS NULL AND tim = ''"; $p = [$projectId]; $cond2 = "x.worker_id IS NULL AND x.tim = ''"; }
+    $a = db()->prepare("SELECT COALESCE(SUM(jumlah),0) FROM kasbon WHERE project_id = ? AND $cond");
+    $a->execute($p);
     $given = (float)$a->fetchColumn();
-    $w2 = $workerId === null ? 'x.worker_id IS NULL' : 'x.worker_id = ?';
-    $b = db()->prepare("SELECT COALESCE(SUM(x.jumlah),0) FROM payroll_adjustments x JOIN payroll_periods p ON p.id = x.period_id
-                         WHERE p.project_id = ? AND x.kategori = 'kasbon' AND x.jenis = 'potong' AND $w2");
-    $b->execute($workerId === null ? [$projectId] : [$projectId, $workerId]);
+    $b = db()->prepare("SELECT COALESCE(SUM(x.jumlah),0) FROM payroll_adjustments x JOIN payroll_periods pp ON pp.id = x.period_id
+                         WHERE pp.project_id = ? AND x.kategori = 'kasbon' AND x.jenis = 'potong' AND $cond2");
+    $b->execute($p);
     return $given - (float)$b->fetchColumn();
 }
 
-/** Saldo kasbon for many (project, worker) at once — two grouped queries instead of two per row.
- *  Keys: "projectId|workerId" (worker empty = grup). Only non-zero balances are returned. */
+/** Saldo kasbon for many at once — two grouped queries. Keys: "projectId|workerId", "projectId|t:TimName" or "projectId|" (grup).
+ *  Only non-zero balances are returned. */
 function kasbon_saldo_map(?array $projectIds): array {
     $cond = ''; $params = [];
     if ($projectIds !== null) {
@@ -217,59 +223,72 @@ function kasbon_saldo_map(?array $projectIds): array {
         $cond = ' WHERE project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')';
         $params = $projectIds;
     }
+    $key = fn($pid, $w, $t) => $pid . '|' . ($w !== '' ? $w : ($t !== '' ? 't:' . $t : ''));
     $map = [];
-    $g = db()->prepare("SELECT project_id, COALESCE(worker_id, '') AS w, SUM(jumlah) AS t FROM kasbon$cond GROUP BY project_id, w");
+    $g = db()->prepare("SELECT project_id, COALESCE(worker_id, '') AS w, tim, SUM(jumlah) AS t FROM kasbon$cond GROUP BY project_id, w, tim");
     $g->execute($params);
-    foreach ($g->fetchAll() as $r) $map[$r['project_id'] . '|' . $r['w']] = (float)$r['t'];
+    foreach ($g->fetchAll() as $r) $map[$key($r['project_id'], $r['w'], $r['w'] === '' ? $r['tim'] : '')] = ($map[$key($r['project_id'], $r['w'], $r['w'] === '' ? $r['tim'] : '')] ?? 0.0) + (float)$r['t'];
     $condP = $projectIds !== null ? ' AND p.project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')' : '';
-    $b = db()->prepare("SELECT p.project_id, COALESCE(x.worker_id, '') AS w, SUM(x.jumlah) AS t
+    $b = db()->prepare("SELECT p.project_id, COALESCE(x.worker_id, '') AS w, x.tim, SUM(x.jumlah) AS t
                           FROM payroll_adjustments x JOIN payroll_periods p ON p.id = x.period_id
-                         WHERE x.kategori = 'kasbon' AND x.jenis = 'potong'$condP GROUP BY p.project_id, w");
+                         WHERE x.kategori = 'kasbon' AND x.jenis = 'potong'$condP GROUP BY p.project_id, w, x.tim");
     $b->execute($params);
-    foreach ($b->fetchAll() as $r) { $k = $r['project_id'] . '|' . $r['w']; $map[$k] = ($map[$k] ?? 0.0) - (float)$r['t']; }
+    foreach ($b->fetchAll() as $r) { $k = $key($r['project_id'], $r['w'], $r['w'] === '' ? $r['tim'] : ''); $map[$k] = ($map[$k] ?? 0.0) - (float)$r['t']; }
     return array_filter($map, fn($v) => abs($v) > 0.005);
 }
 
-
 /** Automatic kasbon deduction for one period (what the Akuntan sees before approving, and what approval writes).
  *  Rule: kasbon given up to the end of the period is deducted; kasbon given after it waits for the next payment
- *  (the payment happening right when a kasbon is given is never reduced by it). Each person is deducted
- *  min(saldo still owed, pay of the period before this deduction) — so a zero saldo is never deducted, and
- *  what cannot be taken now carries over to the next period. Lines made earlier by this routine are ignored
- *  when recomputing, so approving twice never deducts twice. */
+ *  (a kasbon handed over after the week ended was not part of that week's pay). Each person / tim / the group is deducted
+ *  min(saldo still owed, pay of the period before this deduction) — so a zero saldo is never deducted, and what
+ *  cannot be taken now carries over to the next period. Lines made earlier by this routine are ignored when
+ *  recomputing, so approving twice never deducts twice. A tim's kasbon is taken from the pay of that tim's workers. */
 function kasbon_auto_plan(string $projectId, array $p): array {
     $db = db();
+    $kf = fn($w, $t) => $w !== '' ? $w : ($t !== '' ? 't:' . $t : '');
     $given = []; $deducted = [];
-    $g = $db->prepare("SELECT COALESCE(worker_id, '') AS w, SUM(jumlah) AS t FROM kasbon WHERE project_id = ? AND tgl <= ? GROUP BY w");
+    $g = $db->prepare("SELECT COALESCE(worker_id, '') AS w, tim, SUM(jumlah) AS t FROM kasbon WHERE project_id = ? AND tgl <= ? GROUP BY w, tim");
     $g->execute([$projectId, $p['tgl_akhir']]);
-    foreach ($g->fetchAll() as $r) $given[$r['w']] = (float)$r['t'];
+    foreach ($g->fetchAll() as $r) { $k = $kf($r['w'], $r['w'] === '' ? $r['tim'] : ''); $given[$k] = ($given[$k] ?? 0.0) + (float)$r['t']; }
     if (!$given) return ['items' => [], 'total' => 0.0];
-    $d = $db->prepare("SELECT COALESCE(x.worker_id, '') AS w, SUM(x.jumlah) AS t FROM payroll_adjustments x JOIN payroll_periods pp ON pp.id = x.period_id
+    $d = $db->prepare("SELECT COALESCE(x.worker_id, '') AS w, x.tim, SUM(x.jumlah) AS t FROM payroll_adjustments x JOIN payroll_periods pp ON pp.id = x.period_id
                         WHERE pp.project_id = ? AND x.kategori = 'kasbon' AND x.jenis = 'potong' AND NOT (x.period_id = ? AND x.label LIKE '%(otomatis)')
-                        GROUP BY w");
+                        GROUP BY w, x.tim");
     $d->execute([$projectId, $p['id']]);
-    foreach ($d->fetchAll() as $r) $deducted[$r['w']] = (float)$r['t'];
+    foreach ($d->fetchAll() as $r) { $k = $kf($r['w'], $r['w'] === '' ? $r['tim'] : ''); $deducted[$k] = ($deducted[$k] ?? 0.0) + (float)$r['t']; }
     // pay of this period before any automatic kasbon line
     $adj = [];
-    $a = $db->prepare("SELECT COALESCE(worker_id, '') AS w, jenis, SUM(jumlah) AS t FROM payroll_adjustments
-                        WHERE period_id = ? AND NOT (kategori = 'kasbon' AND label LIKE '%(otomatis)') GROUP BY w, jenis");
+    $a = $db->prepare("SELECT COALESCE(worker_id, '') AS w, tim, jenis, SUM(jumlah) AS t FROM payroll_adjustments
+                        WHERE period_id = ? AND NOT (kategori = 'kasbon' AND label LIKE '%(otomatis)') GROUP BY w, tim, jenis");
     $a->execute([$p['id']]);
-    foreach ($a->fetchAll() as $r) $adj[$r['w']][$r['jenis']] = (float)$r['t'];
+    foreach ($a->fetchAll() as $r) { $k = $kf($r['w'], $r['w'] === '' ? $r['tim'] : ''); $adj[$k][$r['jenis']] = ($adj[$k][$r['jenis']] ?? 0.0) + (float)$r['t']; }
     $calc = payroll_compute([$projectId], $p['tgl_mulai'], $p['tgl_akhir']);
-    $items = []; $left = 0.0; $total = 0.0;
+    $items = []; $total = 0.0; $leftAll = 0.0; $leftTim = [];
     foreach ($calc['rows'] as $r) {
         $w = $r['worker_id'];
         $cap = $r['gaji'] + $r['lembur_rp'] + ($adj[$w]['tambah'] ?? 0.0) - ($adj[$w]['potong'] ?? 0.0);
         $avail = max(0.0, ($given[$w] ?? 0.0) - ($deducted[$w] ?? 0.0));
         $take = $avail > 0.005 && $cap > 0.005 ? round(min($avail, $cap), 2) : 0.0;
-        $left += max(0.0, $cap - $take);
-        if ($avail > 0.005) { $items[] = ['worker_id' => $w, 'nama' => $r['nama'], 'saldo' => round($avail, 2), 'potong' => $take]; $total += $take; }
+        $rest = max(0.0, $cap - $take);
+        $leftAll += $rest; $leftTim[$r['tim']] = ($leftTim[$r['tim']] ?? 0.0) + $rest;
+        if ($avail > 0.005) { $items[] = ['worker_id' => $w, 'tim' => '', 'nama' => $r['nama'], 'saldo' => round($avail, 2), 'potong' => $take]; $total += $take; }
+    }
+    // tims: taken from that tim's workers' remaining pay
+    foreach ($given as $k => $v) {
+        if (strncmp($k, 't:', 2) !== 0) continue;
+        $tim = substr($k, 2);
+        $avail = max(0.0, $v - ($deducted[$k] ?? 0.0));
+        if ($avail <= 0.005) continue;
+        $cap = max(0.0, ($leftTim[$tim] ?? 0.0) + ($adj[$k]['tambah'] ?? 0.0) - ($adj[$k]['potong'] ?? 0.0));
+        $take = $cap > 0.005 ? round(min($avail, $cap), 2) : 0.0;
+        $leftAll -= $take; $total += $take;
+        $items[] = ['worker_id' => null, 'tim' => $tim, 'nama' => tim_label($tim), 'saldo' => round($avail, 2), 'potong' => $take];
     }
     $availG = max(0.0, ($given[''] ?? 0.0) - ($deducted[''] ?? 0.0));
     if ($availG > 0.005) {
-        $capG = max(0.0, $left + ($adj['']['tambah'] ?? 0.0) - ($adj['']['potong'] ?? 0.0));
+        $capG = max(0.0, $leftAll + ($adj['']['tambah'] ?? 0.0) - ($adj['']['potong'] ?? 0.0));
         $takeG = $capG > 0.005 ? round(min($availG, $capG), 2) : 0.0;
-        $items[] = ['worker_id' => null, 'nama' => 'Grup / penanggung jawab', 'saldo' => round($availG, 2), 'potong' => $takeG]; $total += $takeG;
+        $items[] = ['worker_id' => null, 'tim' => '', 'nama' => 'Grup / penanggung jawab', 'saldo' => round($availG, 2), 'potong' => $takeG]; $total += $takeG;
     }
     return ['items' => $items, 'total' => round($total, 2)];
 }

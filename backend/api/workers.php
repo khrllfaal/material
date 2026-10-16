@@ -59,6 +59,26 @@ if ($method === 'POST') {
         audit('update', 'workers', 'verifikasi', "$n pekerja diverifikasi");
         json_response(['ok' => true, 'diverifikasi' => $n]);
     }
+    // Merge or rename a tim everywhere (workers, tim rates, kasbon, open periods) so nothing is orphaned.
+    if (($b['action'] ?? '') === 'rename_tim') {
+        if ($isField) json_error('Anda tidak punya akses untuk aksi ini.', 403);
+        $pid = (string)($b['project_id'] ?? ''); $dari = trim((string)($b['dari'] ?? '')); $ke = trim((string)($b['ke'] ?? ''));
+        if ($pid === '' || $dari === '' || $ke === '' || mb_strlen($ke) > 80) json_error('Isi tim asal dan nama tim baru (maksimal 80 karakter).', 422);
+        if ($dari === $ke) json_error('Nama tim baru sama dengan yang lama.', 422);
+        require_project_access($user, $pid);
+        $db = db(); $db->beginTransaction();
+        $n = $db->prepare('UPDATE workers SET tim = ? WHERE project_id = ? AND tim = ?'); $n->execute([$ke, $pid, $dari]); $nw = $n->rowCount();
+        $db->prepare('UPDATE IGNORE labor_rates SET tim = ? WHERE project_id = ? AND tim = ?')->execute([$ke, $pid, $dari]);
+        $db->prepare('DELETE FROM labor_rates WHERE project_id = ? AND tim = ?')->execute([$pid, $dari]); // the target already had its own rate
+        $db->prepare('UPDATE kasbon SET tim = ? WHERE project_id = ? AND worker_id IS NULL AND tim = ?')->execute([$ke, $pid, $dari]);
+        $db->prepare('UPDATE kasbon_requests SET tim = ? WHERE project_id = ? AND worker_id IS NULL AND tim = ?')->execute([$ke, $pid, $dari]);
+        $db->prepare('UPDATE payroll_adjustments x JOIN payroll_periods p ON p.id = x.period_id SET x.tim = ? WHERE p.project_id = ? AND x.worker_id IS NULL AND x.tim = ?')->execute([$ke, $pid, $dari]);
+        $db->prepare("UPDATE attendance a JOIN payroll_periods p ON p.project_id = a.project_id AND a.tgl BETWEEN p.tgl_mulai AND p.tgl_akhir
+                         SET a.tim = ? WHERE a.project_id = ? AND a.tim = ? AND p.status <> 'dibayar'")->execute([$ke, $pid, $dari]); // paid weeks keep the name they were paid under
+        $db->commit();
+        audit('update', 'workers', $pid, "tim '$dari' -> '$ke' ($nw pekerja)");
+        json_response(['ok' => true, 'pekerja' => $nw]);
+    }
     $id = (string)($b['id'] ?? '');
     $projectId = (string)($b['project_id'] ?? '');
     $nama = trim(preg_replace('/\s+/u', ' ', (string)($b['nama'] ?? '')));
@@ -69,6 +89,10 @@ if ($method === 'POST') {
     if (!isset(WORKER_GRADES[$grade])) json_error('Status pekerja tidak valid.', 422);
     if (mb_strlen($tim) > 80) json_error('Nama tim terlalu panjang.', 422);
     require_project_access($user, $projectId);
+    if ($tim !== '') { // "tim a" / "Tim A " must not become a second team: reuse the spelling already in this project
+        $tq = db()->prepare('SELECT tim FROM workers WHERE project_id = ? AND tim <> \'\' GROUP BY tim'); $tq->execute([$projectId]);
+        foreach ($tq->fetchAll() as $t0) if (norm_name($t0['tim']) === norm_name($tim)) { $tim = $t0['tim']; break; }
+    }
 
     $exists = null;
     if ($id !== '') {

@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS payroll_adjustments (
   id            VARCHAR(40) PRIMARY KEY,
   period_id     VARCHAR(80) NOT NULL,
   worker_id     VARCHAR(40) NULL,
+  tim           VARCHAR(80) NOT NULL DEFAULT '',   -- baris milik satu tim (mis. potong kasbon tim)
   jenis         ENUM('tambah','potong') NOT NULL,
   kategori      VARCHAR(20) NOT NULL DEFAULT 'lainnya', -- kasbon, potongan, bonus, tambahan
   label         VARCHAR(160) NOT NULL,
@@ -310,6 +311,7 @@ CREATE TABLE IF NOT EXISTS kasbon (
   id            VARCHAR(40) PRIMARY KEY,
   project_id    VARCHAR(40) NOT NULL,
   worker_id     VARCHAR(40) NULL,
+  tim           VARCHAR(80) NOT NULL DEFAULT '',   -- kasbon atas nama tim (worker_id kosong)
   tgl           DATE NOT NULL,
   jumlah        DECIMAL(14,2) NOT NULL,
   ket           VARCHAR(255) NOT NULL DEFAULT '',
@@ -327,6 +329,7 @@ CREATE TABLE IF NOT EXISTS kasbon_requests (
   project_id    VARCHAR(40) NOT NULL,
   worker_id     VARCHAR(40) NULL,                 -- NULL = atas nama tim / grup / penanggung jawab
   tim           VARCHAR(80) NOT NULL DEFAULT '',   -- nama tim bila atas nama tim
+  batch_id      VARCHAR(40) NULL,                  -- satu pengajuan berisi beberapa tim/pekerja
   jumlah        DECIMAL(14,2) NOT NULL,
   ket           VARCHAR(255) NOT NULL DEFAULT '',
   status        ENUM('diajukan','disetujui','ditolak') NOT NULL DEFAULT 'diajukan',

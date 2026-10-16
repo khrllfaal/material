@@ -6,7 +6,7 @@ Options -Indexes
 
 # Project files that must never be downloadable.
 RedirectMatch 403 ^/(docs|scripts|\.git)(/|$)
-<FilesMatch "\.(sql|md|sample|sh)$">
+<FilesMatch "\.(sql|gz|md|sample|sh|bak|zip|log)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>

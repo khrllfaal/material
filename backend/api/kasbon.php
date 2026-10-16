@@ -17,13 +17,17 @@ if ($method === 'GET') {
            JOIN projects p ON p.id = k.project_id LEFT JOIN workers w ON w.id = k.worker_id ORDER BY k.tgl DESC, k.created_at DESC")->fetchAll();
     $out = [];
     foreach ($rows as $r) { $r['jumlah'] = (float)$r['jumlah']; $out[] = $r; }
+    $pn = []; foreach (db()->query('SELECT id, nama FROM projects')->fetchAll() as $r) $pn[$r['id']] = $r['nama'];
+    $wn = []; foreach (db()->query('SELECT id, nama FROM workers')->fetchAll() as $r) $wn[$r['id']] = $r['nama'];
     $saldo = [];
-    foreach ($out as $r) {
-        $k = $r['project_id'] . '|' . ($r['worker_id'] ?? '');
-        if (!isset($saldo[$k])) $saldo[$k] = ['project_id' => $r['project_id'], 'project_nama' => $r['project_nama'], 'worker_id' => $r['worker_id'],
-            'nama' => $r['worker_nama'] ?? 'Grup / penanggung jawab', 'saldo' => kasbon_saldo($r['project_id'], $r['worker_id'])];
+    foreach (kasbon_saldo_map(null) as $key => $v) {
+        [$pid, $who] = explode('|', $key, 2);
+        $isTim = strncmp($who, 't:', 2) === 0;
+        $saldo[] = ['project_id' => $pid, 'project_nama' => $pn[$pid] ?? $pid, 'worker_id' => ($who !== '' && !$isTim) ? $who : null,
+                    'tim' => $isTim ? substr($who, 2) : '', 'nama' => $isTim ? tim_label(substr($who, 2)) : ($who !== '' ? ($wn[$who] ?? $who) : 'Grup / penanggung jawab'), 'saldo' => round($v, 2)];
     }
-    json_response(['kasbon' => $out, 'saldo' => array_values($saldo)]);
+    usort($saldo, fn($a, $b) => [$a['project_nama'], $a['nama']] <=> [$b['project_nama'], $b['nama']]);
+    json_response(['kasbon' => $out, 'saldo' => $saldo]);
 }
 
 if ($method === 'POST') {
@@ -31,13 +35,22 @@ if ($method === 'POST') {
     $projectId = (string)($b['project_id'] ?? '');
     $tgl = require_valid_date($b['tgl'] ?? '', 'Tanggal kasbon');
     $jumlah = money_in($b['jumlah'] ?? null, 'Jumlah');
+    $pelunasan = (string)($b['jenis'] ?? '') === 'pelunasan'; // the worker / tim hands cash back (e.g. the project ended with a balance)
     if ($projectId === '' || $jumlah <= 0) json_error('Proyek dan jumlah wajib diisi.', 422);
     $workerId = !empty($b['worker_id']) ? (string)$b['worker_id'] : null;
-    if ($workerId) { $w = db()->prepare('SELECT 1 FROM workers WHERE id = ?'); $w->execute([$workerId]); if (!$w->fetchColumn()) json_error('Pekerja tidak ditemukan.', 422); }
+    $tim = $workerId === null ? mb_substr(trim((string)($b['tim'] ?? '')), 0, 80) : '';
+    if ($workerId) { $w = db()->prepare('SELECT project_id FROM workers WHERE id = ?'); $w->execute([$workerId]); $wp = $w->fetchColumn(); if ($wp === false) json_error('Pekerja tidak ditemukan.', 422); if ($wp !== $projectId) json_error('Pekerja bukan bagian dari proyek ini.', 422); }
+    if ($tim !== '') { $tq = db()->prepare('SELECT 1 FROM workers WHERE project_id = ? AND tim = ? LIMIT 1'); $tq->execute([$projectId, $tim]); if (!$tq->fetchColumn()) json_error('Tim tidak ditemukan di proyek ini.', 422); }
+    if ($pelunasan) {
+        $saldo = kasbon_saldo($projectId, $workerId, $tim);
+        if ($jumlah > $saldo + 0.005) json_error('Pelunasan melebihi saldo kasbon (' . number_format(max(0, $saldo), 0, ',', '.') . ').', 422);
+    }
     $id = new_id('ksb_');
-    db()->prepare('INSERT INTO kasbon (id, project_id, worker_id, tgl, jumlah, ket, created_by) VALUES (?,?,?,?,?,?,?)')
-        ->execute([$id, $projectId, $workerId, $tgl, $jumlah, mb_substr(trim((string)($b['ket'] ?? '')), 0, 255), $user['id']]);
-    audit('create', 'kasbon', $id, (string)$jumlah);
+    $ket = mb_substr(trim((string)($b['ket'] ?? '')), 0, 240);
+    if ($pelunasan) $ket = 'Pelunasan' . ($ket !== '' ? ': ' . $ket : '');
+    db()->prepare('INSERT INTO kasbon (id, project_id, worker_id, tim, tgl, jumlah, ket, created_by) VALUES (?,?,?,?,?,?,?,?)')
+        ->execute([$id, $projectId, $workerId, $tim, $tgl, $pelunasan ? -$jumlah : $jumlah, $ket, $user['id']]);
+    audit('create', 'kasbon', $id, ($pelunasan ? 'pelunasan ' : '') . $jumlah);
     json_response(['ok' => true, 'id' => $id]);
 }
 
@@ -46,7 +59,7 @@ if ($method === 'DELETE') {
     $st = db()->prepare('SELECT * FROM kasbon WHERE id = ?'); $st->execute([$id]);
     $k = $st->fetch();
     if (!$k) json_error('Data tidak ditemukan.', 404);
-    if (kasbon_saldo($k['project_id'], $k['worker_id']) - (float)$k['jumlah'] < -0.005) {
+    if ((float)$k['jumlah'] > 0 && kasbon_saldo($k['project_id'], $k['worker_id'], (string)$k['tim']) - (float)$k['jumlah'] < -0.005) {
         json_error('Kasbon ini sudah dipotong dari gaji, jadi tidak bisa dihapus.', 409);
     }
     db()->prepare('DELETE FROM kasbon WHERE id = ?')->execute([$id]);

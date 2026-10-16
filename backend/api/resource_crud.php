@@ -87,16 +87,23 @@ function handle_resource_crud(string $table, array $columns, string $idColumn = 
         // list. Count them first so the audit log records what went.
         $detail = '';
         if ($table === 'projects') {
-            // Stock history may cascade (the owner asked for that) but MONEY never silently disappears:
-            // a project with attendance, wage payments or kasbon cannot be deleted.
-            $blockers = [];
+            // A project that has attendance, wage payments or kasbon can still be deleted, but only on purpose:
+            // the admin must type the exact project name (a mistaken tap can never wipe money records).
+            $cnt = [];
             foreach (['attendance' => 'absen', 'kasbon' => 'kasbon'] as $t => $label) {
                 $c = db()->prepare("SELECT COUNT(*) FROM `$t` WHERE project_id = ?"); $c->execute([$id]);
-                if ((int)$c->fetchColumn() > 0) $blockers[] = $label;
+                $n = (int)$c->fetchColumn(); if ($n > 0) $cnt[$label] = $n;
             }
             $c = db()->prepare('SELECT COUNT(*) FROM payroll_payments pp JOIN payroll_periods p ON p.id = pp.period_id WHERE p.project_id = ?'); $c->execute([$id]);
-            if ((int)$c->fetchColumn() > 0) $blockers[] = 'pembayaran gaji';
-            if ($blockers) json_error('Proyek ini tidak bisa dihapus karena sudah punya data ' . implode(', ', array_unique($blockers)) . '. Data gaji dan kasbon tidak boleh hilang; hubungi pengembang bila memang harus dikosongkan.', 409);
+            $n = (int)$c->fetchColumn(); if ($n > 0) $cnt['pembayaran gaji'] = $n;
+            if ($cnt) {
+                $nm = db()->prepare('SELECT nama FROM projects WHERE id = ?'); $nm->execute([$id]);
+                $nama = (string)$nm->fetchColumn();
+                if (trim((string)($_GET['konfirmasi'] ?? '')) !== $nama || $nama === '') {
+                    json_response(['error' => 'Proyek ini punya data ' . implode(', ', array_keys($cnt)) . '. Ketik nama proyek untuk memastikan penghapusan.',
+                                   'butuh_konfirmasi' => true, 'nama' => $nama, 'ringkasan' => $cnt], 409);
+                }
+            }
         }
         if ($table === 'projects' || $table === 'materials') {
             $col = $table === 'projects' ? 'project_id' : 'material_id';
@@ -106,7 +113,7 @@ function handle_resource_crud(string $table, array $columns, string $idColumn = 
                 $c->execute([$id]);
                 $n[] = "$t=" . (int)$c->fetchColumn();
             }
-            $detail = 'cascade: ' . implode(', ', $n);
+            $detail = 'cascade: ' . implode(', ', $n) . (!empty($cnt) ? ' | DATA GAJI IKUT TERHAPUS: ' . json_encode($cnt, JSON_UNESCAPED_UNICODE) : '');
         }
         $stmt = db()->prepare("DELETE FROM `$table` WHERE `$idColumn` = ?");
         $stmt->execute([$id]);

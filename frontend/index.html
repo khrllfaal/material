@@ -114,7 +114,7 @@
           </div>
           <div class="border-t border-slate-100"></div>
           <button id="btnGuide" type="button" class="w-full flex items-center gap-2.5 px-5 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left">
-            <i data-lucide="help-circle" class="w-4 h-4 text-slate-400"></i> Panduan Singkat
+            <i data-lucide="help-circle" class="w-4 h-4 text-slate-400"></i> Buku Panduan (PDF)
           </button>
           <div class="border-t border-slate-100"></div>
           <button id="btnProfil" type="button" class="w-full flex items-center gap-2.5 px-5 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left">
@@ -143,7 +143,7 @@
     </div>
     <div class="flex items-center gap-3">
       <span id="mSync" class="hidden"></span>
-      <button id="mBtnGuide" type="button" class="text-emerald-700 bg-emerald-50 rounded-full w-9 h-9 flex items-center justify-center" aria-label="Panduan singkat"><i data-lucide="help-circle" class="w-5 h-5"></i></button>
+      <button id="mBtnGuide" type="button" class="text-emerald-700 bg-emerald-50 rounded-full w-9 h-9 flex items-center justify-center" aria-label="Buku panduan (PDF)"><i data-lucide="help-circle" class="w-5 h-5"></i></button>
       <button id="mBtnLogout" class="text-slate-400 hover:text-red-600 transition flex items-center gap-1 text-xs font-semibold">
       <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
     </button>
@@ -223,7 +223,7 @@ function apiFetch(path, opts){
     var data = {}; try{ data = await res.json(); }catch(e){}
     if(!res.ok){
       var err = new Error(data.error || ('HTTP '+res.status));
-      err.status = res.status;
+      err.status = res.status; err.data = data;
       if(res.status === 401 && !/auth_login|auth_me|auth_logout/.test(path)){ err.auth = true; }
       throw err;
     }
@@ -600,54 +600,10 @@ apiFetch('/auth_me.php').then(function(res){ if(res.user){ saveUser(res.user); b
   if(cached && cached.role==='lapangan') boot(cached);
 });
 
-/* Short, role-specific "how do I start" guide. Shown once at the first login of each person and
-   available any time from the ? button (phone) or the account menu (desktop). */
-var GUIDES = {
-  lapangan:{title:'Panduan Admin Lapangan', lead:'Tugas harian Anda cuma 3: absen, ajukan di akhir minggu, dan catat bahan.', steps:[
-    ['calendar-days','Pilih proyek & tanggal','Proyek ada di bagian atas. Ketuk tanggal untuk memilih hari lain (boleh mengisi hari yang terlewat).'],
-    ['check-check','Absen dalam 3 langkah','Tab Absen → ketuk Semua hadir → ubah yang berbeda saja (½ atau ✕, ketuk nama untuk lembur) → Simpan Absen.'],
-    ['send','Ajukan di akhir minggu','Tombol besar Ajukan: hijau = siap, kuning = ada hari belum lengkap. Hari tanpa kerja? Ketuk Tandai libur.'],
-    ['banknote','Kasbon & pekerja baru','Tombol Kasbon (atas nama tim atau pekerja, 1× per minggu) dan Pekerja untuk menambah orang. Gaji tidak terlihat oleh Anda.'],
-    ['truck','Bahan masuk & pemakaian','Tab Bahan: Masuk, Pakai, Stok, Riwayat. Bahan belum ada? Ketuk Bahan baru di atas kolom Material.']]},
-  akuntan:{title:'Panduan Akuntan', lead:'Alurnya satu arah: lapangan mengajukan → Anda periksa & setujui → Anda bayar.', steps:[
-    ['send','Pengajuan & Approval','Mulai dari sini. Kartu merah = harus dibayar sekarang, kartu kuning = menunggu persetujuan Anda.'],
-    ['check-circle-2','Periksa → Setujui → Bayar','Periksa & Setujui menampilkan total, rincian per tim, dan potongan kasbon otomatis. Lalu Catat Pembayaran.'],
-    ['banknote','Kasbon','Tab Kasbon: setujui atau tolak pengajuan. Setelah disetujui, saldo dipotong otomatis dari gaji sampai lunas; saldo nol tidak dipotong.'],
-    ['book-open','Rekap & Pembukuan','Rincian per pekerja, jurnal debit/kredit, buku kasbon, dan evaluasi kehadiran. Semua bisa diunduh Excel/PDF.'],
-    ['hard-hat','Pekerja & Tarif','Isi tarif per status. Tim dengan upah berbeda? Isi kolom tim — kosong berarti ikut tarif standar.']]},
-  admin:{title:'Panduan Admin Pusat', lead:'Anda mengelola data dan mengoreksi; persetujuan & pembayaran gaji dilakukan Akuntan.', steps:[
-    ['briefcase','Data master','Master Proyek, Bahan, Pekerjaan, dan RAP ada di grup Data Master.'],
-    ['users','Kelola User','Buat akun Owner, Akuntan, dan Admin Lapangan, lalu tugaskan proyeknya.'],
-    ['hard-hat','Tenaga Kerja','Pengajuan & Approval (koreksi, tambahan/potongan), Rekap & Pembukuan, serta Pekerja & Tarif (tarif per tim).'],
-    ['layout-dashboard','Dashboard & laporan','Pantau stok, RAP, dan tenaga kerja. Semua tabel bisa difilter dan diunduh.'],
-    ['history','Log Aktivitas','Siapa mengubah apa dan kapan, termasuk perubahan setelah diajukan.']]},
-  owner:{title:'Panduan Owner', lead:'Anda memantau; semua layar bersifat hanya-baca.', steps:[
-    ['layout-dashboard','Dashboard','Ringkasan stok, pemakaian bahan, dan biaya tenaga kerja. Gunakan filter proyek dan tanggal.'],
-    ['wallet','Tenaga Kerja','Pengajuan & Approval untuk memantau status gaji dan kasbon; Rekap & Pembukuan untuk jurnal dan evaluasi kehadiran.'],
-    ['file-down','Unduh laporan','Tombol Excel / PDF ada di tiap halaman laporan.'],
-    ['history','Log Aktivitas','Jejak semua perubahan data.']]},
-};
-function showGuide(){
-  var role = STATE.user && STATE.user.role, g = GUIDES[role]; if(!g) return;
-  openModal(g.title,
-    '<div class="text-sm text-slate-600 mb-4">'+esc(g.lead)+'</div><div class="space-y-3">'+
-    g.steps.map(function(x, i){ return '<div class="flex gap-3"><div class="shrink-0 w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><i data-lucide="'+x[0]+'" class="w-4.5 h-4.5"></i></div>'+
-      '<div class="min-w-0"><div class="text-sm font-bold text-slate-800 leading-tight">'+(i+1)+'. '+esc(x[1])+'</div><div class="text-[13px] text-slate-500 mt-0.5 leading-snug">'+esc(x[2])+'</div></div></div>'; }).join('')+
-    '</div><div class="text-[11px] text-slate-400 mt-4">Panduan ini bisa dibuka lagi kapan saja lewat tombol <b>?</b> (HP) atau menu akun → Panduan Singkat (komputer).</div>',
-    function(){ closeModal(); });
-  var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Mengerti';
-  var cb = document.getElementById('mCancel'); if(cb) cb.style.display = 'none';
-  icons();
-}
-function guideOnce(user){
-  var key = 'ms_guide_seen_'+user.id;
-  if(navigator.webdriver && !lsGet('ms_guide_force', false)) return; // automated test browsers skip the welcome card
-  if(lsGet(key, false)) return;
-  lsSet(key, true);
-  setTimeout(function(){ if(STATE.user && STATE.user.id===user.id) showGuide(); }, 900);
-}
-document.getElementById('btnGuide').onclick = function(){ document.getElementById('userMenu').classList.add('hidden'); showGuide(); };
-document.getElementById('mBtnGuide').onclick = showGuide;
+/* The user handbook is a PDF (Buku_Panduan.pdf, next to index.html) — no pop-ups; just a link. */
+function openHandbook(){ window.open('Buku_Panduan.pdf', '_blank', 'noopener'); }
+document.getElementById('btnGuide').onclick = function(){ document.getElementById('userMenu').classList.add('hidden'); openHandbook(); };
+document.getElementById('mBtnGuide').onclick = openHandbook;
 
 function boot(user){
   STATE.user = user;
@@ -657,7 +613,6 @@ function boot(user){
     document.getElementById('mobileShell').classList.remove('hidden');
     document.getElementById('mobileShell').classList.add('flex');
     bootMobile(user);
-    guideOnce(user);
   } else {
     document.getElementById('mobileShell').classList.add('hidden');
     document.getElementById('desktopShell').classList.remove('hidden');
@@ -675,7 +630,6 @@ function boot(user){
     icons();
     go(user.role==='akuntan' ? 'pengajuan' : 'dashboard');
     refreshKasbonBadge();
-    guideOnce(user);
   }
 }
 
@@ -1151,6 +1105,18 @@ function masterPage(cfg){
       apiFetch(cfg.endpoint).then(function(data){ rows=data; draw(); })
         .catch(function(e){ document.getElementById('tbl').innerHTML=''; toast('Gagal memuat: '+e.message, true); });
     }
+    function delProjectForced(id, e){
+      var d = e.data || {}, rs = d.ringkasan || {};
+      openModal('Hapus Proyek — Konfirmasi',
+        '<div class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 mb-3"><b>Proyek ini sudah punya data uang:</b> '+Object.keys(rs).map(function(k){ return esc(k)+' ('+rs[k]+')'; }).join(', ')+'. Menghapus proyek <b>menghapus semuanya</b> dan tidak bisa dibatalkan (tercatat di Log Aktivitas).</div>'+
+        '<label class="block text-xs font-semibold text-slate-500 mb-1.5">Ketik nama proyek persis untuk menghapus:</label><div class="text-sm font-bold mb-2">'+esc(d.nama||'')+'</div><input id="dp_nama" type="text" autocomplete="off" class="'+fieldCls+'" placeholder="Nama proyek">',
+        function(){
+          if(fv('dp_nama') !== (d.nama||'')){ toast('Nama proyek tidak sama.', true); return; }
+          apiFetch(cfg.endpoint+'?id='+encodeURIComponent(id)+'&konfirmasi='+encodeURIComponent(d.nama), {method:'DELETE'})
+            .then(function(){ closeModal(); toast('Proyek dihapus.'); refresh(); }).catch(function(e2){ toast('Gagal menghapus: '+e2.message, true); });
+        });
+      var sv = document.getElementById('mSave'); if(sv){ sv.textContent = 'Hapus Permanen'; sv.className = sv.className.replace('bg-indigo-600 hover:bg-indigo-700','bg-red-600 hover:bg-red-700'); }
+    }
     function del(id){
       var cascade = /\/(projects|materials)\.php/.test(cfg.endpoint);
       confirmModal('Hapus Data', cascade
@@ -1158,7 +1124,7 @@ function masterPage(cfg){
         : 'Yakin mau menghapus data ini? Tindakan ini tidak bisa dibatalkan.', function(){
         apiFetch(cfg.endpoint+'?id='+encodeURIComponent(id), {method:'DELETE'})
           .then(function(){ toast('Data dihapus.'); refresh(); })
-          .catch(function(e){ toast('Gagal menghapus: '+e.message, true); });
+          .catch(function(e){ if(e.data && e.data.butuh_konfirmasi){ delProjectForced(id, e); return; } toast('Gagal menghapus: '+e.message, true); });
       });
     }
     function form(id){
@@ -2313,7 +2279,7 @@ function rp(n){ n = Number(n)||0; return (n<0?'−':'')+'Rp '+Math.abs(Math.roun
 function canWritePay(){ return !!(STATE.user && (STATE.user.role==='admin' || STATE.user.role==='akuntan')); }
 var HARI_ABBR = ['MG','SN','SL','RB','KM','JM','SB'];
 var PAY_BADGE = {lunas:['aman','Lunas'], sebagian:['warn','Sebagian'], belum:['danger','Belum dibayar'], nol:['neutral','—']};
-var FLAG_LABEL = {tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan'};
+var FLAG_LABEL = {net_minus:'Gaji minus: potongan lebih besar dari gaji', tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan'};
 function fmtHariVal(v){ return v===1 ? '1' : (v===0.5 ? '½' : (v>0 ? String(v).replace('.',',') : '–')); }
 function datesBetween(from, to, max){ var out=[], d=from; while(d<=to && out.length<(max||62)){ out.push(d); d=addDays(d,1); } return out; }
 function periodStatusBadge(st){ var m = PERIOD_STATUS[st]||PERIOD_STATUS.draft; return badge(m[0], m[1]); }
@@ -2582,7 +2548,9 @@ function payrollView(c, mode){
     });
     ((G.shared.ledger && G.shared.ledger.kasbon) || []).forEach(function(k){
       if((proj && k.project_id!==proj) || k.tgl<G.from || k.tgl>G.to) return;
-      ev.push({tgl:k.tgl, ket:'Kasbon diberikan · '+(k.worker_nama||'Grup / penanggung jawab')+' · '+k.project_nama, lines:[['Piutang Kasbon', k.jumlah, 0],['Kas', 0, k.jumlah]]});
+      var nm = k.worker_nama || (k.tim ? timLabel(k.tim) : 'Grup / penanggung jawab');
+      if(k.jumlah < 0) ev.push({tgl:k.tgl, ket:'Pelunasan kasbon · '+nm+' · '+k.project_nama, lines:[['Kas', -k.jumlah, 0],['Piutang Kasbon', 0, -k.jumlah]]});
+      else ev.push({tgl:k.tgl, ket:'Kasbon diberikan · '+nm+' · '+k.project_nama, lines:[['Piutang Kasbon', k.jumlah, 0],['Kas', 0, k.jumlah]]});
     });
     ev.sort(function(a,b){ return a.tgl<b.tgl ? -1 : (a.tgl>b.tgl ? 1 : 0); });
     var rows = [], n = 0, D = 0, K = 0;
@@ -2707,7 +2675,7 @@ function payrollView(c, mode){
     } else if(G.tab==='kasbon'){
       bindExportBtns('Buku_Kasbon_'+G.from+'_sd_'+G.to, 'Buku Kasbon', sub, ['Tanggal','Proyek','Atas nama','Jumlah','Keterangan'], function(){
         var proj = fv('fProj');
-        return ((G.shared.ledger && G.shared.ledger.kasbon) || []).filter(function(k){ return (!proj || k.project_id===proj) && k.tgl>=G.from && k.tgl<=G.to; }).map(function(k){ return [k.tgl, k.project_nama, k.worker_nama||'Grup / penanggung jawab', Math.round(k.jumlah), k.ket]; });
+        return ((G.shared.ledger && G.shared.ledger.kasbon) || []).filter(function(k){ return (!proj || k.project_id===proj) && k.tgl>=G.from && k.tgl<=G.to; }).map(function(k){ return [k.tgl, k.project_nama, k.worker_nama||(k.tim?timLabel(k.tim):'Grup / penanggung jawab'), Math.round(k.jumlah), k.ket]; });
       }, null, null);
     } else if(G.tab==='buku'){
       bindExportBtns('Jurnal_Upah_'+G.from+'_sd_'+G.to, 'Jurnal Upah & Kasbon', sub, JURNAL_HEAD, function(){ return buildJurnalExport(buildJurnal()); }, null, null);
@@ -2724,7 +2692,7 @@ function payrollView(c, mode){
       var mini = function(l, v, cls){ return '<div><div class="text-[11px] font-semibold text-slate-400">'+l+'</div><div class="text-[15px] font-extrabold tabular-nums '+(cls||'text-slate-800')+'">'+v+'</div></div>'; };
       var adjRows = p.adjustments.map(function(x){
         return '<tr class="border-t border-slate-100"><td class="py-2 pr-3 text-sm">'+esc(x.label)+(x.kategori==='kasbon'?' <span class="text-[11px] font-bold text-red-500">kasbon</span>':'')+'</td>'+
-          '<td class="py-2 pr-3 text-xs text-slate-500">'+(x.worker_nama?esc(x.worker_nama):'Seluruh grup')+'</td>'+
+          '<td class="py-2 pr-3 text-xs text-slate-500">'+(x.worker_nama?esc(x.worker_nama):(x.tim?esc(timLabel(x.tim)):'Seluruh grup'))+'</td>'+
           '<td class="py-2 pr-3 text-right tabular-nums font-bold '+(x.jenis==='tambah'?'text-emerald-600':'text-red-600')+'">'+(x.jenis==='tambah'?'+':'−')+rp(x.jumlah).replace('Rp ','Rp ')+'</td>'+
           '<td class="py-2 text-right">'+(write && !locked?'<button class="text-xs text-slate-300 hover:text-red-600 font-bold" data-adj-del="'+esc(x.id)+'" title="Hapus">✕</button>':'')+'</td></tr>';
       }).join('');
@@ -2736,7 +2704,7 @@ function payrollView(c, mode){
       if(write && !locked) acts += btn('data-pj-adj="'+esc(p.id)+'"','plus','Tambahan / Potongan');
       if(isAk && p.status==='draft') acts += btn('data-pj-ajukan="'+esc(p.id)+'"','send','Ajukan (atas nama lapangan)');
       if(isAk && (p.status==='diajukan' || p.status==='disetujui') && !p.payments.length) acts += btn('data-pj-kembali="'+esc(p.id)+'"','','Kembalikan ke lapangan');
-      if(write && !locked) acts += btn('data-pj-head="'+esc(p.id)+'"','','Ubah PJ / grup');
+      if(write && !locked) acts += btn('data-pj-head="'+esc(p.id)+'"','','Ubah PJ');
       acts += btn('data-pj-xls="'+esc(p.id)+'"','file-down','Absen Upah (Excel)');
       acts += btn('data-pj-pdf="'+esc(p.id)+'"','file-text','Daftar Bayar (PDF)');
       if(p.status==='disetujui' || p.status==='dibayar') acts += btn('data-pj-trf="'+esc(p.id)+'"','banknote','Daftar Transfer (Excel)');
@@ -2772,14 +2740,13 @@ function payrollView(c, mode){
       .catch(function(e){ toast(e.message, true); });
   }
   function openHeader(p){
-    openModal('Penanggung Jawab & Grup',
+    openModal('Penanggung Jawab',
       '<div class="space-y-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Penanggung jawab</label><input id="hd_pj" type="text" value="'+esc(p.pj_nama)+'" class="'+fieldCls+'"></div>'+
-      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama grup</label><input id="hd_grup" type="text" value="'+esc(p.grup_nama)+'" class="'+fieldCls+'"></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Catatan</label><input id="hd_cat" type="text" value="'+esc(p.catatan)+'" class="'+fieldCls+'"></div></div>',
-      function(){ post('/payroll_periods.php', {action:'header', project_id:p.project_id, tgl:p.tgl_mulai, pj_nama:fv('hd_pj'), grup_nama:fv('hd_grup'), catatan:fv('hd_cat')}, 'Disimpan.'); });
+      function(){ post('/payroll_periods.php', {action:'header', project_id:p.project_id, tgl:p.tgl_mulai, pj_nama:fv('hd_pj'), catatan:fv('hd_cat')}, 'Disimpan.'); });
   }
   function doAjukan(p){
-    if(!p.pj_nama){ toast('Isi penanggung jawab dulu lewat "Ubah PJ / grup".', true); return; }
+    if(!p.pj_nama){ toast('Isi penanggung jawab dulu lewat "Ubah PJ".', true); return; }
     confirmModal('Ajukan Periode','Tandai absen periode ini sebagai <b>diajukan</b>? Setelah itu lapangan tidak bisa mengubahnya dan akuntan bisa mencatat pembayaran.', function(){
       post('/payroll_periods.php', {action:'ajukan', project_id:p.project_id, tgl:p.tgl_mulai, pj_nama:p.pj_nama, grup_nama:p.grup_nama}, 'Periode diajukan.');
     });
@@ -2839,7 +2806,8 @@ function payrollView(c, mode){
   }
   function openAdjustment(p){
     var ws = G.data.rows.filter(function(r){ return r.project_id===p.project_id; });
-    var optsW = '<option value="">Seluruh grup (satu angka untuk semua)</option>'+ws.map(function(r){ return '<option value="'+esc(r.worker_id)+'">'+esc(r.nama)+' · '+esc(r.grade_nama)+'</option>'; }).join('');
+    var timsHere = Array.from(new Set(ws.map(function(r){ return r.tim||''; }))).filter(function(x){ return x; }).sort();
+    var optsW = '<option value="">Seluruh grup (satu angka untuk semua)</option>'+timsHere.map(function(t){ return '<option value="t:'+esc(t)+'">'+esc(timLabel(t))+' (seluruh tim)</option>'; }).join('')+ws.map(function(r){ return '<option value="'+esc(r.worker_id)+'">'+esc(r.nama)+' · '+esc(r.grade_nama)+'</option>'; }).join('');
     openModal('Tambahan / Potongan — '+p.project_nama,
       '<div class="space-y-4">'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis</label><select id="ad_kat" class="'+fieldCls+'">'+
@@ -2855,7 +2823,8 @@ function payrollView(c, mode){
       function(){
         var kp = fv('ad_kat').split('|'), qty = parseIdNum(fv('ad_qty')), harga = parseIdNum(fv('ad_harga')), jum = parseIdNum(fv('ad_jumlah'));
         if(!fv('ad_label')){ toast('Keterangan wajib diisi.', true); return; }
-        var body = {project_id:p.project_id, tgl:p.tgl_mulai, jenis:kp[1], kategori:kp[0], label:fv('ad_label'), worker_id:fv('ad_w')||null};
+        var who = fv('ad_w');
+        var body = {project_id:p.project_id, tgl:p.tgl_mulai, jenis:kp[1], kategori:kp[0], label:fv('ad_label'), worker_id:(who && who.indexOf('t:')!==0) ? who : null, tim: who.indexOf('t:')===0 ? who.slice(2) : ''};
         if(!Number.isNaN(qty) && !Number.isNaN(harga)){ body.qty = qty; body.harga = harga; }
         else if(!Number.isNaN(jum)) body.jumlah = jum;
         else { toast('Isi Qty × Harga atau Jumlah.', true); return; }
@@ -3104,7 +3073,7 @@ PAGES.pekerja = function(c){
         (write ? '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>Pekerja</button>' : '')+'</div>')+
     '<div id="wkCards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>'+
     panel('<div class="flex items-center justify-between flex-wrap gap-3 mb-1"><div class="font-extrabold text-slate-800">Tarif upah</div>'+
-      '<select id="trProj" class="'+selCls+' min-w-[220px]"></select></div>'+
+      '<div class="flex items-center gap-2 flex-wrap">'+(write ? '<button class="'+btnGhostSm+'" id="btnRenameTim" title="Ganti nama atau gabungkan tim">Ganti nama / gabung tim</button>' : '')+'<select id="trProj" class="'+selCls+' min-w-[220px]"></select></div></div>'+
       '<div class="text-xs text-slate-400 mb-4">Kolom <b>Semua tim</b> = tarif standar proyek. Kolom tim diisi hanya bila tim itu upahnya berbeda; dikosongkan = ikut tarif standar. Lembur dikosongkan = tarif harian ÷ 8, dibulatkan ke bawah per Rp500.</div>'+
       '<div id="trTable" class="overflow-x-auto"></div>'+
       (write ? '<label class="flex items-center gap-2 text-xs font-semibold text-slate-600 mt-4 cursor-pointer"><input type="checkbox" id="trApply" class="w-4 h-4 rounded border-slate-300"> Terapkan juga ke absen yang sudah ada tapi belum dibayar (koreksi tarif)</label>' : ''))+
@@ -3264,6 +3233,21 @@ PAGES.pekerja = function(c){
   }
   load();
   document.getElementById('trProj').addEventListener('change', function(){ D.proj = this.value; drawRates(); });
+  var brn = document.getElementById('btnRenameTim');
+  if(brn) brn.onclick = function(){
+    var tims = timsOf(D.proj);
+    if(!tims.length){ toast('Proyek ini belum punya tim.'); return; }
+    openModal('Ganti Nama / Gabung Tim',
+      '<div class="space-y-4"><div class="text-sm text-slate-600">Semua pekerja, tarif tim, kasbon, dan periode yang belum dibayar ikut berpindah ke nama baru. Isi nama tim yang sudah ada untuk <b>menggabungkan</b> dua tim.</div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tim</label><select id="rt_dari" class="'+fieldCls+'">'+tims.map(function(t){ return '<option value="'+esc(t)+'">'+esc(t)+'</option>'; }).join('')+'</select></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama baru</label><input id="rt_ke" type="text" maxlength="80" class="'+fieldCls+'" placeholder="mis. Tim Pondasi"></div></div>',
+      function(){
+        if(!fv('rt_ke')){ toast('Isi nama baru.', true); return; }
+        apiFetch('/workers.php', {method:'POST', body:JSON.stringify({action:'rename_tim', project_id:D.proj, dari:fv('rt_dari'), ke:fv('rt_ke')})})
+          .then(function(r){ closeModal(); toast('Tim diperbarui ('+r.pekerja+' pekerja).'); return load(); }).catch(function(e){ toast(e.message, true); });
+      });
+    var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Terapkan';
+  };
   ['q'].forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ D.PG.page=1; drawWorkers(); }); });
   ['fProj','fTim','fGrade','fOff'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ D.PG.page=1; drawWorkers(); }); });
   var ba = document.getElementById('btnAdd'); if(ba) ba.onclick = function(){ openWorker(null); };
@@ -3278,47 +3262,58 @@ function kasbonView(c, part, opts){
   var write = canWritePay(), isAk = STATE.user.role==='akuntan';
   var K = {data:{kasbon:[], saldo:[]}, projects:[], workers:[], req:[]};
   var flt = function(){ return (opts.getFilter && opts.getFilter()) || {project_id:'', from:'', to:''}; };
-  c.innerHTML = (part==='requests' && write ? '<div class="flex justify-end mb-3"><button class="'+btnPrimary+'" id="btnAddKasbon"><i data-lucide="plus" class="w-4 h-4"></i>Catat Kasbon</button></div>' : '')+
+  c.innerHTML = (part==='requests' && write ? '<div class="flex justify-end gap-2 mb-3 flex-wrap"><button class="'+btnGhostSm+' flex items-center gap-1" id="btnPelunasan"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>Catat Pelunasan</button><button class="'+btnPrimary+'" id="btnAddKasbon"><i data-lucide="plus" class="w-4 h-4"></i>Catat Kasbon</button></div>' : '')+
     (part==='requests' ? '<div id="ksReq"></div>' : '<div class="grid lg:grid-cols-2 gap-5"><div id="ksSaldo"></div><div id="ksRiwayat"></div></div>');
   icons();
   function drawReq(){
     var f = flt();
     var inProj = function(r){ return !f.project_id || r.project_id===f.project_id; };
-    var pend = (K.req||[]).filter(function(r){ return r.status==='diajukan' && inProj(r); });
-    var done = (K.req||[]).filter(function(r){ return r.status!=='diajukan' && inProj(r); }).slice(0, 8);
+    var pendRows = (K.req||[]).filter(function(r){ return r.status==='diajukan' && inProj(r); });
+    var doneRows = (K.req||[]).filter(function(r){ return r.status!=='diajukan' && inProj(r); }).slice(0, 24);
     var host = document.getElementById('ksReq'); if(!host) return;
+    // rows of one request (same batch) are decided together; a single row is its own card
+    var group = function(rows){ var gs = [], ix = {}; rows.forEach(function(r){ var key = r.batch_id || r.id; if(!(key in ix)){ ix[key] = gs.length; gs.push({key:key, batch:r.batch_id, rows:[]}); } gs[ix[key]].rows.push(r); }); return gs; };
+    var pend = group(pendRows), done = group(doneRows).slice(0, 8);
+    var sumJ = function(g){ return g.rows.reduce(function(a,r){ return a+r.jumlah; },0); };
     var chip = function(st){ return st==='disetujui' ? badge('aman','Disetujui') : badge('danger','Ditolak'); };
-    host.innerHTML = panel('<div class="flex items-center gap-2 mb-3"><div class="font-extrabold text-slate-800">Pengajuan kasbon dari lapangan</div>'+(pend.length?'<span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">'+pend.length+' menunggu dicek</span>':'')+'</div>'+
-      (pend.length ? '<table class="w-full"><tbody>'+pend.map(function(r){
-        return '<tr class="border-t border-slate-100"><td class="py-3 pr-3"><b>'+esc(kreqName(r))+'</b><div class="text-xs text-slate-400">'+esc(r.project_nama)+' · '+esc((r.created_at||'').slice(0,10))+(r.ket?' · '+esc(r.ket):'')+'</div></td>'+
-          '<td class="py-3 pr-3 text-right font-extrabold tabular-nums">'+rp(r.jumlah)+'</td>'+
-          '<td class="py-3 text-right whitespace-nowrap">'+(isAk?'<button class="'+btnPrimary+' !py-1.5 !px-3 !text-xs" data-kr-ok="'+esc(r.id)+'">Setujui</button> <button class="'+btnDangerSm+'" data-kr-no="'+esc(r.id)+'">Tolak</button>':'<span class="text-xs text-slate-400">diperiksa Akuntan</span>')+'</td></tr>';
-      }).join('')+'</tbody></table>' : '<div class="text-sm text-slate-400 py-6 text-center">Tidak ada pengajuan kasbon yang menunggu. Pengajuan dari HP lapangan akan muncul di sini.</div>')+
-      (done.length ? '<div class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-4 mb-1">Terakhir diproses</div>'+done.map(function(r){
-        return '<div class="flex items-center justify-between gap-3 py-1.5 text-sm"><span class="truncate">'+esc(kreqName(r))+' · '+esc(r.project_nama)+(r.catatan?' · <span class="text-slate-400">'+esc(r.catatan)+'</span>':'')+'</span><span class="flex items-center gap-2 shrink-0"><b class="tabular-nums">'+rp(r.jumlah)+'</b>'+chip(r.status)+'</span></div>'; }).join('') : ''));
-    var find = function(id){ return K.req.find(function(x){ return x.id===id; }); };
+    host.innerHTML = panel('<div class="flex items-center gap-2 mb-3"><div class="font-extrabold text-slate-800">Pengajuan kasbon dari lapangan</div>'+(pendRows.length?'<span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">'+pend.length+' pengajuan menunggu dicek</span>':'')+'</div>'+
+      (pend.length ? '<div class="space-y-3">'+pend.map(function(g){
+        var r0 = g.rows[0];
+        return '<div class="rounded-xl border border-slate-200 p-3.5"><div class="flex items-start justify-between gap-3 flex-wrap"><div class="min-w-0">'+
+          '<div class="text-xs text-slate-400">'+esc(r0.project_nama)+' · '+esc((r0.tgl_wib||r0.created_at||'').slice(0,10))+(r0.ket?' · '+esc(r0.ket):'')+'</div>'+
+          g.rows.map(function(r){ return '<div class="flex items-center justify-between gap-6 py-1"><b class="text-slate-800">'+esc(kreqName(r))+'</b><span class="tabular-nums font-bold">'+rp(r.jumlah)+'</span></div>'; }).join('')+
+          (g.rows.length>1 ? '<div class="flex items-center justify-between gap-6 pt-1.5 mt-1 border-t border-slate-100 text-sm"><span class="font-semibold text-slate-500">Total '+g.rows.length+' baris</span><b class="tabular-nums">'+rp(sumJ(g))+'</b></div>' : '')+
+          '</div><div class="whitespace-nowrap">'+(isAk ? '<button class="'+btnPrimary+' !py-1.5 !px-3 !text-xs" data-kr-ok="'+esc(g.key)+'">'+(g.rows.length>1?'Setujui semua':'Setujui')+'</button> <button class="'+btnDangerSm+'" data-kr-no="'+esc(g.key)+'">'+(g.rows.length>1?'Tolak semua':'Tolak')+'</button>' : '<span class="text-xs text-slate-400">diperiksa Akuntan</span>')+'</div></div></div>';
+      }).join('')+'</div>' : '<div class="text-sm text-slate-400 py-6 text-center">Tidak ada pengajuan kasbon yang menunggu. Pengajuan dari HP lapangan akan muncul di sini.</div>')+
+      (done.length ? '<div class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-4 mb-1">Terakhir diproses</div>'+done.map(function(g){
+        var r0 = g.rows[0];
+        return '<div class="flex items-center justify-between gap-3 py-1.5 text-sm"><span class="truncate">'+g.rows.map(function(r){ return esc(kreqName(r)); }).join(' + ')+' · '+esc(r0.project_nama)+(r0.catatan?' · <span class="text-slate-400">'+esc(r0.catatan)+'</span>':'')+'</span><span class="flex items-center gap-2 shrink-0"><b class="tabular-nums">'+rp(sumJ(g))+'</b>'+chip(r0.status)+'</span></div>'; }).join('') : ''));
+    var find = function(key){ var rows = K.req.filter(function(x){ return (x.batch_id || x.id)===key && x.status==='diajukan'; }); return {key:key, batch:rows[0] && rows[0].batch_id, rows:rows}; };
     host.querySelectorAll('[data-kr-ok]').forEach(function(b){ b.onclick = function(){
-      var r = find(b.getAttribute('data-kr-ok'));
-      openModal('Setujui Kasbon',
-        '<div class="space-y-4"><div class="text-sm text-slate-600"><b>'+esc(kreqName(r))+'</b> · '+esc(r.project_nama)+(r.ket?'<div class="text-xs text-slate-400 mt-0.5">'+esc(r.ket)+'</div>':'')+'</div>'+
-        '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah disetujui (Rp)</label>'+numInputHtml('kr_ok_j', r.jumlah, fieldCls)+'</div>'+
+      var g = find(b.getAttribute('data-kr-ok')), r = g.rows[0], multi = g.rows.length>1;
+      openModal(multi ? 'Setujui Semua ('+g.rows.length+' baris)' : 'Setujui Kasbon',
+        '<div class="space-y-4"><div class="text-sm text-slate-600"><b>'+g.rows.map(function(x){ return esc(kreqName(x))+' '+rp(x.jumlah); }).join('</b><br><b>')+'</b><div class="text-xs text-slate-400 mt-1">'+esc(r.project_nama)+(r.ket?' · '+esc(r.ket):'')+'</div></div>'+
+        '<div class="grid grid-cols-2 gap-3">'+(multi ? '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Total disetujui</label><div class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold tabular-nums">'+rp(sumJ(g))+'</div></div>'
+          : '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah disetujui (Rp)</label>'+numInputHtml('kr_ok_j', r.jumlah, fieldCls)+'</div>')+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal diberikan</label><input id="kr_ok_t" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Catatan</label><input id="kr_ok_c" type="text" class="'+fieldCls+'"></div>'+
-        '<div class="text-xs text-slate-400">Setelah disetujui, otomatis tercatat di buku kasbon dan menambah saldo.</div></div>',
+        '<div class="text-xs text-slate-400">Setelah disetujui, otomatis tercatat di buku kasbon dan menambah saldo. Saldo dipotong otomatis dari gaji periode berikutnya.</div></div>',
         function(){
-          var j = parseIdNum(fv('kr_ok_j'));
-          if(Number.isNaN(j) || j<=0){ toast('Isi jumlah.', true); return; }
-          apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify({action:'setujui', id:r.id, jumlah:j, tgl:fv('kr_ok_t'), catatan:fv('kr_ok_c')})})
+          var body;
+          if(multi) body = {action:'setujui_batch', batch_id:g.batch, tgl:fv('kr_ok_t'), catatan:fv('kr_ok_c')};
+          else { var j = parseIdNum(fv('kr_ok_j')); if(Number.isNaN(j) || j<=0){ toast('Isi jumlah.', true); return; } body = {action:'setujui', id:r.id, jumlah:j, tgl:fv('kr_ok_t'), catatan:fv('kr_ok_c')}; }
+          apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify(body)})
             .then(function(){ closeModal(); toast('Disetujui dan dicatat ✓'); return load().then(function(){ refreshKasbonBadge(); if(opts.onChange) opts.onChange(); }); }).catch(function(e){ toast(e.message, true); });
         });
-      var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Setujui';
+      var sv = document.getElementById('mSave'); if(sv) sv.textContent = multi ? 'Setujui semua' : 'Setujui';
     }; });
     host.querySelectorAll('[data-kr-no]').forEach(function(b){ b.onclick = function(){
-      var r = find(b.getAttribute('data-kr-no'));
-      openModal('Tolak Pengajuan', '<p class="text-sm text-slate-600 mb-3">'+esc(kreqName(r))+' · '+rp(r.jumlah)+'</p><label class="block text-xs font-semibold text-slate-500 mb-1.5">Alasan *</label><input id="kr_no_c" type="text" class="'+fieldCls+'">',
+      var g = find(b.getAttribute('data-kr-no')), multi = g.rows.length>1;
+      openModal(multi ? 'Tolak Semua' : 'Tolak Pengajuan', '<p class="text-sm text-slate-600 mb-3">'+g.rows.map(function(x){ return esc(kreqName(x))+' '+rp(x.jumlah); }).join(' · ')+'</p><label class="block text-xs font-semibold text-slate-500 mb-1.5">Alasan *</label><input id="kr_no_c" type="text" class="'+fieldCls+'">',
         function(){
           if(!fv('kr_no_c')){ toast('Alasan wajib diisi.', true); return; }
-          apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify({action:'tolak', id:r.id, catatan:fv('kr_no_c')})})
+          var body = multi ? {action:'tolak_batch', batch_id:g.batch, catatan:fv('kr_no_c')} : {action:'tolak', id:g.rows[0].id, catatan:fv('kr_no_c')};
+          apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify(body)})
             .then(function(){ closeModal(); toast('Pengajuan ditolak.'); return load().then(function(){ refreshKasbonBadge(); if(opts.onChange) opts.onChange(); }); }).catch(function(e){ toast(e.message, true); });
         });
     }; });
@@ -3332,9 +3327,9 @@ function kasbonView(c, part, opts){
     sh.innerHTML = panel('<div class="flex items-center justify-between mb-3"><div class="font-extrabold text-slate-800">Saldo kasbon berjalan</div><div class="text-sm font-extrabold text-red-600 tabular-nums">'+rp(sal.reduce(function(a,s){ return a+s.saldo; },0))+'</div></div>'+
       (sal.length ? '<table class="w-full"><tbody>'+sal.map(function(s){ return '<tr class="border-t border-slate-100"><td class="py-2.5 pr-3"><b>'+esc(s.nama)+'</b><div class="text-xs text-slate-400">'+esc(s.project_nama)+'</div></td><td class="py-2.5 text-right font-extrabold tabular-nums '+(s.saldo>0?'text-red-600':'text-slate-500')+'">'+rp(s.saldo)+'</td></tr>'; }).join('')+'</tbody></table>'
         : '<div class="text-sm text-slate-400 py-6 text-center">Tidak ada kasbon yang masih berjalan.</div>'));
-    rh.innerHTML = panel('<div class="font-extrabold text-slate-800 mb-3">Kasbon diberikan pada rentang ini</div>'+
-      (hist.length ? '<table class="w-full"><tbody>'+hist.map(function(k){ return '<tr class="border-t border-slate-100"><td class="py-2.5 pr-3"><b>'+esc(k.worker_nama||'Grup / penanggung jawab')+'</b><div class="text-xs text-slate-400">'+esc(k.project_nama)+' · '+esc(k.tgl)+(k.ket?' · '+esc(k.ket):'')+'</div></td>'+
-        '<td class="py-2.5 text-right font-bold tabular-nums">'+rp(k.jumlah)+'</td><td class="py-2.5 pl-2 text-right">'+(write?'<button class="text-xs text-slate-300 hover:text-red-600 font-bold" data-ks-del="'+esc(k.id)+'" title="Hapus">✕</button>':'')+'</td></tr>'; }).join('')+'</tbody></table>'
+    rh.innerHTML = panel('<div class="font-extrabold text-slate-800 mb-3">Kasbon diberikan &amp; pelunasan pada rentang ini</div>'+
+      (hist.length ? '<table class="w-full"><tbody>'+hist.map(function(k){ var back = k.jumlah < 0; return '<tr class="border-t border-slate-100"><td class="py-2.5 pr-3"><b>'+esc(k.worker_nama||(k.tim?timLabel(k.tim):'Grup / penanggung jawab'))+'</b>'+(back?' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">pelunasan</span>':'')+'<div class="text-xs text-slate-400">'+esc(k.project_nama)+' · '+esc(k.tgl)+(k.ket?' · '+esc(k.ket):'')+'</div></td>'+
+        '<td class="py-2.5 text-right font-bold tabular-nums '+(back?'text-emerald-600':'')+'">'+(back?'−':'')+rp(Math.abs(k.jumlah))+'</td><td class="py-2.5 pl-2 text-right">'+(write?'<button class="text-xs text-slate-300 hover:text-red-600 font-bold" data-ks-del="'+esc(k.id)+'" title="Hapus">✕</button>':'')+'</td></tr>'; }).join('')+'</tbody></table>'
         : '<div class="text-sm text-slate-400 py-6 text-center">Belum ada kasbon pada rentang ini.</div>'));
     document.querySelectorAll('[data-ks-del]').forEach(function(b){ b.onclick = function(){ confirmModal('Hapus Kasbon','Hapus catatan kasbon ini?', function(){
       apiFetch('/kasbon.php?id='+encodeURIComponent(b.getAttribute('data-ks-del')), {method:'DELETE'}).then(function(){ toast('Dihapus.'); return load().then(function(){ if(opts.onChange) opts.onChange(); }); }).catch(function(e){ toast(e.message, true); });
@@ -3350,7 +3345,7 @@ function kasbonView(c, part, opts){
   var ba = document.getElementById('btnAddKasbon');
   if(ba) ba.onclick = function(){
     var timsOf = function(pid){ var t = {}; K.workers.forEach(function(w){ if(w.project_id===pid && w.tim && w.aktif) t[w.tim] = 1; }); return Object.keys(t).sort(); };
-    var opts2 = function(pid){ return '<option value="">Grup / penanggung jawab</option>'+timsOf(pid).map(function(t){ return '<option value="t:'+esc(t)+'">Tim · '+esc(t)+'</option>'; }).join('')+K.workers.filter(function(w){ return w.project_id===pid && w.aktif; }).map(function(w){ return '<option value="w:'+esc(w.id)+'">'+esc(w.nama)+' · '+esc(GRADE_NAMA[w.grade]||w.grade)+(w.tim?' · '+esc(w.tim):'')+'</option>'; }).join(''); };
+    var opts2 = function(pid){ return '<option value="">Grup / penanggung jawab</option>'+timsOf(pid).map(function(t){ return '<option value="t:'+esc(t)+'">'+esc(timLabel(t))+'</option>'; }).join('')+K.workers.filter(function(w){ return w.project_id===pid && w.aktif; }).map(function(w){ return '<option value="w:'+esc(w.id)+'">'+esc(w.nama)+' · '+esc(GRADE_NAMA[w.grade]||w.grade)+(w.tim?' · '+esc(w.tim):'')+'</option>'; }).join(''); };
     var first = (flt().project_id) || (K.projects[0] ? K.projects[0].id : '');
     openModal('Catat Kasbon',
       '<div class="space-y-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek *</label><select id="ks_proj" class="'+fieldCls+'">'+K.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===first?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('')+'</select></div>'+
@@ -3360,12 +3355,32 @@ function kasbonView(c, part, opts){
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="ks_ket" type="text" class="'+fieldCls+'"></div></div>',
       function(){
         var j = parseIdNum(fv('ks_jum')); if(Number.isNaN(j) || j<=0){ toast('Isi jumlah kasbon.', true); return; }
-        var who = fv('ks_w'), ket = fv('ks_ket');
-        if(who.indexOf('t:')===0) ket = ('Tim '+who.slice(2)+(ket?': '+ket:''));
-        apiFetch('/kasbon.php', {method:'POST', body:JSON.stringify({project_id:fv('ks_proj'), worker_id: who.indexOf('w:')===0 ? who.slice(2) : null, tgl:fv('ks_tgl'), jumlah:j, ket:ket})})
+        var who = fv('ks_w');
+        apiFetch('/kasbon.php', {method:'POST', body:JSON.stringify({project_id:fv('ks_proj'), worker_id: who.indexOf('w:')===0 ? who.slice(2) : null, tim: who.indexOf('t:')===0 ? who.slice(2) : '', tgl:fv('ks_tgl'), jumlah:j, ket:fv('ks_ket')})})
           .then(function(){ closeModal(); toast('Kasbon dicatat.'); return load().then(function(){ if(opts.onChange) opts.onChange(); }); }).catch(function(e){ toast(e.message, true); });
       });
     document.getElementById('ks_proj').addEventListener('change', function(){ var w = document.getElementById('ks_w'); w.innerHTML = opts2(this.value); w.dispatchEvent(new Event('ss-refresh')); });
+  };
+  /* Pelunasan: a worker / tim hands cash back (typical when the project stops while a balance is still open). */
+  var bp = document.getElementById('btnPelunasan');
+  if(bp) bp.onclick = function(){
+    var f = flt(), open = (K.data.saldo||[]).filter(function(x){ return x.saldo > 0.5 && (!f.project_id || x.project_id===f.project_id); });
+    if(!open.length){ toast('Tidak ada saldo kasbon yang masih berjalan.'); return; }
+    var keyOf = function(x, i){ return String(i); };
+    openModal('Catat Pelunasan Kasbon',
+      '<div class="space-y-4"><div class="text-sm text-slate-600">Dipakai bila pekerja / tim mengembalikan uang kasbon secara tunai (mis. proyek berhenti sebelum saldo lunas lewat gaji).</div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Atas nama</label><select id="pl_w" class="'+fieldCls+'">'+open.map(function(x, i){ return '<option value="'+i+'">'+esc(x.nama)+' · '+esc(x.project_nama)+' · sisa '+rp(x.saldo)+'</option>'; }).join('')+'</select></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah dilunasi (Rp)</label>'+numInputHtml('pl_jum', open[0].saldo, fieldCls)+'</div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal</label><input id="pl_tgl" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="pl_ket" type="text" class="'+fieldCls+'" placeholder="mis. dibayar tunai ke kasir"></div></div>',
+      function(){
+        var x = open[+fv('pl_w')], j = parseIdNum(fv('pl_jum'));
+        if(!x || Number.isNaN(j) || j<=0){ toast('Isi jumlah pelunasan.', true); return; }
+        apiFetch('/kasbon.php', {method:'POST', body:JSON.stringify({project_id:x.project_id, worker_id:x.worker_id, tim:x.tim||'', tgl:fv('pl_tgl'), jumlah:j, ket:fv('pl_ket'), jenis:'pelunasan'})})
+          .then(function(){ closeModal(); toast('Pelunasan dicatat ✓'); return load().then(function(){ if(opts.onChange) opts.onChange(); }); }).catch(function(e){ toast(e.message, true); });
+      });
+    var sel = document.getElementById('pl_w'); if(sel) sel.addEventListener('change', function(){ var x = open[+sel.value]; var el = document.getElementById('pl_jum'); if(x && el) el.value = fmtIdNum(x.saldo); });
+    var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Catat Lunas';
   };
   return {reload: load, redraw: draw};
 }
@@ -3668,6 +3683,21 @@ function submitInput(mode){
   var materialId = document.getElementById('f_material').value;
   if(!materialId){ toast('Pilih material.', true); return; }
   if(!qty || qty <= 0){ toast('Isi jumlah (qty) yang valid.', true); return; }
+  // Pemakaian above the recorded stock almost always means a Bahan Masuk was forgotten: ask before saving.
+  if(mode !== 'masuk' && !submitInput._checked){
+    var go = function(){ submitInput._checked = true; try{ submitInput(mode); } finally { submitInput._checked = false; } };
+    apiFetch('/material_stock.php').then(function(rows){
+      var r = rows.find(function(x){ return x.project_id===STATE.projectId && x.material_id===materialId; });
+      var stok = r ? (Number(r.stok)||0) : 0;
+      if(qty > stok + 1e-9){
+        var m = STATE.materials.find(function(x){ return x.id===materialId; }) || {nama:'bahan ini', satuan:''};
+        confirmModal('Pemakaian melebihi stok', 'Stok <b>'+esc(m.nama)+'</b> yang tercatat hanya <b>'+fmtNum(stok)+' '+esc(m.satuan)+'</b>, sedangkan pemakaian <b>'+fmtNum(qty)+'</b>. Biasanya Bahan Masuk belum dicatat. Tetap simpan?', function(){ closeModal(); go(); });
+        return;
+      }
+      go();
+    }).catch(function(){ go(); });
+    return;
+  }
 
   var btn = document.getElementById('f_save');
   btn.disabled = true; btn.textContent = 'Menyimpan…';
@@ -3800,7 +3830,7 @@ function renderAbsen(c){
     ABSEN.weekFilled = null;
     if(Array.isArray(r[4])){ ABSEN.weekFilled = {}; r[4].forEach(function(a){ ABSEN.weekFilled[a.tgl] = true; }); }
     ABSEN.kreqAll = (r[3]||[]).filter(function(k){ return k.project_id === pid; });
-    ABSEN.kreq = ABSEN.kreqAll.slice(0, 5);
+    ABSEN.kreq = ABSEN.kreqAll.slice(0, 12);
     ABSEN.cur = {}; ABSEN.orig = {}; ABSEN.rev = {}; ABSEN.q = ''; if(ABSEN.projKey !== pid){ ABSEN.tim = ''; ABSEN.projKey = pid; } ABSEN.filter = 'all'; ABSEN.open = {};
     ABSEN.workers.forEach(function(w){ ABSEN.cur[w.id] = {h:null, l:0}; ABSEN.orig[w.id] = {h:null, l:0}; });
     r[1].forEach(function(a){
@@ -3845,7 +3875,8 @@ function absenDirty(){
   });
 }
 function fmtJam(n){ return String(n).replace('.', ','); }
-function kreqName(r){ return r.worker_nama || (r.tim ? 'Tim '+r.tim : 'Grup / penanggung jawab'); }
+function timLabel(t){ return /^tim\b/i.test(t||'') ? t : 'Tim '+t; }
+function kreqName(r){ return r.worker_nama || (r.tim ? timLabel(r.tim) : 'Grup / penanggung jawab'); }
 /* Days of this week (up to today) that nobody has filled in yet. */
 function absenMissing(){
   var out = [], tgl = ABSEN.tgl;
@@ -3905,17 +3936,16 @@ function drawAbsen(c){
   if(!ed) banner += '<div class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-3">'+esc(ABSEN.reason)+'</div>';
   if(ABSEN.period && ABSEN.period.status==='draft' && /^Dikembalikan:/.test(ABSEN.period.catatan||'')) banner += '<div class="text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-3"><b>Absen minggu ini dikembalikan oleh Akuntan.</b><br>'+esc((ABSEN.period.catatan||'').replace(/^Dikembalikan:\s*/,''))+'<br><span class="text-red-600">Perbaiki lalu ajukan lagi.</span></div>';
   var missing = absenMissing();
-  if(ABSEN.libur) banner += '<div class="text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-xl px-3 py-3 mb-3 flex items-center justify-between gap-3"><div><b>Hari ini ditandai LIBUR / tidak ada kerja.</b><div class="text-xs text-slate-500 mt-0.5">Semua pekerja tercatat tidak masuk dan tidak dibayar.</div></div>'+(ed?'<button type="button" id="abUnlibur" class="shrink-0 h-10 px-3 rounded-lg bg-white border border-slate-300 text-[13px] font-bold text-slate-700">Jadikan hari kerja</button>':'')+'</div>';
   if(ed && missing.length) banner += '<div class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3"><div class="mb-2"><b>Ada hari yang belum diisi minggu ini.</b> Ketuk harinya untuk mengisi:</div><div class="flex flex-wrap gap-2">'+
     missing.slice(0,7).map(function(d){ return '<button type="button" data-ab-goto="'+d+'" class="h-9 px-3 rounded-lg bg-amber-500 text-white font-bold">'+esc(HARI_NAMA[parseISO(d).getDay()].slice(0,3)+' '+parseISO(d).getDate())+'</button>'; }).join('')+'</div>'+
-    '<div class="mt-2.5 pt-2.5 border-t border-amber-200 text-amber-800">Memang tidak ada kerja di hari itu? <button type="button" id="abLibur" class="font-extrabold underline underline-offset-2">Tandai libur / tidak kerja</button></div></div>';
+    '<div class="mt-2.5 pt-2.5 border-t border-amber-200 text-amber-800">Hari tanpa kerja? Ketuk harinya, lalu pilih <b>Tandai libur / hujan</b>.</div></div>';
 
   var btn3 = function(id, icon, label, attr){ return '<button type="button" '+(id?'id="'+id+'"':'')+' '+(attr||'')+' class="h-12 rounded-xl bg-white border border-slate-200 text-[13px] font-bold text-slate-700 flex flex-col items-center justify-center gap-0.5 leading-tight"><i data-lucide="'+icon+'" class="w-4 h-4"></i>'+label+'</button>'; };
   var tools = '<div class="grid '+(ed?'grid-cols-3':'grid-cols-1')+' gap-2 mb-3">'+
       (ed ? btn3('', 'user-plus', 'Pekerja', 'data-ab-add')+
         '<button type="button" id="abAll" class="h-12 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 text-[13px] font-bold flex flex-col items-center justify-center gap-0.5 leading-tight"><i data-lucide="check-check" class="w-4 h-4"></i>Semua hadir'+(ABSEN.tim?' <span class="font-semibold opacity-70">('+esc(ABSEN.tim)+')</span>':'')+'</button>' : '')+btn3('abKasbon', 'banknote', 'Kasbon')+'</div>';
 
-  var nothingYet = ed && !ABSEN.libur && ABSEN.workers.length && ABSEN.workers.every(function(w){ return ABSEN.cur[w.id].h === null; });
+  var nothingYet = ed && ABSEN.workers.length && ABSEN.workers.every(function(w){ return ABSEN.cur[w.id].h === null; });
   var head =
     '<div class="flex items-center justify-between gap-2 mb-3">'+
       '<button type="button" id="abPrev" class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>'+
@@ -3961,12 +3991,22 @@ function drawAbsen(c){
 function kasbonBoxHtml(){
   var kStat = {diajukan:['bg-amber-50 text-amber-700','Menunggu dicek'], disetujui:['bg-emerald-50 text-emerald-700','Disetujui'], ditolak:['bg-red-50 text-red-600','Ditolak']};
   var pendingK = outboxGet().filter(function(o){ return o.endpoint==='/kasbon_requests.php' && o.payload.project_id===STATE.projectId; })
-    .map(function(o){ return {jumlah:o.payload.jumlah, worker_nama:(ABSEN.workers.find(function(w){ return w.id===o.payload.worker_id; })||{}).nama||'', tim:o.payload.tim||'', status:'_antre', ket:o.payload.ket}; });
-  var list = (pendingK.concat(ABSEN.kreq||[])).map(function(k){
-    var st = k.status==='_antre' ? ['bg-slate-100 text-slate-600','Menunggu sinyal'] : kStat[k.status];
-    return '<div class="flex items-center justify-between gap-3 py-2.5 border-t border-slate-100 first:border-0"><div class="min-w-0"><div class="text-sm font-bold truncate">'+esc(k.worker_nama||'Grup / penanggung jawab')+'</div>'+
-      '<div class="text-xs text-slate-400 truncate">'+esc(k.ket||'')+(k.status==='ditolak'&&k.catatan?' · '+esc(k.catatan):'')+'</div></div>'+
-      '<div class="text-right shrink-0"><div class="text-sm font-extrabold tabular-nums">'+fmtIdNum(k.jumlah)+'</div><span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+st[0]+'">'+st[1]+'</span></div></div>';
+    .map(function(o){ var items = o.payload.items || [o.payload];
+      return {batch:'_q'+o.payload.project_id, status:'_antre', ket:o.payload.ket, lines:items.map(function(i){ return {nama:(ABSEN.workers.find(function(w){ return w.id===i.worker_id; })||{}).nama || (i.tim ? timLabel(i.tim) : 'Grup / penanggung jawab'), jumlah:i.jumlah}; })}; });
+  // rows that belong to one request (same batch_id) are shown together as one card
+  var groups = [], idx = {};
+  (ABSEN.kreq||[]).forEach(function(k){
+    var key = k.batch_id || k.id;
+    if(!(key in idx)){ idx[key] = groups.length; groups.push({batch:key, status:k.status, ket:k.ket, catatan:k.catatan, lines:[]}); }
+    groups[idx[key]].lines.push({nama:kreqName(k), jumlah:k.jumlah});
+  });
+  var list = pendingK.concat(groups).map(function(g){
+    var st = g.status==='_antre' ? ['bg-slate-100 text-slate-600','Menunggu sinyal'] : (kStat[g.status] || kStat.diajukan);
+    var total = g.lines.reduce(function(a,l){ return a+(Number(l.jumlah)||0); },0);
+    return '<div class="flex items-start justify-between gap-3 py-2.5 border-t border-slate-100 first:border-0"><div class="min-w-0">'+
+      g.lines.map(function(l){ return '<div class="text-sm font-bold truncate">'+esc(l.nama)+' <span class="font-semibold text-slate-500 tabular-nums">· '+fmtIdNum(l.jumlah)+'</span></div>'; }).join('')+
+      '<div class="text-xs text-slate-400 truncate">'+esc(g.ket||'')+(g.status==='ditolak'&&g.catatan?' · '+esc(g.catatan):'')+'</div></div>'+
+      '<div class="text-right shrink-0"><div class="text-sm font-extrabold tabular-nums">'+fmtIdNum(total)+'</div><span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+st[0]+'">'+st[1]+'</span></div></div>';
   }).join('');
   return list ? '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2 mb-3"><div class="text-[11px] font-extrabold uppercase tracking-wide text-slate-400 pt-1.5">Pengajuan kasbon</div>'+list+'</div>' : '';
 }
@@ -4127,39 +4167,8 @@ function bindAbsen(c){
       ABSEN.markLibur = true; closeModal(); saveAbsen(c);
     });
   };
-  var ul = document.getElementById('abUnlibur');
-  if(ul) ul.onclick = function(){
-    var entries = ABSEN.workers.map(function(w){ return {worker_id:w.id, hari:null, ver:(ABSEN.rev && ABSEN.rev[w.id] !== undefined) ? ABSEN.rev[w.id] : null}; });
-    apiFetch('/attendance.php', {method:'POST', body:JSON.stringify({project_id:STATE.projectId, tgl:ABSEN.tgl, entries:entries})})
-      .then(function(){ if(ABSEN.weekFilled) delete ABSEN.weekFilled[ABSEN.tgl]; toast('Hari ini dikembalikan menjadi hari kerja. Silakan isi absennya.'); renderTab(); })
-      .catch(function(e){ toast(e.message, true); });
-  };
-  var lib = document.getElementById('abLibur');
-  if(lib) lib.onclick = function(){ openLibur(c); };
   var kb = document.getElementById('abKasbon');
   if(kb) kb.onclick = function(){ openKasbonRequest(c); };
-}
-
-/* Days with no work (rain, holiday, only 3 working days that week): one tap marks
-   every worker "Absen" for those days so they stop being reminded and are not paid. */
-function openLibur(c){
-  var days = absenMissing();
-  if(!days.length){ toast('Tidak ada hari kosong.'); return; }
-  openModal('Tandai Libur / Tidak Kerja',
-    '<div class="text-sm text-slate-600 mb-3">Pilih hari yang <b>tidak ada pekerjaan</b>. Semua pekerja ditandai Absen di hari itu, tanpa gaji.</div>'+
-    '<div class="flex flex-wrap gap-2" id="lb_days">'+days.map(function(d){
-      return '<label class="cursor-pointer"><input type="checkbox" class="peer sr-only" value="'+d+'"><span class="inline-flex h-11 px-4 items-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">'+esc(HARI_NAMA[parseISO(d).getDay()].slice(0,3)+' '+parseISO(d).getDate())+'</span></label>';
-    }).join('')+'</div>'+
-    '<div class="text-xs text-slate-400 mt-3">Hari yang ada pekerjaan jangan dipilih — ketuk harinya di pengingat untuk mengisi absennya.</div>',
-    function(){
-      var pick = Array.from(document.querySelectorAll('#lb_days input:checked')).map(function(i){ return i.value; });
-      if(!pick.length){ toast('Pilih minimal satu hari.', true); return; }
-      var entries = ABSEN.workers.map(function(w){ return {worker_id:w.id, hari:0, lembur_jam:0, ver:null, ket:'LIBUR'}; });
-      var sv = document.getElementById('mSave'); if(sv){ sv.disabled = true; sv.textContent = 'Menyimpan…'; }
-      pick.reduce(function(pr, d){ return pr.then(function(){ return apiFetch('/attendance.php', {method:'POST', body:JSON.stringify({project_id:STATE.projectId, tgl:d, entries:entries})}).then(function(){ ABSEN.weekFilled[d] = true; }); }); }, Promise.resolve())
-        .then(function(){ closeModal(); toast(pick.length+' hari ditandai libur ✓'); drawAbsen(c); })
-        .catch(function(e){ closeModal(); toast(e.network ? 'Tandai libur butuh sinyal.' : e.message, true); drawAbsen(c); });
-    });
 }
 
 function saveAbsen(c){
@@ -4235,13 +4244,13 @@ function openAddWorker(c){
   ts.addEventListener('change', syncTim);
 }
 
-/* Kasbon: "atas nama" = a whole tim first, then individual workers, all searchable.
-   One request per name per week (the server enforces it too). */
+/* Kasbon: ONE request can hold several lines (e.g. Tim A and Tim B). "Atas nama" = a whole tim first, then
+   individual workers, all searchable. One request per name per week (the server enforces it too). */
 function openKasbonRequest(c){
   var tims = []; ABSEN.workers.forEach(function(w){ if(w.tim && tims.indexOf(w.tim)<0) tims.push(w.tim); });
   var wkNow = weekOf(today()), asked = {};
   (ABSEN.kreqAll||[]).forEach(function(k){
-    var d = String(k.created_at||'').slice(0,10);
+    var d = String(k.tgl_wib || k.created_at || '').slice(0,10);
     if(k.status !== 'ditolak' && d >= wkNow.from && d <= wkNow.to) asked[k.worker_id ? 'w:'+k.worker_id : (k.tim ? 't:'+k.tim : 'g')] = true;
   });
   var tag = function(key){ return asked[key] ? ' · sudah diajukan minggu ini' : ''; };
@@ -4249,33 +4258,64 @@ function openKasbonRequest(c){
   tims.forEach(function(t){ opts.push(['t:'+t, 'Tim · '+t+tag('t:'+t)]); });
   if(!tims.length) opts.push(['g', 'Grup / penanggung jawab'+tag('g')]);
   ABSEN.workers.forEach(function(w){ opts.push(['w:'+w.id, 'Pekerja · '+w.nama+' ('+(GRADE_NAMA[w.grade]||w.grade)+(w.tim?', '+w.tim:'')+')'+tag('w:'+w.id)]); });
-  var first = (opts.find(function(o){ return !asked[o[0]]; }) || opts[0])[0];
+  var free = opts.filter(function(o){ return !asked[o[0]]; });
+  var lines = [{who:(free[0]||opts[0])[0], jum:''}];
+  function rowHtml(i){
+    var ln = lines[i];
+    return '<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3" data-kl="'+i+'">'+
+      '<div class="flex items-center justify-between mb-1.5"><label class="block text-xs font-bold text-slate-500">Atas nama (tim atau pekerja)</label>'+(lines.length>1?'<button type="button" data-kl-del="'+i+'" class="text-xs font-bold text-red-500">Hapus</button>':'')+'</div>'+
+      '<select data-kl-who="'+i+'" class="'+inputCls+'">'+opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===ln.who?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'+
+      '<div class="mt-2">'+numInputHtml('kl_j'+i, ln.jum, inputCls, ' placeholder="Jumlah (Rp), mis. 500.000" data-kl-jum="'+i+'"')+'</div></div>';
+  }
+  function draw(){
+    document.getElementById('kl_rows').innerHTML = lines.map(function(_, i){ return rowHtml(i); }).join('<div class="h-2"></div>');
+    document.querySelectorAll('#kl_rows select').forEach(enhanceSelect);
+    document.querySelectorAll('#kl_rows [data-kl-who]').forEach(function(el){ el.addEventListener('change', function(){ lines[+el.getAttribute('data-kl-who')].who = el.value; }); });
+    document.querySelectorAll('#kl_rows [data-kl-jum]').forEach(function(el){ el.addEventListener('input', function(){ lines[+el.getAttribute('data-kl-jum')].jum = el.value; updTotal(); }); });
+    document.querySelectorAll('#kl_rows [data-kl-del]').forEach(function(el){ el.onclick = function(){ lines.splice(+el.getAttribute('data-kl-del'), 1); draw(); updTotal(); }; });
+    updTotal();
+  }
+  function updTotal(){ var t = lines.reduce(function(a,l){ var v = parseIdNum(l.jum); return a+(Number.isNaN(v)?0:v); },0); var el = document.getElementById('kl_total'); if(el) el.textContent = t>0 ? 'Total Rp '+fmtIdNum(t) : ''; }
   openModal('Ajukan Kasbon',
-    '<div class="space-y-4">'+
-      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Atas nama (tim atau pekerja)</label><select id="kr_w" class="'+inputCls+'">'+
-        opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===first?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select></div>'+
-      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Jumlah (Rp) *</label>'+numInputHtml('kr_jum','',inputCls,' placeholder="mis. 500.000"')+'</div>'+
+    '<div class="space-y-3"><div id="kl_rows"></div>'+
+      '<div class="flex items-center justify-between"><button type="button" id="kl_add" class="text-sm font-bold text-emerald-700">＋ Tambah tim / pekerja lain</button><span id="kl_total" class="text-sm font-extrabold text-slate-700 tabular-nums"></span></div>'+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Keperluan</label><input id="kr_ket" type="text" autocomplete="off" class="'+inputCls+'" placeholder="Opsional"></div>'+
-      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Satu pengajuan per minggu untuk tiap nama. Setelah disetujui Akuntan, kasbon dipotong otomatis dari gaji pembayaran berikutnya sampai lunas — tidak perlu menunggu absen minggu ini lengkap.</div>'+
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Satu pengajuan boleh untuk beberapa tim. Satu nama hanya sekali per minggu. Setelah disetujui Akuntan, kasbon dipotong otomatis dari gaji sampai lunas.</div>'+
     '</div>',
     function(){
-      var j = parseIdNum(fv('kr_jum')), who = fv('kr_w');
-      if(Number.isNaN(j) || j<=0){ toast('Isi jumlah kasbon.', true); return; }
-      if(asked[who]){ toast('Nama ini sudah mengajukan kasbon minggu ini (satu kali per minggu).', true); return; }
-      var payload = {id:'ksr_'+Math.random().toString(36).slice(2,8)+Date.now().toString(36), project_id:STATE.projectId, jumlah:j, ket:fv('kr_ket'),
-        worker_id: who.indexOf('w:')===0 ? who.slice(2) : null, tim: who.indexOf('t:')===0 ? who.slice(2) : ''};
+      var items = [], used = {};
+      for(var i=0;i<lines.length;i++){
+        var ln = lines[i], j = parseIdNum(ln.jum);
+        if(Number.isNaN(j) || j<=0){ toast('Isi jumlah kasbon di baris '+(i+1)+'.', true); return; }
+        if(asked[ln.who]){ toast('Nama di baris '+(i+1)+' sudah mengajukan kasbon minggu ini (satu kali per minggu).', true); return; }
+        if(used[ln.who]){ toast('Nama yang sama dipilih dua kali.', true); return; }
+        used[ln.who] = true;
+        items.push({id:'ksr_'+Math.random().toString(36).slice(2,8)+Date.now().toString(36)+i, jumlah:j,
+          worker_id: ln.who.indexOf('w:')===0 ? ln.who.slice(2) : null, tim: ln.who.indexOf('t:')===0 ? ln.who.slice(2) : ''});
+      }
+      var payload = {project_id:STATE.projectId, ket:fv('kr_ket'), items:items};
       var sv = document.getElementById('mSave'); if(sv){ sv.disabled = true; sv.textContent = 'Mengirim…'; }
       apiFetch('/kasbon_requests.php', {method:'POST', body:JSON.stringify(payload)})
-        .then(function(){
-          var wn = payload.worker_id ? ((ABSEN.workers.find(function(w){ return w.id===payload.worker_id; })||{}).nama||'') : '';
-          var row = {id:payload.id, project_id:STATE.projectId, worker_id:payload.worker_id, worker_nama:wn, tim:payload.tim, jumlah:j, ket:payload.ket, status:'diajukan', catatan:'', created_at:new Date().toISOString()};
-          ABSEN.kreqAll = [row].concat(ABSEN.kreqAll||[]); ABSEN.kreq = ABSEN.kreqAll.slice(0,5);
+        .then(function(r){
+          var rows = items.map(function(it){
+            var wn = it.worker_id ? ((ABSEN.workers.find(function(w){ return w.id===it.worker_id; })||{}).nama||'') : '';
+            return {id:it.id, project_id:STATE.projectId, worker_id:it.worker_id, worker_nama:wn, tim:it.tim, batch_id:r.batch_id||null, jumlah:it.jumlah, ket:payload.ket, status:'diajukan', catatan:'', created_at:new Date().toISOString(), tgl_wib:today()};
+          });
+          ABSEN.kreqAll = rows.concat(ABSEN.kreqAll||[]); ABSEN.kreq = ABSEN.kreqAll.slice(0,12);
           closeModal(); toast('Pengajuan kasbon terkirim ✓'); drawAbsen(c); })
         .catch(function(e){
           if(e.network || e.auth){ outboxAdd({endpoint:'/kasbon_requests.php', payload:payload, label:'Kasbon'}); closeModal(); toast(e.auth ? 'Sesi berakhir. Pengajuan disimpan dan terkirim otomatis setelah Anda masuk lagi.' : 'Tidak ada sinyal. Pengajuan disimpan dan dikirim otomatis saat sinyal kembali.'); renderTab(); }
           else { if(sv){ sv.disabled = false; sv.textContent = 'Simpan'; } toast(e.message, true); }
         });
     });
+  draw();
+  document.getElementById('kl_add').onclick = function(){
+    if(lines.length >= 6){ toast('Maksimal 6 baris per pengajuan.', true); return; }
+    var taken = lines.map(function(l){ return l.who; });
+    var nxt = opts.find(function(o){ return !asked[o[0]] && taken.indexOf(o[0])<0; });
+    if(!nxt){ toast('Semua nama sudah dipilih / sudah mengajukan minggu ini.', true); return; }
+    lines.push({who:nxt[0], jum:''}); draw();
+  };
 }
 
 function openAjukan(c){
@@ -4284,18 +4324,18 @@ function openAjukan(c){
   var gaps = absenMissing();
   openModal('Ajukan Absen Minggu Ini',
     '<div class="space-y-4">'+
-      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">Periode <b>'+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+'</b>. Setelah diajukan, absen minggu ini dikunci untuk Anda dan diteruskan ke pusat untuk dibayar.</div>'+
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">Periode <b>'+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+'</b>. Satu pengajuan untuk <b>seluruh tim</b> di proyek ini. Setelah diajukan, absen minggu ini dikunci untuk Anda dan diteruskan ke pusat untuk dibayar.</div>'+
+      '<div class="rounded-xl bg-sky-50 border border-sky-100 px-4 py-2.5 text-xs text-sky-800">Proyek berhenti sebelum akhir minggu (mis. di hari ke-4)? Tidak apa-apa — ajukan sekarang. Hari yang tidak diisi dianggap tidak kerja.</div>'+
       (gaps.length ? '<div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-900"><b>Hari yang masih kosong:</b> '+gaps.map(function(d){ return esc(HARI_NAMA[parseISO(d).getDay()].slice(0,3)+' '+parseISO(d).getDate()); }).join(', ')+'. Hari kosong dihitung tidak kerja (tanpa gaji).</div>' : '')+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Penanggung jawab *</label><input id="aj_pj" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(p.pj_nama||'')+'" placeholder="mis. Arya"></div>'+
-      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Nama grup</label><input id="aj_grup" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(p.grup_nama||'')+'" placeholder="mis. Upah Harian"></div>'+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Keterangan pekerjaan <span class="font-normal text-slate-400">(opsional)</span></label><input id="aj_cat" type="text" autocomplete="off" maxlength="200" class="'+inputCls+'" placeholder="mis. cor lantai 2, bongkar gudang"></div>'+
     '</div>',
     function(){
       var pj = fv('aj_pj');
       if(!pj){ toast('Nama penanggung jawab wajib diisi.', true); return; }
       var sv = document.getElementById('mSave'); if(sv){ sv.disabled = true; sv.textContent = 'Mengirim…'; }
-      apiFetch('/payroll_periods.php', {method:'POST', body:JSON.stringify({action:'ajukan', project_id:STATE.projectId, tgl:ABSEN.tgl, pj_nama:pj, grup_nama:fv('aj_grup'), catatan:fv('aj_cat')})})
-        .then(function(){ ABSEN.period = Object.assign({}, ABSEN.period||{}, {status:'diajukan', pj_nama:pj, grup_nama:fv('aj_grup')}); closeModal(); toast('Absen minggu ini sudah diajukan ✓'); drawAbsen(c); })
+      apiFetch('/payroll_periods.php', {method:'POST', body:JSON.stringify({action:'ajukan', project_id:STATE.projectId, tgl:ABSEN.tgl, pj_nama:pj, catatan:fv('aj_cat')})})
+        .then(function(){ ABSEN.period = Object.assign({}, ABSEN.period||{}, {status:'diajukan', pj_nama:pj}); closeModal(); toast('Absen minggu ini sudah diajukan ✓'); drawAbsen(c); })
         .catch(function(e){ if(sv){ sv.disabled = false; sv.textContent = 'Simpan'; } toast(e.network ? 'Mengajukan butuh sinyal.' : e.message, true); });
     });
   var sv0 = document.getElementById('mSave'); if(sv0) sv0.textContent = 'Ajukan';

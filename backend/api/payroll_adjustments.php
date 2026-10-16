@@ -34,6 +34,7 @@ if ($method === 'POST') {
     if ($kategori === 'kasbon' && $jenis !== 'potong') json_error('Kasbon hanya berupa potongan.', 422);
     if ($label === '' || mb_strlen($label) > 160) json_error('Keterangan wajib diisi.', 422);
     $workerId = !empty($b['worker_id']) ? (string)$b['worker_id'] : null;
+    $tim = $workerId === null ? mb_substr(trim((string)($b['tim'] ?? '')), 0, 80) : '';
     $qty = (isset($b['qty']) && $b['qty'] !== '') ? (float)$b['qty'] : null;
     $harga = (isset($b['harga']) && $b['harga'] !== '') ? money_in($b['harga'], 'Harga') : null;
     $jumlah = ($qty !== null && $harga !== null) ? round($qty * $harga, 2) : money_in($b['jumlah'] ?? null, 'Jumlah');
@@ -45,12 +46,12 @@ if ($method === 'POST') {
     }
     $p = adj_period_or_fail($projectId, $tgl);
     if ($kategori === 'kasbon') {
-        $saldo = kasbon_saldo($projectId, $workerId);
+        $saldo = kasbon_saldo($projectId, $workerId, $tim);
         if ($jumlah > $saldo + 0.005) json_error('Potongan kasbon melebihi saldo kasbon (' . number_format($saldo, 0, ',', '.') . ').', 422);
     }
     $id = new_id('adj_');
-    db()->prepare('INSERT INTO payroll_adjustments (id, period_id, worker_id, jenis, kategori, label, qty, harga, jumlah, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$id, $p['id'], $workerId, $jenis, $kategori, $label, $qty, $harga, $jumlah, $user['id']]);
+    db()->prepare('INSERT INTO payroll_adjustments (id, period_id, worker_id, tim, jenis, kategori, label, qty, harga, jumlah, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$id, $p['id'], $workerId, $tim, $jenis, $kategori, $label, $qty, $harga, $jumlah, $user['id']]);
     db()->commit();
     audit('create', 'payroll_adjustments', $id, "$jenis $kategori $jumlah — $label");
     json_response(['ok' => true, 'id' => $id, 'jumlah' => $jumlah]);

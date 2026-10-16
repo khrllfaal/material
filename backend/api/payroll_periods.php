@@ -111,13 +111,20 @@ if ($action === 'setujui') {
     $zero->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
     $zn = array_column($zero->fetchAll(), 'nama');
     if ($zn) json_error('Tarif belum diisi untuk: ' . implode(', ', $zn) . '. Isi dulu di Pekerja & Tarif.', 409);
+    $neg = [];
+    foreach (payroll_compute([$projectId], $p['tgl_mulai'], $p['tgl_akhir'])['rows'] as $rw) {
+        $adjAuto = $db->prepare("SELECT COALESCE(SUM(jumlah),0) FROM payroll_adjustments WHERE period_id = ? AND worker_id = ? AND kategori = 'kasbon' AND label LIKE '%(otomatis)'");
+        $adjAuto->execute([$p['id'], $rw['worker_id']]);
+        if ($rw['net'] + (float)$adjAuto->fetchColumn() < -0.005) $neg[] = $rw['nama'];
+    }
+    if ($neg) json_error('Gaji minus (potongan lebih besar dari gaji) untuk: ' . implode(', ', array_slice($neg, 0, 5)) . '. Perbaiki potongan dulu.', 409);
     $unvRows = []; // verifikasi pekerja baru dinonaktifkan (disederhanakan)
     // Automatic kasbon deduction: recomputed from the real saldo at the moment of approval (earlier automatic lines are replaced).
     $db->prepare("DELETE FROM payroll_adjustments WHERE period_id = ? AND kategori = 'kasbon' AND label LIKE '%(otomatis)'")->execute([$p['id']]);
     $plan = kasbon_auto_plan($projectId, $p);
-    $insAdj = $db->prepare("INSERT INTO payroll_adjustments (id, period_id, worker_id, jenis, kategori, label, jumlah, created_by) VALUES (?,?,?,'potong','kasbon','Potong kasbon (otomatis)',?,?)");
+    $insAdj = $db->prepare("INSERT INTO payroll_adjustments (id, period_id, worker_id, tim, jenis, kategori, label, jumlah, created_by) VALUES (?,?,?,?,'potong','kasbon','Potong kasbon (otomatis)',?,?)");
     $nAuto = 0;
-    foreach ($plan['items'] as $it) if ($it['potong'] > 0.005) { $insAdj->execute([new_id('adj_'), $p['id'], $it['worker_id'], $it['potong'], $user['id']]); $nAuto++; }
+    foreach ($plan['items'] as $it) if ($it['potong'] > 0.005) { $insAdj->execute([new_id('adj_'), $p['id'], $it['worker_id'], $it['tim'], $it['potong'], $user['id']]); $nAuto++; }
     $db->prepare("UPDATE payroll_periods SET status='disetujui', disetujui_at=NOW(), disetujui_by=? WHERE id=?")->execute([$user['id'], $p['id']]);
     $db->commit();
     if ($nAuto) audit('create', 'payroll_adjustments', $p['id'], "potong kasbon otomatis: $nAuto orang, total {$plan['total']}");
