@@ -352,8 +352,9 @@ function default_lembur_rate(float $harian): float {
 
 /** Effective rates for a worker: personal override, else the project's status rate. */
 function worker_rates(array $worker): array {
-    $st = db()->prepare('SELECT tarif_harian, tarif_lembur FROM labor_rates WHERE project_id = ? AND grade = ?');
-    $st->execute([$worker['project_id'], $worker['grade']]);
+    // Rate order: the worker's own override, then the rate of the worker's tim (if the tim has one), then the project's standard rate.
+    $st = db()->prepare("SELECT tarif_harian, tarif_lembur FROM labor_rates WHERE project_id = ? AND grade = ? AND tim IN (?, '') ORDER BY tim DESC LIMIT 1");
+    $st->execute([$worker['project_id'], $worker['grade'], (string)($worker['tim'] ?? '')]);
     $r = $st->fetch() ?: ['tarif_harian' => 0, 'tarif_lembur' => 0];
     $harian = $worker['tarif_harian'] !== null ? (float)$worker['tarif_harian'] : (float)$r['tarif_harian'];
     if ($worker['tarif_lembur'] !== null) $lembur = (float)$worker['tarif_lembur'];
@@ -397,7 +398,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
  *  fails quietly otherwise. The SQL file backend/mysql/migrations_2026-10-payroll-controls.sql does the same. */
 function ensure_payroll_controls(): void {
     start_session();
-    if (!empty($_SESSION['controls_ok'])) return;
+    if ((int)($_SESSION['controls_ok'] ?? 0) >= 2) return; // bump the number whenever a new migration is added
     try {
         $db = db();
         $has = function (string $table, string $col) use ($db): bool {
@@ -420,10 +421,13 @@ function ensure_payroll_controls(): void {
         if (!$has('attendance', 'rev')) {
             $db->exec('ALTER TABLE attendance ADD COLUMN rev INT NOT NULL DEFAULT 0');
         }
+        if (!$has('labor_rates', 'tim')) {
+            $db->exec("ALTER TABLE labor_rates ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER project_id, ADD INDEX idx_lr_project (project_id), DROP PRIMARY KEY, ADD PRIMARY KEY (project_id, tim, grade)");
+        }
         if (!$has('kasbon_requests', 'tim')) {
             $db->exec("ALTER TABLE kasbon_requests ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER worker_id");
         }
-        $_SESSION['controls_ok'] = 1;
+        $_SESSION['controls_ok'] = 2;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
     }

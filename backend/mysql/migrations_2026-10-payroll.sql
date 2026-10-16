@@ -11,12 +11,13 @@ ALTER TABLE users MODIFY role ENUM('admin','owner','lapangan','akuntan') NOT NUL
 -- tidak mengubah gaji yang sudah lewat.
 CREATE TABLE IF NOT EXISTS labor_rates (
   project_id    VARCHAR(40) NOT NULL,
+  tim           VARCHAR(80) NOT NULL DEFAULT '',   -- '' = tarif standar proyek; isi = tarif khusus tim tsb
   grade         VARCHAR(10) NOT NULL,
   tarif_harian  DECIMAL(14,2) NOT NULL DEFAULT 0,
   tarif_lembur  DECIMAL(14,2) NOT NULL DEFAULT 0, -- per jam
   updated_by    VARCHAR(40) NULL,
   updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (project_id, grade),
+  PRIMARY KEY (project_id, tim, grade),
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
