@@ -28,3 +28,9 @@ Options -Indexes
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE application/json
 </IfModule>
+
+# LiteSpeed (Hostinger) page cache: never cache API answers.
+<IfModule LiteSpeed>
+    RewriteEngine On
+    RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>

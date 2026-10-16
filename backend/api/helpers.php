@@ -145,6 +145,7 @@ function send_security_headers(): void {
         header('Strict-Transport-Security: max-age=31536000');
     }
     header('Cache-Control: no-store');
+    header('X-LiteSpeed-Cache-Control: no-cache'); // hosting-level page caches must never keep API answers
 }
 
 /** 422s unless $v is a real calendar date (YYYY-MM-DD) that is not in

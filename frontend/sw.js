@@ -2,7 +2,7 @@
    new frontend files. API responses are deliberately not cached here: stock
    and transaction data stay out of the browser cache, and offline writes go
    through the app's own outbox instead. */
-const VERSION = 'v3-2026-10-14';
+const VERSION = 'v4-2026-10-16';
 const SHELL = 'ms-shell-' + VERSION;
 const SHELL_FILES = [
   './', './index.html', './backend-config.js',

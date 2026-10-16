@@ -211,6 +211,9 @@ function apiFetch(path, opts){
   opts.headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
   var isWrite = !!opts.method && opts.method !== 'GET';
   if(isWrite) busyOn();
+  // Reads are never allowed to come from any cache (browser, hosting cache, proxy): a unique
+  // query value plus no-store, so the screen always shows what is really in the database.
+  if(!isWrite){ opts.cache = 'no-store'; path += (path.indexOf('?') > -1 ? '&' : '?') + '_t=' + Date.now(); }
   var pr = fetch((window.API_BASE_URL||'') + path, opts).then(async function(res){
     var data = {}; try{ data = await res.json(); }catch(e){}
     if(!res.ok){
@@ -2777,7 +2780,8 @@ function payrollView(c, mode){
       var el = document.getElementById('ad_saldo'); if(!el) return;
       if(fv('ad_kat').split('|')[0]!=='kasbon'){ el.textContent=''; return; }
       var s = G.data.kasbon_saldo[p.project_id+'|'+fv('ad_w')];
-      el.innerHTML = 'Saldo kasbon: <b class="'+(s>0?'text-red-600':'text-slate-500')+'">'+rp(s||0)+'</b>'+(s>0?'':' — belum ada kasbon, catat dulu di menu Kasbon');
+      el.innerHTML = 'Saldo kasbon: <b class="'+(s>0?'text-red-600':'text-slate-500')+'">'+rp(s||0)+'</b>'+(s>0?' · <button type="button" id="ad_all" class="font-bold text-indigo-600 underline">Potong semua saldo</button>':' — belum ada kasbon, catat dulu di tab Kasbon');
+      var ab = document.getElementById('ad_all'); if(ab) ab.onclick = function(){ var j = document.getElementById('ad_jumlah'); if(j){ j.value = fmtIdNum(s); } var q = document.getElementById('ad_qty'); if(q) q.value = ''; var h = document.getElementById('ad_harga'); if(h) h.value = ''; var l = document.getElementById('ad_label'); if(l && !l.value) l.value = 'potong kasbon'; };
     };
     document.getElementById('ad_kat').addEventListener('change', upd); document.getElementById('ad_w').addEventListener('change', upd);
   }
