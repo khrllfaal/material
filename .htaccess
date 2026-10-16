@@ -11,3 +11,14 @@ RedirectMatch 403 ^/(docs|scripts|\.git)(/|$)
         Require all denied
     </IfModule>
 </FilesMatch>
+
+# --- HTTPS (SSL) ------------------------------------------------------------
+# Hostinger gives every domain a free SSL certificate. Turn on "Force HTTPS"
+# in hPanel (Websites > Security > SSL) -- or remove the leading '#' on the lines
+# below -- so every visit and every password is encrypted in transit.
+#<IfModule mod_rewrite.c>
+#  RewriteEngine On
+#  RewriteCond %{HTTPS} !=on
+#  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+#  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+#</IfModule>

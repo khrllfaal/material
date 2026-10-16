@@ -682,6 +682,8 @@ function closeSidebar(){
   document.getElementById('sidebarBackdrop').classList.add('hidden');
 }
 function go(page){
+  // Akuntan only ever sees the three pay pages, whatever address or old bookmark asks for.
+  if(STATE.user && STATE.user.role==='akuntan' && NAV_AKUNTAN.indexOf(page)<0) page = 'pengajuan';
   STATE.page=page;
   document.querySelectorAll('.nav-link').forEach(function(a){
     var on = a.getAttribute('data-page')===page;

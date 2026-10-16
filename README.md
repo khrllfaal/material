@@ -71,8 +71,8 @@ scripts/
 - **Admin Pusat** (`admin`) — akses penuh untuk mengelola dan mengoreksi data: kelola Master Proyek,
   Master Bahan, Master Pekerjaan, Konfigurasi RAP, lihat semua
   laporan, dan kelola user.
-- **Akuntan** (`akuntan`) — hanya menu gaji: Rekap Gaji, Kasbon, Pekerja & Tarif. Memeriksa dan menyetujui
-  absen yang diajukan, memeriksa pengajuan kasbon, dan membayar; tidak
+- **Akuntan** (`akuntan`) — hanya 3 menu Tenaga Kerja: Pengajuan & Approval, Rekap & Pembukuan, Pekerja & Tarif.
+  Memeriksa dan menyetujui absen yang diajukan, memeriksa pengajuan kasbon, dan membayar; tidak
   bisa mengubah absen, dan seluruh endpoint stok/bahan/user ditolak (403).
 - **Owner** (`owner`) — bisa melihat semua menu, tapi setiap endpoint
   menolak permintaan tulis (POST/DELETE) dari role ini dengan HTTP
@@ -94,14 +94,24 @@ scripts/
 
 ## Absensi & Rekap Gaji
 
-- Admin Lapangan: menu **Absen** di bar bawah HP (untuk tim besar: *Pola kemarin*, *Semua hadir*, *Lembur standar*, cari nama, filter Belum/Hadir/½/Absen) — satu ketukan per pekerja (Hadir / ½ / Absen),
-  lembur dalam jam, tambah pekerja baru, lalu **Ajukan** absen mingguan (Jumat–Kamis).
-  Tidak pernah melihat nominal gaji. Tombol **Kasbon** untuk mengajukan kasbon; statusnya
-  (Menunggu dicek / Disetujui / Ditolak) terlihat di layar yang sama.
-- Akuntan memeriksa pengajuan di menu **Kasbon** (angka di menu = jumlah yang menunggu),
-  lalu Setujui (otomatis masuk buku kasbon) atau Tolak dengan alasan.
-- Admin Pusat / Akuntan / Owner: menu **Rekap Gaji** (kartu, filter proyek, cari, tanggal),
-  **Pekerja & Tarif**, **Kasbon**. Ekspor Excel format lembar "Absen Upah" dan PDF Daftar Bayar.
+- Admin Lapangan: menu **Absen** di bar bawah HP — satu ketukan per pekerja (Hadir / ½ / Absen), tombol **Semua hadir**
+  (per tim bila ada beberapa tim), *Lembur standar*, jam lembur bisa diketik (1,5 atau 1.5), cari nama, filter
+  Belum/Hadir/½/Absen, pilih tanggal dengan mengetuk tanggal. **Tambah pekerja** (tim dipilih dari daftar atau tim baru),
+  lalu **Ajukan** absen mingguan (Jumat–Kamis) untuk **satu proyek** — tombolnya berwarna: abu-abu (belum ada absen),
+  kuning (ada hari belum lengkap), hijau (siap diajukan); setelah diajukan berubah jadi lencana status.
+  Minggu dengan hanya 2–3 hari kerja: hari tanpa pekerjaan ditandai lewat **Tandai libur / tidak kerja** (pengingat
+  hari kosong); hari kosong dianggap tidak kerja. Tidak pernah melihat nominal gaji.
+  Tombol **Kasbon**: atas nama **tim** (pilihan pertama) atau pekerja (bisa dicari); **satu pengajuan per nama per
+  minggu**; kasbon dipotong dari gaji saat dibayar sehingga tidak perlu menunggu absen minggu itu lengkap.
+- **Pengajuan & Approval** (Akuntan; Admin Pusat/Owner hanya melihat & mengoreksi): kartu *Harus dibayar sekarang*,
+  *Menunggu persetujuan*, *Kasbon menunggu*, filter proyek/status/tanggal, tab **Gaji Mingguan** (Periksa & Setujui —
+  dengan rincian per tim —, Catat Pembayaran, Kembalikan, Tambahan/Potongan, unduh Absen Upah per tim, Daftar Bayar PDF,
+  Daftar Transfer) dan tab **Kasbon** (Setujui/Tolak, Catat Kasbon langsung). Excel/PDF daftar pengajuan.
+- **Rekap & Pembukuan**: kartu ringkasan, tab **Rincian Pekerja**, **Pembukuan & Jurnal** (beban upah per proyek +
+  jurnal debit/kredit: beban upah, potong kasbon, pembayaran kas/bank, kasbon diberikan), **Buku Kasbon**,
+  **Evaluasi** (kehadiran %, lembur, biaya per hari, per tim & per pekerja, biaya per minggu). Semua bisa diunduh.
+- **Pekerja & Tarif**: kartu ringkasan, tarif per status per proyek, dan **tarif khusus per tim** (kolom tim; kosong =
+  ikut tarif standar proyek). Urutan tarif: pribadi pekerja → tarif tim → tarif standar proyek.
 - Gaji = hari × tarif harian; lembur = jam lembur × tarif lembur; tarif disimpan
   per baris absen sehingga kenaikan tarif tidak mengubah periode yang sudah lewat.
 - Database yang sudah berjalan: jalankan `backend/mysql/migrations_2026-10-payroll.sql` sekali,
@@ -112,6 +122,7 @@ scripts/
   **Admin Pusat** hanya mengoreksi dan menghapus data (absen, pekerja, tarif, penyesuaian) — tidak menyetujui
   atau membayar. Absen yang diubah setelah disetujui otomatis membatalkan persetujuan.
 - Pekerja baru yang ditambah lapangan langsung aktif (tanpa verifikasi, agar sederhana). Tarif kosong menahan persetujuan.
+- Setiap penyimpanan menampilkan indikator *Menyimpan…* dan menonaktifkan tombol Simpan sampai selesai (mencegah dobel input).
 - **Log Aktivitas** (Admin Pusat & Owner): siapa mengubah apa, sebelum → sesudah, dan penanda "SETELAH DIAJUKAN".
 - Tidak ada data yang saling menimpa: dua HP yang mengedit absen yang sama tidak saling menimpa (yang
   terlambat ditolak dan layar dimuat ulang), dan persetujuan/pembayaran dikunci per periode sehingga tidak bisa
