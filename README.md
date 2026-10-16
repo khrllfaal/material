@@ -34,7 +34,8 @@ frontend/
     icons.js      subset ikon Lucide, di-inline lokal (bukan CDN)
 
 backend/mysql/
-  schema.sql    skema tabel MySQL/MariaDB — aman dijalankan ulang
+  database_lengkap.sql  DATABASE BARU lengkap (21 tabel + akun Admin Pusat awal). MENGHAPUS tabel lama lalu membuat ulang
+  schema.sql    skema yang sama tanpa menghapus apa pun (CREATE IF NOT EXISTS) — sumber database_lengkap.sql
 
 backend/api/    REST API PHP 8 di atas MySQL (sesi cookie, audit log)
 
@@ -47,8 +48,8 @@ scripts/
 
 ## Setup cepat
 
-1. Buat database MySQL, jalankan `backend/mysql/schema.sql` lewat
-   phpMyAdmin (tab SQL) atau `mysql -u <user> -p <db> < schema.sql`.
+1. Buat database MySQL, jalankan `backend/mysql/database_lengkap.sql` lewat
+   phpMyAdmin (tab SQL). Perhatian: file ini menghapus tabel lama. Login awal: `adminpusat` (ganti password di Kelola User).
 2. Salin `backend/api/config.sample.php` → `backend/api/config.php`,
    isi kredensial database Anda.
 3. Buat akun Admin Pusat pertama:
@@ -114,8 +115,8 @@ scripts/
   ikut tarif standar proyek). Urutan tarif: pribadi pekerja → tarif tim → tarif standar proyek.
 - Gaji = hari × tarif harian; lembur = jam lembur × tarif lembur; tarif disimpan
   per baris absen sehingga kenaikan tarif tidak mengubah periode yang sudah lewat.
-- Database yang sudah berjalan: jalankan `backend/mysql/migrations_2026-10-payroll.sql` sekali,
-  lalu (opsional) `backend/mysql/seed_absensi_percobaan.sql` untuk 2 proyek percobaan.
+- Struktur tabel baru (kolom tim, peran Akuntan, dsb.) ditambahkan otomatis oleh backend saat Admin login; untuk database baru cukup `database_lengkap.sql`.
+  Opsional: `seed_absensi_percobaan.sql` (2 proyek percobaan), `import_master_bahan.sql` (201 bahan).
 
 ### Pengendalian (anti-kecurangan & keamanan)
 - Alur gaji: **Lapangan mengajukan → Akuntan memeriksa & menyetujui → Akuntan membayar.**
@@ -131,5 +132,4 @@ scripts/
   tolak permintaan lintas-situs (CSRF: wajib JSON & Origin sama), pertanyaan SQL terparameter, teks pengguna
   selalu di-escape, waktu login sama untuk user dikenal/tidak (anti-enumerasi), penguncian akun setelah 5 kali
   salah, file internal (`helpers.php`, `payroll_lib.php`, `bin/`, `sessions/`) diblokir dari akses web.
-- Kolom/tabel baru dibuat otomatis saat pertama dipakai; `migrations_2026-10-payroll-controls.sql` tersedia bila
-  hak ALTER database dibatasi.
+- Kolom/tabel baru dibuat otomatis saat pertama dipakai (perlu hak ALTER/CREATE pada database).

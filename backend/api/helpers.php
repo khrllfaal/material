@@ -395,7 +395,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
 /** Adds the columns/tables introduced by the payroll controls (approval step,
  *  worker verification, login throttling) when a deployment has not run the
  *  SQL migration yet. Checked once per session; needs ALTER/CREATE rights and
- *  fails quietly otherwise. The SQL file backend/mysql/migrations_2026-10-payroll-controls.sql does the same. */
+ *  fails quietly otherwise. */
 function ensure_payroll_controls(): void {
     start_session();
     if ((int)($_SESSION['controls_ok'] ?? 0) >= 3) return; // bump the number whenever a new migration is added
