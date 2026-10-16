@@ -229,3 +229,47 @@ function kasbon_saldo_map(?array $projectIds): array {
     foreach ($b->fetchAll() as $r) { $k = $r['project_id'] . '|' . $r['w']; $map[$k] = ($map[$k] ?? 0.0) - (float)$r['t']; }
     return array_filter($map, fn($v) => abs($v) > 0.005);
 }
+
+
+/** Automatic kasbon deduction for one period (what the Akuntan sees before approving, and what approval writes).
+ *  Rule: kasbon given up to the end of the period is deducted; kasbon given after it waits for the next payment
+ *  (the payment happening right when a kasbon is given is never reduced by it). Each person is deducted
+ *  min(saldo still owed, pay of the period before this deduction) — so a zero saldo is never deducted, and
+ *  what cannot be taken now carries over to the next period. Lines made earlier by this routine are ignored
+ *  when recomputing, so approving twice never deducts twice. */
+function kasbon_auto_plan(string $projectId, array $p): array {
+    $db = db();
+    $given = []; $deducted = [];
+    $g = $db->prepare("SELECT COALESCE(worker_id, '') AS w, SUM(jumlah) AS t FROM kasbon WHERE project_id = ? AND tgl <= ? GROUP BY w");
+    $g->execute([$projectId, $p['tgl_akhir']]);
+    foreach ($g->fetchAll() as $r) $given[$r['w']] = (float)$r['t'];
+    if (!$given) return ['items' => [], 'total' => 0.0];
+    $d = $db->prepare("SELECT COALESCE(x.worker_id, '') AS w, SUM(x.jumlah) AS t FROM payroll_adjustments x JOIN payroll_periods pp ON pp.id = x.period_id
+                        WHERE pp.project_id = ? AND x.kategori = 'kasbon' AND x.jenis = 'potong' AND NOT (x.period_id = ? AND x.label LIKE '%(otomatis)')
+                        GROUP BY w");
+    $d->execute([$projectId, $p['id']]);
+    foreach ($d->fetchAll() as $r) $deducted[$r['w']] = (float)$r['t'];
+    // pay of this period before any automatic kasbon line
+    $adj = [];
+    $a = $db->prepare("SELECT COALESCE(worker_id, '') AS w, jenis, SUM(jumlah) AS t FROM payroll_adjustments
+                        WHERE period_id = ? AND NOT (kategori = 'kasbon' AND label LIKE '%(otomatis)') GROUP BY w, jenis");
+    $a->execute([$p['id']]);
+    foreach ($a->fetchAll() as $r) $adj[$r['w']][$r['jenis']] = (float)$r['t'];
+    $calc = payroll_compute([$projectId], $p['tgl_mulai'], $p['tgl_akhir']);
+    $items = []; $left = 0.0; $total = 0.0;
+    foreach ($calc['rows'] as $r) {
+        $w = $r['worker_id'];
+        $cap = $r['gaji'] + $r['lembur_rp'] + ($adj[$w]['tambah'] ?? 0.0) - ($adj[$w]['potong'] ?? 0.0);
+        $avail = max(0.0, ($given[$w] ?? 0.0) - ($deducted[$w] ?? 0.0));
+        $take = $avail > 0.005 && $cap > 0.005 ? round(min($avail, $cap), 2) : 0.0;
+        $left += max(0.0, $cap - $take);
+        if ($avail > 0.005) { $items[] = ['worker_id' => $w, 'nama' => $r['nama'], 'saldo' => round($avail, 2), 'potong' => $take]; $total += $take; }
+    }
+    $availG = max(0.0, ($given[''] ?? 0.0) - ($deducted[''] ?? 0.0));
+    if ($availG > 0.005) {
+        $capG = max(0.0, $left + ($adj['']['tambah'] ?? 0.0) - ($adj['']['potong'] ?? 0.0));
+        $takeG = $capG > 0.005 ? round(min($availG, $capG), 2) : 0.0;
+        $items[] = ['worker_id' => null, 'nama' => 'Grup / penanggung jawab', 'saldo' => round($availG, 2), 'potong' => $takeG]; $total += $takeG;
+    }
+    return ['items' => $items, 'total' => round($total, 2)];
+}

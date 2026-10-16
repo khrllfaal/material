@@ -23,7 +23,8 @@ if ($method === 'GET') {
     if ($projectId === '' && in_array($role, ['admin', 'akuntan', 'owner'], true)) {
         // Pusat view: which weeks are waiting (e.g. status=diajukan -> ready to be paid). No money here.
         $status = (string)($_GET['status'] ?? '');
-        $st = db()->prepare('SELECT p.id, p.project_id, pr.nama AS project_nama, p.tgl_mulai, p.tgl_akhir, p.status, p.pj_nama, p.grup_nama
+        $st = db()->prepare('SELECT p.id, p.project_id, pr.nama AS project_nama, p.tgl_mulai, p.tgl_akhir, p.status, p.pj_nama, p.grup_nama,
+                                    (SELECT COUNT(*) FROM attendance a WHERE a.project_id = p.project_id AND a.tgl BETWEEN p.tgl_mulai AND p.tgl_akhir) AS n_absen
                                FROM payroll_periods p JOIN projects pr ON pr.id = p.project_id'
                            . ($status !== '' ? ' WHERE p.status = ?' : '') . ' ORDER BY p.tgl_mulai DESC, pr.nama LIMIT 200');
         $st->execute($status !== '' ? [$status] : []);
@@ -31,6 +32,11 @@ if ($method === 'GET') {
     }
     if ($projectId === '') json_error('Proyek wajib dipilih.', 422);
     require_project_access($user, $projectId);
+    if (($_GET['action'] ?? '') === 'kasbon_plan') { // preview of the automatic kasbon deduction (money: pusat roles only)
+        if (!in_array($role, ['admin', 'akuntan', 'owner'], true)) json_error('Anda tidak punya akses untuk aksi ini.', 403);
+        $per = payroll_period($projectId, !empty($_GET['tgl']) ? require_valid_date($_GET['tgl']) : date('Y-m-d'));
+        json_response(kasbon_auto_plan($projectId, $per));
+    }
     $tgl = !empty($_GET['tgl']) ? require_valid_date($_GET['tgl']) : date('Y-m-d');
     [$s, $e] = payroll_week($tgl);
     $st = db()->prepare('SELECT id, project_id, tgl_mulai, tgl_akhir, status, pj_nama, grup_nama, catatan FROM payroll_periods WHERE project_id = ? AND tgl_mulai = ?');
@@ -106,11 +112,18 @@ if ($action === 'setujui') {
     $zn = array_column($zero->fetchAll(), 'nama');
     if ($zn) json_error('Tarif belum diisi untuk: ' . implode(', ', $zn) . '. Isi dulu di Pekerja & Tarif.', 409);
     $unvRows = []; // verifikasi pekerja baru dinonaktifkan (disederhanakan)
+    // Automatic kasbon deduction: recomputed from the real saldo at the moment of approval (earlier automatic lines are replaced).
+    $db->prepare("DELETE FROM payroll_adjustments WHERE period_id = ? AND kategori = 'kasbon' AND label LIKE '%(otomatis)'")->execute([$p['id']]);
+    $plan = kasbon_auto_plan($projectId, $p);
+    $insAdj = $db->prepare("INSERT INTO payroll_adjustments (id, period_id, worker_id, jenis, kategori, label, jumlah, created_by) VALUES (?,?,?,'potong','kasbon','Potong kasbon (otomatis)',?,?)");
+    $nAuto = 0;
+    foreach ($plan['items'] as $it) if ($it['potong'] > 0.005) { $insAdj->execute([new_id('adj_'), $p['id'], $it['worker_id'], $it['potong'], $user['id']]); $nAuto++; }
     $db->prepare("UPDATE payroll_periods SET status='disetujui', disetujui_at=NOW(), disetujui_by=? WHERE id=?")->execute([$user['id'], $p['id']]);
     $db->commit();
+    if ($nAuto) audit('create', 'payroll_adjustments', $p['id'], "potong kasbon otomatis: $nAuto orang, total {$plan['total']}");
     if ($unvRows) audit('update', 'workers', 'verifikasi', count($unvRows) . ' pekerja diverifikasi saat persetujuan ' . $p['id']);
     audit('update', 'payroll_periods', $p['id'], 'disetujui' . ($unvRows ? ' (+' . count($unvRows) . ' pekerja diverifikasi)' : ''));
-    json_response(['ok' => true, 'status' => 'disetujui']);
+    json_response(['ok' => true, 'status' => 'disetujui', 'potong_kasbon' => $plan['total'], 'orang' => $nAuto]);
 }
 
 if ($action === 'kembalikan' || $action === 'buka') {
@@ -122,6 +135,7 @@ if ($action === 'kembalikan' || $action === 'buka') {
     if (!in_array($p['status'], ['diajukan', 'disetujui'], true)) json_error('Hanya pengajuan yang belum dibayar yang bisa dikembalikan.', 409);
     $c = $db->prepare('SELECT COUNT(*) FROM payroll_payments WHERE period_id = ?'); $c->execute([$p['id']]);
     if ((int)$c->fetchColumn() > 0) json_error('Sudah ada pembayaran pada periode ini, tidak bisa dikembalikan. Buat penyesuaian di periode berikutnya.', 409);
+    $db->prepare("DELETE FROM payroll_adjustments WHERE period_id = ? AND kategori = 'kasbon' AND label LIKE '%(otomatis)'")->execute([$p['id']]);
     $db->prepare("UPDATE payroll_periods SET status='draft', diajukan_at=NULL, diajukan_by=NULL, disetujui_at=NULL, disetujui_by=NULL, catatan=? WHERE id=?")
        ->execute([$clip('Dikembalikan: ' . $alasan, 255), $p['id']]);
     $db->commit();

@@ -135,6 +135,7 @@ if ($conflicts) {
 // An approved week that is edited loses its approval: it must be checked again.
 if ($period['status'] === 'disetujui' && $changes) {
     $db->prepare("UPDATE payroll_periods SET status='diajukan', disetujui_at=NULL, disetujui_by=NULL WHERE id=?")->execute([$period['id']]);
+    $db->prepare("DELETE FROM payroll_adjustments WHERE period_id = ? AND kategori = 'kasbon' AND label LIKE '%(otomatis)'")->execute([$period['id']]); // recomputed on the next approval
 }
 $db->commit();
 

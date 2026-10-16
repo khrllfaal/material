@@ -113,6 +113,10 @@
             <span class="inline-block mt-2.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600" id="umRole">—</span>
           </div>
           <div class="border-t border-slate-100"></div>
+          <button id="btnGuide" type="button" class="w-full flex items-center gap-2.5 px-5 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left">
+            <i data-lucide="help-circle" class="w-4 h-4 text-slate-400"></i> Panduan Singkat
+          </button>
+          <div class="border-t border-slate-100"></div>
           <button id="btnProfil" type="button" class="w-full flex items-center gap-2.5 px-5 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left">
             <i data-lucide="user" class="w-4 h-4 text-slate-400"></i> Profil Saya
           </button>
@@ -139,6 +143,7 @@
     </div>
     <div class="flex items-center gap-3">
       <span id="mSync" class="hidden"></span>
+      <button id="mBtnGuide" type="button" class="text-emerald-700 bg-emerald-50 rounded-full w-9 h-9 flex items-center justify-center" aria-label="Panduan singkat"><i data-lucide="help-circle" class="w-5 h-5"></i></button>
       <button id="mBtnLogout" class="text-slate-400 hover:text-red-600 transition flex items-center gap-1 text-xs font-semibold">
       <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
     </button>
@@ -595,6 +600,55 @@ apiFetch('/auth_me.php').then(function(res){ if(res.user){ saveUser(res.user); b
   if(cached && cached.role==='lapangan') boot(cached);
 });
 
+/* Short, role-specific "how do I start" guide. Shown once at the first login of each person and
+   available any time from the ? button (phone) or the account menu (desktop). */
+var GUIDES = {
+  lapangan:{title:'Panduan Admin Lapangan', lead:'Tugas harian Anda cuma 3: absen, ajukan di akhir minggu, dan catat bahan.', steps:[
+    ['calendar-days','Pilih proyek & tanggal','Proyek ada di bagian atas. Ketuk tanggal untuk memilih hari lain (boleh mengisi hari yang terlewat).'],
+    ['check-check','Absen dalam 3 langkah','Tab Absen → ketuk Semua hadir → ubah yang berbeda saja (½ atau ✕, ketuk nama untuk lembur) → Simpan Absen.'],
+    ['send','Ajukan di akhir minggu','Tombol besar Ajukan: hijau = siap, kuning = ada hari belum lengkap. Hari tanpa kerja? Ketuk Tandai libur.'],
+    ['banknote','Kasbon & pekerja baru','Tombol Kasbon (atas nama tim atau pekerja, 1× per minggu) dan Pekerja untuk menambah orang. Gaji tidak terlihat oleh Anda.'],
+    ['truck','Bahan masuk & pemakaian','Tab Bahan: Masuk, Pakai, Stok, Riwayat. Bahan belum ada? Ketuk Bahan baru di atas kolom Material.']]},
+  akuntan:{title:'Panduan Akuntan', lead:'Alurnya satu arah: lapangan mengajukan → Anda periksa & setujui → Anda bayar.', steps:[
+    ['send','Pengajuan & Approval','Mulai dari sini. Kartu merah = harus dibayar sekarang, kartu kuning = menunggu persetujuan Anda.'],
+    ['check-circle-2','Periksa → Setujui → Bayar','Periksa & Setujui menampilkan total, rincian per tim, dan potongan kasbon otomatis. Lalu Catat Pembayaran.'],
+    ['banknote','Kasbon','Tab Kasbon: setujui atau tolak pengajuan. Setelah disetujui, saldo dipotong otomatis dari gaji sampai lunas; saldo nol tidak dipotong.'],
+    ['book-open','Rekap & Pembukuan','Rincian per pekerja, jurnal debit/kredit, buku kasbon, dan evaluasi kehadiran. Semua bisa diunduh Excel/PDF.'],
+    ['hard-hat','Pekerja & Tarif','Isi tarif per status. Tim dengan upah berbeda? Isi kolom tim — kosong berarti ikut tarif standar.']]},
+  admin:{title:'Panduan Admin Pusat', lead:'Anda mengelola data dan mengoreksi; persetujuan & pembayaran gaji dilakukan Akuntan.', steps:[
+    ['briefcase','Data master','Master Proyek, Bahan, Pekerjaan, dan RAP ada di grup Data Master.'],
+    ['users','Kelola User','Buat akun Owner, Akuntan, dan Admin Lapangan, lalu tugaskan proyeknya.'],
+    ['hard-hat','Tenaga Kerja','Pengajuan & Approval (koreksi, tambahan/potongan), Rekap & Pembukuan, serta Pekerja & Tarif (tarif per tim).'],
+    ['layout-dashboard','Dashboard & laporan','Pantau stok, RAP, dan tenaga kerja. Semua tabel bisa difilter dan diunduh.'],
+    ['history','Log Aktivitas','Siapa mengubah apa dan kapan, termasuk perubahan setelah diajukan.']]},
+  owner:{title:'Panduan Owner', lead:'Anda memantau; semua layar bersifat hanya-baca.', steps:[
+    ['layout-dashboard','Dashboard','Ringkasan stok, pemakaian bahan, dan biaya tenaga kerja. Gunakan filter proyek dan tanggal.'],
+    ['wallet','Tenaga Kerja','Pengajuan & Approval untuk memantau status gaji dan kasbon; Rekap & Pembukuan untuk jurnal dan evaluasi kehadiran.'],
+    ['file-down','Unduh laporan','Tombol Excel / PDF ada di tiap halaman laporan.'],
+    ['history','Log Aktivitas','Jejak semua perubahan data.']]},
+};
+function showGuide(){
+  var role = STATE.user && STATE.user.role, g = GUIDES[role]; if(!g) return;
+  openModal(g.title,
+    '<div class="text-sm text-slate-600 mb-4">'+esc(g.lead)+'</div><div class="space-y-3">'+
+    g.steps.map(function(x, i){ return '<div class="flex gap-3"><div class="shrink-0 w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><i data-lucide="'+x[0]+'" class="w-4.5 h-4.5"></i></div>'+
+      '<div class="min-w-0"><div class="text-sm font-bold text-slate-800 leading-tight">'+(i+1)+'. '+esc(x[1])+'</div><div class="text-[13px] text-slate-500 mt-0.5 leading-snug">'+esc(x[2])+'</div></div></div>'; }).join('')+
+    '</div><div class="text-[11px] text-slate-400 mt-4">Panduan ini bisa dibuka lagi kapan saja lewat tombol <b>?</b> (HP) atau menu akun → Panduan Singkat (komputer).</div>',
+    function(){ closeModal(); });
+  var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Mengerti';
+  var cb = document.getElementById('mCancel'); if(cb) cb.style.display = 'none';
+  icons();
+}
+function guideOnce(user){
+  var key = 'ms_guide_seen_'+user.id;
+  if(navigator.webdriver && !lsGet('ms_guide_force', false)) return; // automated test browsers skip the welcome card
+  if(lsGet(key, false)) return;
+  lsSet(key, true);
+  setTimeout(function(){ if(STATE.user && STATE.user.id===user.id) showGuide(); }, 900);
+}
+document.getElementById('btnGuide').onclick = function(){ document.getElementById('userMenu').classList.add('hidden'); showGuide(); };
+document.getElementById('mBtnGuide').onclick = showGuide;
+
 function boot(user){
   STATE.user = user;
   document.getElementById('loginScreen').classList.add('hidden');
@@ -603,6 +657,7 @@ function boot(user){
     document.getElementById('mobileShell').classList.remove('hidden');
     document.getElementById('mobileShell').classList.add('flex');
     bootMobile(user);
+    guideOnce(user);
   } else {
     document.getElementById('mobileShell').classList.add('hidden');
     document.getElementById('desktopShell').classList.remove('hidden');
@@ -620,6 +675,7 @@ function boot(user){
     icons();
     go(user.role==='akuntan' ? 'pengajuan' : 'dashboard');
     refreshKasbonBadge();
+    guideOnce(user);
   }
 }
 
@@ -1574,6 +1630,18 @@ function exportPembukuan(d, from, to, kind){
   else exportExcel('Pembukuan_Upah_per_Proyek_'+from+'_sd_'+to, 'Pembukuan Upah per Proyek', t.headers, t.rows, {sub:sub, sheetName:'Pembukuan'});
 }
 
+/* Admin Pusat / Owner open "this week" and find nothing when the real activity was last week
+   (the Akuntan already paid it). Find the most recent week that has attendance and show that
+   instead, with a note — so these screens are never blank while data exists. */
+function latestDataRange(from, to){
+  return apiFetch('/payroll_periods.php').then(function(l){
+    var wd = l.filter(function(x){ return x.n_absen > 0; });
+    if(!wd.length) return null;
+    if(wd.some(function(x){ return x.tgl_mulai <= to && x.tgl_akhir >= from; })) return null;
+    var latest = wd.slice().sort(function(a,b){ return a.tgl_mulai < b.tgl_mulai ? 1 : -1; })[0];
+    return {from:latest.tgl_mulai, to:latest.tgl_akhir};
+  }).catch(function(){ return null; });
+}
 /* Tenaga kerja minggu ini for Admin Pusat / Owner: money out, who is waiting on whom. */
 var DL = {preset:'minggu', from:null, to:null, data:null};
 function loadDashLabor(){
@@ -1585,9 +1653,9 @@ function loadDashLabor(){
     '<div class="flex items-center gap-2 flex-wrap justify-end"><button class="'+btnGhostSm+' flex items-center gap-1" id="dlXls"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Pembukuan Excel</button>'+
     '<button class="'+btnGhostSm+' flex items-center gap-1" id="dlPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button>'+
     '<button class="'+btnGhostSm+'" onclick="go(\'rekap_gaji\')">Buka Rekap & Pembukuan →</button></div></div>'+
-    '<div class="flex items-center gap-3 flex-wrap mb-4"><select id="dlPreset" class="'+selCls+' font-semibold"><option value="minggu">Minggu ini (Jum–Kam)</option><option value="lalu">Minggu lalu</option><option value="bulan">Bulan ini</option><option value="kustom">Rentang manual</option></select>'+
+    '<div class="flex items-center gap-3 flex-wrap mb-4"><select id="dlPreset" class="'+selCls+' font-semibold"><option value="minggu">Minggu ini (Jum–Kam)</option><option value="lalu">Minggu lalu</option><option value="bulan">Bulan ini</option><option value="30hari">30 hari terakhir</option><option value="kustom">Rentang manual</option></select>'+
     '<span class="text-xs text-slate-400">Dari</span><input type="date" id="dlFrom" class="'+selCls+'"><span class="text-xs text-slate-400">Sampai</span><input type="date" id="dlTo" class="'+selCls+'"></div>'+
-    '<div id="dlBody"><div class="text-sm text-slate-400 py-4 text-center">Memuat…</div></div></div>';
+    '<div id="dlNote" class="text-xs text-amber-700 mb-3"></div><div id="dlBody"><div class="text-sm text-slate-400 py-4 text-center">Memuat…</div></div></div>';
   icons();
   document.getElementById('dlPreset').value = DL.preset; document.getElementById('dlFrom').value = DL.from; document.getElementById('dlTo').value = DL.to;
   var setPreset = function(v){
@@ -1595,6 +1663,7 @@ function loadDashLabor(){
     if(v==='minggu'){ var w=weekOf(t); DL.from=w.from; DL.to=w.to; }
     else if(v==='lalu'){ var w2=weekOf(addDays(t,-7)); DL.from=w2.from; DL.to=w2.to; }
     else if(v==='bulan'){ var d=parseISO(t); DL.from=localISO(new Date(d.getFullYear(), d.getMonth(), 1)); DL.to=t; }
+    else if(v==='30hari'){ DL.from=addDays(t,-29); DL.to=t; }
     document.getElementById('dlFrom').value = DL.from; document.getElementById('dlTo').value = DL.to;
   };
   function draw(){
@@ -1613,7 +1682,13 @@ function loadDashLabor(){
           : '<div class="text-sm text-slate-400 py-4 text-center">Belum ada absen pada rentang ini.</div>');
     }).catch(function(e){ body.innerHTML = '<div class="text-sm text-red-500 py-3 text-center">Gagal memuat: '+esc(e.message)+'</div>'; });
   }
-  draw();
+  if(!DL.smart){
+    DL.smart = true;
+    latestDataRange(DL.from, DL.to).then(function(r){
+      if(r){ DL.from = r.from; DL.to = r.to; DL.preset = 'kustom'; document.getElementById('dlFrom').value = DL.from; document.getElementById('dlTo').value = DL.to; document.getElementById('dlPreset').value = 'kustom';
+        var n = document.getElementById('dlNote'); if(n) n.textContent = 'Minggu ini belum ada absen — menampilkan minggu terakhir yang ada datanya ('+fmtTglPendek(r.from)+' – '+fmtTglPendek(r.to)+').'; }
+      draw(); });
+  } else draw();
   document.getElementById('dlPreset').addEventListener('change', function(){ DL.preset = this.value; if(this.value!=='kustom') setPreset(this.value); draw(); });
   ['dlFrom','dlTo'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){
     var f = fv('dlFrom'), t = fv('dlTo'); if(!f || !t) return;
@@ -2267,7 +2342,7 @@ function payrollView(c, mode){
       '<div class="flex items-center gap-3 flex-wrap">'+
         '<select id="fProj" class="'+selCls+' min-w-[180px]"><option value="">Semua Proyek</option></select>'+
         (REKAP ? '' : '<select id="gjSt" class="'+selCls+' min-w-[170px]"><option value="">Semua status</option><option value="draft">Belum diajukan</option><option value="diajukan">Menunggu persetujuan</option><option value="disetujui">Siap dibayar</option><option value="dibayar">Sudah dibayar</option></select>')+
-        '<select id="gjPreset" class="'+selCls+' font-semibold"><option value="minggu">Minggu ini (Jum–Kam)</option><option value="lalu">Minggu lalu</option><option value="bulan">Bulan ini</option><option value="kustom">Rentang manual</option></select>'+
+        '<select id="gjPreset" class="'+selCls+' font-semibold"><option value="minggu">Minggu ini (Jum–Kam)</option><option value="lalu">Minggu lalu</option><option value="bulan">Bulan ini</option><option value="30hari">30 hari terakhir</option><option value="kustom">Rentang manual</option></select>'+
         '<span class="text-xs text-slate-400">Dari</span><input type="date" id="gjFrom" class="'+selCls+'">'+
         '<span class="text-xs text-slate-400">Sampai</span><input type="date" id="gjTo" class="'+selCls+'">'+
         '<span class="text-xs text-slate-400" id="gjRangeNote"></span>'+
@@ -2299,6 +2374,7 @@ function payrollView(c, mode){
     if(v==='minggu'){ var w=weekOf(t); G.from=w.from; G.to=w.to; }
     else if(v==='lalu'){ var w2=weekOf(addDays(t,-7)); G.from=w2.from; G.to=w2.to; }
     else if(v==='bulan'){ var d=parseISO(t); G.from=localISO(new Date(d.getFullYear(), d.getMonth(), 1)); G.to=t; }
+    else if(v==='30hari'){ G.from=addDays(t,-29); G.to=t; }
     document.getElementById('gjFrom').value=G.from; document.getElementById('gjTo').value=G.to;
   }
   function load(){
@@ -2722,8 +2798,16 @@ function payrollView(c, mode){
       keys.map(function(k){ return '<tr class="border-t border-slate-100"><td class="px-3 py-1.5 font-semibold">'+esc(k)+'</td><td class="px-3 py-1.5 text-right">'+m[k].n+'</td><td class="px-3 py-1.5 text-right">'+num0(m[k].h)+'</td><td class="px-3 py-1.5 text-right font-bold">'+rp(m[k].t)+'</td></tr>'; }).join('')+
       '</tbody></table></div></div>';
   }
+  function kasbonPlanHtml(plan){
+    if(!plan || !plan.items || !plan.items.length) return '<div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500"><b class="text-slate-700">Kasbon:</b> tidak ada saldo kasbon yang harus dipotong pada periode ini.</div>';
+    return '<div class="rounded-xl border border-sky-200 bg-sky-50 p-3"><div class="flex items-center justify-between mb-1.5"><div class="text-sm font-bold text-sky-900">Potongan kasbon otomatis</div><div class="text-sm font-extrabold text-sky-900 tabular-nums">'+rp(plan.total)+'</div></div>'+
+      '<table class="w-full text-xs"><thead class="text-sky-700"><tr><th class="text-left font-semibold py-0.5">Nama</th><th class="text-right font-semibold">Saldo kasbon</th><th class="text-right font-semibold">Dipotong</th></tr></thead><tbody>'+
+      plan.items.map(function(x){ return '<tr class="border-t border-sky-100"><td class="py-1">'+esc(x.nama)+'</td><td class="py-1 text-right tabular-nums">'+rp(x.saldo)+'</td><td class="py-1 text-right tabular-nums font-bold">'+(x.potong>0?rp(x.potong):'<span class="font-normal text-slate-400">ditunda</span>')+'</td></tr>'; }).join('')+'</tbody></table>'+
+      '<div class="text-[11px] text-sky-800 mt-1.5">Dipotong dari gaji periode ini sebesar saldo yang masih ada (tidak lebih dari gaji). Sisa saldo dipotong di pembayaran berikutnya. Yang saldonya nol tidak dipotong.</div></div>';
+  }
   function doSetujui(p){
-    periodData(p).then(function(d){
+    Promise.all([periodData(p), apiFetch('/payroll_periods.php?action=kasbon_plan&project_id='+encodeURIComponent(p.project_id)+'&tgl='+p.tgl_mulai).catch(function(){ return null; })]).then(function(rs){
+      var d = rs[0], plan = rs[1];
       var rows = d.rows, per = d.period;
       var other = rows.filter(function(r){ return r.flags.length; });
       var lembur = rows.reduce(function(a,r){ return a+r.lembur_jam; },0);
@@ -2734,6 +2818,7 @@ function payrollView(c, mode){
           '<div class="rounded-xl bg-indigo-50 p-3"><div class="text-[11px] font-semibold text-indigo-400">Total bayar</div><div class="text-lg font-extrabold text-indigo-700">'+rp(per.total_bayar)+'</div></div></div>'+
           '<div class="text-xs text-slate-500">Lembur total '+fmtJam(lembur)+' jam · PJ '+esc(per.pj_nama||'-')+'</div>'+
           timBreakdown(rows)+
+          kasbonPlanHtml(plan)+
           (other.length ? '<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><b>'+other.length+' pekerja ditandai perlu dicek</b> (lembur tinggi, absen kosong, atau hadir di 2 proyek). Buka rincian per pekerja untuk melihatnya.</div>' : '')+
           '<div class="text-xs text-slate-400">Setelah disetujui, Anda bisa mencatat pembayaran. Jika absen diubah lagi oleh siapa pun, persetujuan ini otomatis dibatalkan.</div>'+
         '</div>',
@@ -2859,20 +2944,28 @@ function payrollView(c, mode){
     document.getElementById('fProj').innerHTML = '<option value="">Semua Proyek</option>'+projects.map(function(x){ return '<option value="'+esc(x.id)+'">'+esc(x.nama)+'</option>'; }).join('');
     enhanceSelect(document.getElementById('fProj'));
     STATE.pendingFilter = null;
-    if(REKAP || !isAk) return load();
-    // Accountant lands on the oldest week that is submitted and waiting to be paid.
-    return apiFetch('/payroll_periods.php').then(function(l){
-      l = l.filter(function(x){ return x.status==='diajukan' || x.status==='disetujui'; });
-      if(l.length){
-        var oldest = l.slice().sort(function(a,b){ return a.tgl_mulai < b.tgl_mulai ? -1 : 1; })[0];
-        var newest = l.slice().sort(function(a,b){ return a.tgl_mulai < b.tgl_mulai ? 1 : -1; })[0];
-        G.from = oldest.tgl_mulai; G.to = newest.tgl_akhir;
-        document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to;
-        var sel = document.getElementById('gjPreset'); sel.value = 'kustom'; sel.dispatchEvent(new Event('ss-refresh'));
-        toast('Menampilkan periode yang perlu diperiksa/dibayar ('+l.length+').');
+    var setRange = function(from, to, msg){
+      G.from = from; G.to = to;
+      document.getElementById('gjFrom').value = G.from; document.getElementById('gjTo').value = G.to;
+      var sel = document.getElementById('gjPreset'); sel.value = 'kustom'; G.preset = 'kustom'; sel.dispatchEvent(new Event('ss-refresh'));
+      if(msg) toast(msg);
+    };
+    return apiFetch('/payroll_periods.php').catch(function(){ return []; }).then(function(l){
+      var pending = l.filter(function(x){ return x.status==='diajukan' || x.status==='disetujui'; });
+      if(!REKAP && isAk && pending.length){
+        // Accountant lands on the weeks that are submitted and waiting to be checked / paid.
+        var asc = pending.slice().sort(function(a,b){ return a.tgl_mulai < b.tgl_mulai ? -1 : 1; });
+        setRange(asc[0].tgl_mulai, asc[asc.length-1].tgl_akhir, 'Menampilkan periode yang perlu diperiksa/dibayar ('+pending.length+').');
+      } else {
+        // Everybody else: if the chosen week has nothing, jump to the latest week that has data.
+        var wd = l.filter(function(x){ return x.n_absen > 0; });
+        if(wd.length && !wd.some(function(x){ return x.tgl_mulai <= G.to && x.tgl_akhir >= G.from; })){
+          var latest = wd.slice().sort(function(a,b){ return a.tgl_mulai < b.tgl_mulai ? 1 : -1; })[0];
+          setRange(latest.tgl_mulai, latest.tgl_akhir, 'Minggu ini belum ada data. Menampilkan minggu terakhir yang ada datanya ('+fmtTglPendek(latest.tgl_mulai)+' – '+fmtTglPendek(latest.tgl_akhir)+').');
+        }
       }
       return load();
-    }).catch(function(){ return load(); });
+    });
   });
   var onv = function(id, ev, fn){ var el = document.getElementById(id); if(el) el.addEventListener(ev, fn); };
   onv('q','input', function(){ G.PG.page=1; if(G.data) draw(); });
@@ -3514,9 +3607,9 @@ function materialOptions(selected){
   // blank placeholder, the form silently started every entry on
   // whichever material happened to sort first, and an admin who didn't
   // notice could submit real data against the wrong bahan.
-  return '<option value="">— Pilih Bahan —</option>' + list.map(function(m){
+  return '<option value="">— Pilih Bahan —</option><option value="__new__">＋ Bahan belum ada? Tambah baru</option>' + list.map(function(m){
     return '<option value="'+esc(m.id)+'"'+(m.id===selected?' selected':'')+'>'+esc(m.nama)+' ('+esc(m.satuan)+')</option>';
-  }).join('') + '<option value="__new__">+ Bahan belum ada, tambah baru</option>';
+  }).join('');
 }
 function pekerjaanOptions(selected){
   var list = pekerjaanForProject();
@@ -3539,7 +3632,9 @@ function renderInputForm(c, mode){
       '<h3 class="font-bold text-[15px]">'+(isMasuk?'Catat Bahan Masuk':'Catat Pemakaian Bahan')+'</h3>'+
     '</div>'+
     fieldWrap('Tanggal', '<input type="date" id="f_tgl" value="'+today()+'" class="'+inputCls+'">')+
-    fieldWrap('Material', '<select id="f_material" class="'+inputCls+'">'+materialOptions(STATE.pendingMaterial)+'</select>')+
+    '<div class="mb-4"><div class="flex items-center justify-between mb-1.5"><label class="block text-xs font-bold text-slate-500">Material</label>'+
+      '<button type="button" id="f_newmat" class="inline-flex items-center gap-1 text-[12px] font-bold text-'+accent+'-700 bg-'+accent+'-50 border border-'+accent+'-100 rounded-lg px-2.5 py-1.5"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Bahan baru</button></div>'+
+      '<select id="f_material" class="'+inputCls+'">'+materialOptions(STATE.pendingMaterial)+'</select></div>'+
     (isMasuk ? '' : fieldWrap('Pekerjaan (untuk analisis RAP)', '<select id="f_pekerjaan" class="'+inputCls+'">'+pekerjaanOptions()+'</select>'))+
     fieldWrap('Jumlah (Qty)', numInputHtml('f_qty', '', inputCls, ' placeholder="0"'))+
     (isMasuk ? fieldWrap('No. Surat Jalan / Nota', '<input type="text" id="f_ref" placeholder="Opsional" class="'+inputCls+'">') : '')+
@@ -3558,6 +3653,7 @@ function renderInputForm(c, mode){
   document.getElementById('f_cancel').onclick = function(){ renderInputForm(c, mode); };
   STATE.pendingMaterial = null;
   enhanceSelect(document.getElementById('f_material'));
+  document.getElementById('f_newmat').onclick = function(){ openNewMaterial(mode); };
   document.getElementById('f_material').addEventListener('change', function(){
     if(this.value === '__new__'){ this.value = ''; this.dispatchEvent(new Event('ss-refresh')); openNewMaterial(mode); }
   });
@@ -3713,6 +3809,8 @@ function renderAbsen(c){
       ABSEN.orig[a.worker_id] = {h:Number(a.hari), l:Number(a.lembur_jam)||0};
       ABSEN.rev[a.worker_id] = Number(a.rev)||0;
     });
+    // A day the field marked "libur / tidak kerja": every worker is Absen with the LIBUR note.
+    ABSEN.libur = r[1].length > 0 && r[1].length >= ABSEN.workers.length && r[1].every(function(a){ return Number(a.hari) === 0 && a.ket === 'LIBUR'; });
     // Anything still waiting in the outbox for this day is shown as already entered.
     outboxGet().forEach(function(o){
       if(o.endpoint !== '/attendance.php' || o.payload.project_id !== pid || o.payload.tgl !== tgl) return;
@@ -3807,6 +3905,7 @@ function drawAbsen(c){
   if(!ed) banner += '<div class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mb-3">'+esc(ABSEN.reason)+'</div>';
   if(ABSEN.period && ABSEN.period.status==='draft' && /^Dikembalikan:/.test(ABSEN.period.catatan||'')) banner += '<div class="text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-3"><b>Absen minggu ini dikembalikan oleh Akuntan.</b><br>'+esc((ABSEN.period.catatan||'').replace(/^Dikembalikan:\s*/,''))+'<br><span class="text-red-600">Perbaiki lalu ajukan lagi.</span></div>';
   var missing = absenMissing();
+  if(ABSEN.libur) banner += '<div class="text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-xl px-3 py-3 mb-3 flex items-center justify-between gap-3"><div><b>Hari ini ditandai LIBUR / tidak ada kerja.</b><div class="text-xs text-slate-500 mt-0.5">Semua pekerja tercatat tidak masuk dan tidak dibayar.</div></div>'+(ed?'<button type="button" id="abUnlibur" class="shrink-0 h-10 px-3 rounded-lg bg-white border border-slate-300 text-[13px] font-bold text-slate-700">Jadikan hari kerja</button>':'')+'</div>';
   if(ed && missing.length) banner += '<div class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3"><div class="mb-2"><b>Ada hari yang belum diisi minggu ini.</b> Ketuk harinya untuk mengisi:</div><div class="flex flex-wrap gap-2">'+
     missing.slice(0,7).map(function(d){ return '<button type="button" data-ab-goto="'+d+'" class="h-9 px-3 rounded-lg bg-amber-500 text-white font-bold">'+esc(HARI_NAMA[parseISO(d).getDay()].slice(0,3)+' '+parseISO(d).getDate())+'</button>'; }).join('')+'</div>'+
     '<div class="mt-2.5 pt-2.5 border-t border-amber-200 text-amber-800">Memang tidak ada kerja di hari itu? <button type="button" id="abLibur" class="font-extrabold underline underline-offset-2">Tandai libur / tidak kerja</button></div></div>';
@@ -3816,6 +3915,7 @@ function drawAbsen(c){
       (ed ? btn3('', 'user-plus', 'Pekerja', 'data-ab-add')+
         '<button type="button" id="abAll" class="h-12 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 text-[13px] font-bold flex flex-col items-center justify-center gap-0.5 leading-tight"><i data-lucide="check-check" class="w-4 h-4"></i>Semua hadir'+(ABSEN.tim?' <span class="font-semibold opacity-70">('+esc(ABSEN.tim)+')</span>':'')+'</button>' : '')+btn3('abKasbon', 'banknote', 'Kasbon')+'</div>';
 
+  var nothingYet = ed && !ABSEN.libur && ABSEN.workers.length && ABSEN.workers.every(function(w){ return ABSEN.cur[w.id].h === null; });
   var head =
     '<div class="flex items-center justify-between gap-2 mb-3">'+
       '<button type="button" id="abPrev" class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>'+
@@ -3823,7 +3923,7 @@ function drawAbsen(c){
       '<div class="text-xs text-slate-400 mt-0.5">Minggu '+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+' · '+badge(ps[0], ps[1])+'</div>'+
       '<input type="date" id="abDate" value="'+tgl+'" max="'+today()+'" aria-label="Pilih tanggal" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"></div>'+
       '<button type="button" id="abNext" '+(canNext?'':'disabled')+' class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center disabled:opacity-30"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>'+
-    '</div><div id="abTiles"></div>';
+    '</div><div id="abTiles"></div>'+(nothingYet ? '<div class="text-center mt-2"><button type="button" id="abLiburToday" class="text-xs font-bold text-slate-500 underline underline-offset-2 py-1">Tidak ada kerja hari ini? Tandai libur / hujan</button></div>' : '');
 
   var quick = ed && ABSEN.workers.length ?
     '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 mb-3">'+
@@ -3998,6 +4098,7 @@ function bindAbsen(c){
   document.getElementById('abPrev').onclick = function(){ ABSEN.tgl = addDays(ABSEN.tgl, -1); renderTab(); };
   document.getElementById('abNext').onclick = function(){ if(ABSEN.tgl < today()){ ABSEN.tgl = addDays(ABSEN.tgl, 1); renderTab(); } };
   var dp = document.getElementById('abDate');
+  if(dp) dp.addEventListener('click', function(){ try{ if(dp.showPicker) dp.showPicker(); }catch(e){} });
   if(dp) dp.onchange = function(){
     var v = dp.value;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
@@ -4019,6 +4120,20 @@ function bindAbsen(c){
     ABSEN.workers.forEach(function(w){ var x = ABSEN.cur[w.id]; if(x.h>0) x.l = ABSEN.defL; });
     document.querySelectorAll('#abDefL [data-defl]').forEach(function(o){ var on = Number(o.getAttribute('data-defl'))===ABSEN.defL; o.className = 'h-10 rounded-lg text-[13px] font-bold '+(on?'bg-indigo-600 text-white':'bg-slate-100 text-slate-500'); });
     upd(); }; });
+  var lt = document.getElementById('abLiburToday');
+  if(lt) lt.onclick = function(){
+    confirmModal('Tandai libur / hujan', 'Semua pekerja ditandai <b>tidak masuk</b> pada '+esc(fmtTglPanjang(ABSEN.tgl))+' dan disimpan sekarang. Hari ini tidak dihitung gaji.', function(){
+      ABSEN.workers.forEach(function(w){ ABSEN.cur[w.id].h = 0; ABSEN.cur[w.id].l = 0; });
+      ABSEN.markLibur = true; closeModal(); saveAbsen(c);
+    });
+  };
+  var ul = document.getElementById('abUnlibur');
+  if(ul) ul.onclick = function(){
+    var entries = ABSEN.workers.map(function(w){ return {worker_id:w.id, hari:null, ver:(ABSEN.rev && ABSEN.rev[w.id] !== undefined) ? ABSEN.rev[w.id] : null}; });
+    apiFetch('/attendance.php', {method:'POST', body:JSON.stringify({project_id:STATE.projectId, tgl:ABSEN.tgl, entries:entries})})
+      .then(function(){ if(ABSEN.weekFilled) delete ABSEN.weekFilled[ABSEN.tgl]; toast('Hari ini dikembalikan menjadi hari kerja. Silakan isi absennya.'); renderTab(); })
+      .catch(function(e){ toast(e.message, true); });
+  };
   var lib = document.getElementById('abLibur');
   if(lib) lib.onclick = function(){ openLibur(c); };
   var kb = document.getElementById('abKasbon');
@@ -4052,7 +4167,7 @@ function saveAbsen(c){
   ABSEN.workers.forEach(function(w){
     var x = ABSEN.cur[w.id], o = ABSEN.orig[w.id];
     var ver = (ABSEN.rev && ABSEN.rev[w.id] !== undefined) ? ABSEN.rev[w.id] : null;
-    if(x.h !== null) entries.push({worker_id:w.id, hari:x.h, lembur_jam: x.h>0 ? x.l : 0, ver:ver});
+    if(x.h !== null) entries.push({worker_id:w.id, hari:x.h, lembur_jam: x.h>0 ? x.l : 0, ver:ver, ket: ABSEN.markLibur ? 'LIBUR' : ''});
     else if(o.h !== null) entries.push({worker_id:w.id, hari:null, ver:ver});
   });
   if(!entries.length){ toast('Belum ada yang diisi.', true); return; }
@@ -4070,7 +4185,9 @@ function saveAbsen(c){
       Object.keys(ABSEN.rev).forEach(function(k){ if(!(r.revs && k in r.revs)) delete ABSEN.rev[k]; });
       Object.keys(r.revs||{}).forEach(function(k){ ABSEN.rev[k] = r.revs[k]; });
       if(r.periode_status && ABSEN.period) ABSEN.period.status = r.periode_status;
-      done('Absen '+fmtTglPendek(tgl)+' tersimpan ✓');
+      var wasLibur = ABSEN.markLibur; ABSEN.markLibur = false;
+      if(wasLibur){ toast('Hari '+fmtTglPendek(tgl)+' ditandai libur ✓'); ABSEN.libur = true; ABSEN.workers.forEach(function(w){ ABSEN.orig[w.id] = {h:0, l:0}; }); if(ABSEN.weekFilled) ABSEN.weekFilled[tgl] = true; drawAbsen(c); }
+      else done('Absen '+fmtTglPendek(tgl)+' tersimpan ✓');
     })
     .catch(function(e){
       if(e.network || e.auth){
@@ -4139,7 +4256,7 @@ function openKasbonRequest(c){
         opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===first?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select></div>'+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Jumlah (Rp) *</label>'+numInputHtml('kr_jum','',inputCls,' placeholder="mis. 500.000"')+'</div>'+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Keperluan</label><input id="kr_ket" type="text" autocomplete="off" class="'+inputCls+'" placeholder="Opsional"></div>'+
-      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Satu pengajuan per minggu untuk tiap nama. Kasbon dipotong dari gaji saat dibayar — tidak perlu menunggu absen minggu ini lengkap. Pengajuan dicek Akuntan.</div>'+
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Satu pengajuan per minggu untuk tiap nama. Setelah disetujui Akuntan, kasbon dipotong otomatis dari gaji pembayaran berikutnya sampai lunas — tidak perlu menunggu absen minggu ini lengkap.</div>'+
     '</div>',
     function(){
       var j = parseIdNum(fv('kr_jum')), who = fv('kr_w');

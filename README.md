@@ -123,6 +123,13 @@ scripts/
   **Admin Pusat** hanya mengoreksi dan menghapus data (absen, pekerja, tarif, penyesuaian) — tidak menyetujui
   atau membayar. Absen yang diubah setelah disetujui otomatis membatalkan persetujuan.
 - Pekerja baru yang ditambah lapangan langsung aktif (tanpa verifikasi, agar sederhana). Tarif kosong menahan persetujuan.
+- **Kasbon otomatis terpotong.** Saat Akuntan menyetujui periode, saldo kasbon tiap pekerja dipotong otomatis dari gaji
+  (kasbon yang diberikan sampai akhir periode; paling banyak sebesar gaji; sisanya dipotong di pembayaran berikutnya;
+  saldo nol tidak dipotong; menyetujui ulang tidak memotong dua kali). Pratinjau ada di jendela Periksa & Setujui.
+- Layar Tenaga Kerja untuk Admin Pusat/Owner/Akuntan otomatis menampilkan minggu terakhir yang ada datanya bila minggu ini kosong.
+- Proyek yang sudah punya absen, pembayaran gaji, atau kasbon tidak bisa dihapus (data uang tidak boleh hilang).
+- Panduan Singkat per peran muncul saat login pertama (tombol ? di HP, menu akun di komputer).
+- Waktu database disamakan dengan WIB (+07:00) agar batas minggu (Jumat–Kamis) tepat.
 - Setiap penyimpanan menampilkan indikator *Menyimpan…* dan menonaktifkan tombol Simpan sampai selesai (mencegah dobel input).
 - **Log Aktivitas** (Admin Pusat & Owner): siapa mengubah apa, sebelum → sesudah, dan penanda "SETELAH DIAJUKAN".
 - Tidak ada data yang saling menimpa: dua HP yang mengedit absen yang sama tidak saling menimpa (yang

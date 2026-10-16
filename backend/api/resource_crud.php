@@ -86,6 +86,18 @@ function handle_resource_crud(string $table, array $columns, string $idColumn = 
         // too (FK ON DELETE CASCADE) so the data always matches the master
         // list. Count them first so the audit log records what went.
         $detail = '';
+        if ($table === 'projects') {
+            // Stock history may cascade (the owner asked for that) but MONEY never silently disappears:
+            // a project with attendance, wage payments or kasbon cannot be deleted.
+            $blockers = [];
+            foreach (['attendance' => 'absen', 'kasbon' => 'kasbon'] as $t => $label) {
+                $c = db()->prepare("SELECT COUNT(*) FROM `$t` WHERE project_id = ?"); $c->execute([$id]);
+                if ((int)$c->fetchColumn() > 0) $blockers[] = $label;
+            }
+            $c = db()->prepare('SELECT COUNT(*) FROM payroll_payments pp JOIN payroll_periods p ON p.id = pp.period_id WHERE p.project_id = ?'); $c->execute([$id]);
+            if ((int)$c->fetchColumn() > 0) $blockers[] = 'pembayaran gaji';
+            if ($blockers) json_error('Proyek ini tidak bisa dihapus karena sudah punya data ' . implode(', ', array_unique($blockers)) . '. Data gaji dan kasbon tidak boleh hilang; hubungi pengembang bila memang harus dikosongkan.', 409);
+        }
         if ($table === 'projects' || $table === 'materials') {
             $col = $table === 'projects' ? 'project_id' : 'material_id';
             $n = [];
