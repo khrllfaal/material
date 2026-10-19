@@ -113,10 +113,6 @@
             <span class="inline-block mt-2.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600" id="umRole">—</span>
           </div>
           <div class="border-t border-slate-100"></div>
-          <button id="btnGuide" type="button" class="w-full flex items-center gap-2.5 px-5 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left">
-            <i data-lucide="help-circle" class="w-4 h-4 text-slate-400"></i> Buku Panduan (PDF)
-          </button>
-          <div class="border-t border-slate-100"></div>
           <button id="btnProfil" type="button" class="w-full flex items-center gap-2.5 px-5 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left">
             <i data-lucide="user" class="w-4 h-4 text-slate-400"></i> Profil Saya
           </button>
@@ -143,7 +139,6 @@
     </div>
     <div class="flex items-center gap-3">
       <span id="mSync" class="hidden"></span>
-      <button id="mBtnGuide" type="button" class="text-emerald-700 bg-emerald-50 rounded-full w-9 h-9 flex items-center justify-center" aria-label="Buku panduan (PDF)"><i data-lucide="help-circle" class="w-5 h-5"></i></button>
       <button id="mBtnLogout" class="text-slate-400 hover:text-red-600 transition flex items-center gap-1 text-xs font-semibold">
       <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
     </button>
@@ -629,10 +624,6 @@ apiFetch('/auth_me.php').then(function(res){ if(res.user){ saveUser(res.user); b
   if(cached && cached.role==='lapangan') boot(cached);
 });
 
-/* The user handbook is a PDF (Buku_Panduan.pdf, next to index.html) — no pop-ups; just a link. */
-function openHandbook(){ window.open('Buku_Panduan.pdf', '_blank', 'noopener'); }
-document.getElementById('btnGuide').onclick = function(){ document.getElementById('userMenu').classList.add('hidden'); openHandbook(); };
-document.getElementById('mBtnGuide').onclick = openHandbook;
 
 function boot(user){
   STATE.user = user;

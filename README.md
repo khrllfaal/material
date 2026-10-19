@@ -142,7 +142,6 @@ scripts/
 - Kolom/tabel baru dibuat otomatis saat pertama dipakai (perlu hak ALTER/CREATE pada database).
 
 
-## Buku panduan & kasbon (update)
-- `frontend/Buku_Panduan.pdf` — buku panduan bergambar per peran (dibuka dari tombol ? / menu akun).
+## Kasbon (update)
 - Kasbon bisa atas nama pekerja, tim, atau grup; satu pengajuan boleh banyak tim; dipotong otomatis saat Akuntan menyetujui gaji (kasbon bertanggal ≤ akhir periode), pelunasan lewat tab Kasbon.
 - Hapus proyek yang sudah berisi data memerlukan mengetik nama proyek.
