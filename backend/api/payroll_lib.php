@@ -58,8 +58,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         if ($l > 8 && !in_array('lembur_tinggi', $r['flags'], true)) $r['flags'][] = 'lembur_tinggi';
         unset($r);
         $dates[$a['project_id'] . '|' . $a['tgl']] = true;
-        $ws = payroll_week($a['tgl'])[0];
-        $pk = $a['project_id'] . '|' . $ws;
+        $pk = $a['project_id'] . '|' . $a['tgl']; // per day; summed per period below (a period can be a part-week)
         if (!isset($pstat[$pk])) $pstat[$pk] = ['hari' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0, 'workers' => []];
         $pstat[$pk]['hari'] += $h; $pstat[$pk]['gaji'] += $h * (float)$a['tarif_harian']; $pstat[$pk]['lembur_rp'] += $lp * (float)$a['tarif_lembur'];
         if ($h > 0) $pstat[$pk]['workers'][$a['worker_id']] = 1;
@@ -164,7 +163,13 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         foreach ($p['adjustments'] as $x) if (!$x['worker_id']) { if ($x['jenis'] === 'tambah') $tg += $x['jumlah']; else $pg += $x['jumlah']; }
         foreach ($p['payments'] as $x) if (!$x['worker_id']) $gp += $x['jumlah'];
         $p['grup_tambah'] = $tg; $p['grup_potong'] = $pg; $p['grup_net'] = $tg - $pg; $p['grup_dibayar'] = $gp;
-        $st2 = $pstat[$p['project_id'] . '|' . $p['tgl_mulai']] ?? ['hari' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0, 'workers' => []];
+        $st2 = ['hari' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0, 'workers' => []];
+        for ($dd = $p['tgl_mulai']; $dd <= $p['tgl_akhir']; $dd = date('Y-m-d', strtotime($dd . ' +1 day'))) {
+            $x = $pstat[$p['project_id'] . '|' . $dd] ?? null;
+            if (!$x) continue;
+            $st2['hari'] += $x['hari']; $st2['gaji'] += $x['gaji']; $st2['lembur_rp'] += $x['lembur_rp'];
+            $st2['workers'] += $x['workers'];
+        }
         $at = 0.0; $ap = 0.0; $paid = 0.0;
         foreach ($p['adjustments'] as $x) { if ($x['jenis'] === 'tambah') $at += $x['jumlah']; else $ap += $x['jumlah']; }
         foreach ($p['payments'] as $x) $paid += $x['jumlah'];

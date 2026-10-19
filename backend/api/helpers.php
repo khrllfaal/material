@@ -326,9 +326,24 @@ function payroll_week(string $tgl): array {
     return [date('Y-m-d', $start), date('Y-m-d', strtotime('+6 days', $start))];
 }
 
-/** Returns the (project, week) period row, creating a draft if needed. */
+/** Start/end of the payroll period that holds $tgl for a project. Normally the Fri–Thu week.
+ *  When a week was submitted early (project stopped mid-week) its period was cut at the
+ *  last working day; the remaining days of that week form a follow-up period. */
+function period_bounds(string $projectId, string $tgl): array {
+    $st = db()->prepare('SELECT tgl_mulai, tgl_akhir FROM payroll_periods WHERE project_id = ? AND tgl_mulai <= ? AND tgl_akhir >= ? ORDER BY tgl_mulai DESC LIMIT 1');
+    $st->execute([$projectId, $tgl, $tgl]);
+    if ($r = $st->fetch()) return [$r['tgl_mulai'], $r['tgl_akhir']];
+    [$s, $e] = payroll_week($tgl);
+    $st = db()->prepare('SELECT MAX(tgl_akhir) FROM payroll_periods WHERE project_id = ? AND tgl_mulai >= ? AND tgl_akhir < ? AND tgl_akhir < ?');
+    $st->execute([$projectId, $s, $e, $tgl]);
+    $cut = $st->fetchColumn();
+    if ($cut) $s = date('Y-m-d', strtotime($cut . ' +1 day'));
+    return [$s, $e];
+}
+
+/** Returns the (project, period) row, creating a draft if needed. */
 function payroll_period(string $projectId, string $tgl): array {
-    [$start, $end] = payroll_week($tgl);
+    [$start, $end] = period_bounds($projectId, $tgl);
     $id = 'per_' . $projectId . '_' . $start;
     db()->prepare('INSERT IGNORE INTO payroll_periods (id, project_id, tgl_mulai, tgl_akhir) VALUES (?,?,?,?)')
         ->execute([$id, $projectId, $start, $end]);
@@ -399,7 +414,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
  *  fails quietly otherwise. */
 function ensure_payroll_controls(): void {
     start_session();
-    if ((int)($_SESSION['controls_ok'] ?? 0) >= 4) return; // bump the number whenever a new migration is added
+    if ((int)($_SESSION['controls_ok'] ?? 0) >= 5) return; // bump the number whenever a new migration is added
     try {
         $db = db();
         $has = function (string $table, string $col) use ($db): bool {
@@ -435,7 +450,11 @@ function ensure_payroll_controls(): void {
         if (!$has('kasbon_requests', 'tim')) {
             $db->exec("ALTER TABLE kasbon_requests ADD COLUMN tim VARCHAR(80) NOT NULL DEFAULT '' AFTER worker_id");
         }
-        $_SESSION['controls_ok'] = 4;
+        // v5: a week that was submitted/paid before it ended is cut at its last working day, so the
+        // remaining days of that week can still be filled in (they become a follow-up period).
+        $mx = "(SELECT MAX(a.tgl) FROM attendance a WHERE a.project_id = p.project_id AND a.tgl BETWEEN p.tgl_mulai AND p.tgl_akhir)";
+        $db->exec("UPDATE payroll_periods p SET p.tgl_akhir = $mx WHERE p.status <> 'draft' AND p.tgl_akhir >= CURDATE() AND $mx IS NOT NULL AND $mx < p.tgl_akhir");
+        $_SESSION['controls_ok'] = 5;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
     }

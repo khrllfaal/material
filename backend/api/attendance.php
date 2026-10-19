@@ -78,7 +78,7 @@ $saved = 0; $changes = []; $conflicts = [];
 // The period row is locked for the whole save: nobody can approve/pay the week
 // half-way through, and two saves for the same project+week run one after the other.
 $lk = $db->prepare('SELECT * FROM payroll_periods WHERE project_id = ? AND tgl_mulai = ? FOR UPDATE');
-$lk->execute([$projectId, payroll_week($tgl)[0]]);
+$lk->execute([$projectId, period_bounds($projectId, $tgl)[0]]);
 $period = $lk->fetch();
 if ($period['status'] === 'dibayar') json_error('Periode ini sudah dibayar dan terkunci. Koreksi dibuat sebagai penyesuaian di periode berikutnya.', 409);
 if ($isField && $period['status'] !== 'draft') json_error('Absen minggu ini sudah diajukan. Hubungi Admin Pusat untuk koreksi.', 409);

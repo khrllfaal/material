@@ -38,7 +38,7 @@ if ($method === 'GET') {
         json_response(kasbon_auto_plan($projectId, $per));
     }
     $tgl = !empty($_GET['tgl']) ? require_valid_date($_GET['tgl']) : date('Y-m-d');
-    [$s, $e] = payroll_week($tgl);
+    [$s, $e] = period_bounds($projectId, $tgl);
     $st = db()->prepare('SELECT id, project_id, tgl_mulai, tgl_akhir, status, pj_nama, grup_nama, catatan FROM payroll_periods WHERE project_id = ? AND tgl_mulai = ?');
     $st->execute([$projectId, $s]);
     $p = $st->fetch() ?: ['id' => null, 'project_id' => $projectId, 'tgl_mulai' => $s, 'tgl_akhir' => $e, 'status' => 'draft', 'pj_nama' => '', 'grup_nama' => '', 'catatan' => ''];
@@ -65,7 +65,7 @@ $db = db();
  *  status checked is the real, current one. */
 function lock_period(string $projectId, string $tgl): array {
     $st = db()->prepare('SELECT * FROM payroll_periods WHERE project_id = ? AND tgl_mulai = ? FOR UPDATE');
-    $st->execute([$projectId, payroll_week($tgl)[0]]);
+    $st->execute([$projectId, period_bounds($projectId, $tgl)[0]]);
     return $st->fetch();
 }
 
@@ -90,6 +90,15 @@ if ($action === 'ajukan') {
     $c = $db->prepare('SELECT COUNT(*) FROM attendance WHERE project_id = ? AND tgl BETWEEN ? AND ?');
     $c->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
     if ((int)$c->fetchColumn() === 0) json_error('Belum ada absen pada minggu ini.', 422);
+    // Submitted before the week is over (e.g. the project stopped on day 4): the period ends on the
+    // last working day. If work resumes later that week, those days form their own follow-up period.
+    $mx = $db->prepare('SELECT MAX(tgl) FROM attendance WHERE project_id = ? AND tgl BETWEEN ? AND ?');
+    $mx->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
+    $lastDay = (string)$mx->fetchColumn();
+    if ($lastDay !== '' && $lastDay < $p['tgl_akhir'] && date('Y-m-d') < $p['tgl_akhir']) {
+        $db->prepare('UPDATE payroll_periods SET tgl_akhir = ? WHERE id = ?')->execute([$lastDay, $p['id']]);
+        $p['tgl_akhir'] = $lastDay;
+    }
     $pj = $clip($b['pj_nama'] ?? $p['pj_nama'], 120);
     if ($pj === '') json_error('Nama penanggung jawab wajib diisi.', 422);
     $catatan = array_key_exists('catatan', $b) ? $clip($b['catatan'], 255) : '';

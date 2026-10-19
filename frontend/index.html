@@ -325,6 +325,35 @@ function parseIdNum(s){
 function numInputHtml(id, value, cls, extra){
   return '<input id="'+esc(id)+'" type="text" inputmode="decimal" autocomplete="off" data-num value="'+esc(fmtIdNum(value))+'" class="'+cls+'"'+(extra||'')+'>';
 }
+/* Live thousands dots while typing (1000 -> 1.000), caret stays where it was.
+   Money fields (data-money): a typed "." is only a thousands mark and is dropped.
+   Other number fields (qty, jam): a typed "." becomes the decimal comma. */
+document.addEventListener('input', function(e){
+  var el = e.target;
+  if(!el || !el.hasAttribute || !el.hasAttribute('data-num') || (e.isComposing)) return;
+  var v = el.value, pos = el.selectionStart == null ? v.length : el.selectionStart;
+  var money = el.hasAttribute('data-money');
+  var typedDot = e.data === '.' || e.data === ',';
+  var out = '', sig = 0, seenComma = false, neg = v.charAt(0) === '-', before = 0;
+  for(var i=0;i<v.length;i++){
+    var ch = v.charAt(i), keep = null;
+    if(/\d/.test(ch)) keep = ch;
+    else if(ch === ',' && !seenComma){ keep = ','; seenComma = true; }
+    else if(ch === '.' && !seenComma && !money && typedDot && i === pos-1){ keep = ','; seenComma = true; }
+    if(keep !== null){ out += keep; if(i < pos) before++; }
+  }
+  var ci = out.indexOf(','), ip = ci > -1 ? out.slice(0, ci) : out, fp = ci > -1 ? out.slice(ci) : '';
+  ip = ip.replace(/^0+(?=\d)/, '');
+  var ipf = ip.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  var res = (neg ? '-' : '') + ipf + fp;
+  if(res === v) return;
+  // put the caret after the same number of digits/comma as before
+  var np = 0, cnt = 0;
+  if(neg) np = 1;
+  while(np < res.length && cnt < before){ if(res.charAt(np) !== '.') cnt++; np++; }
+  el.value = res;
+  try{ el.setSelectionRange(np, np); }catch(_){}
+}, true);
 document.addEventListener('blur', function(e){
   if(e.target && e.target.hasAttribute && e.target.hasAttribute('data-num')){
     var n = parseIdNum(e.target.value);
@@ -2816,8 +2845,8 @@ function payrollView(c, mode){
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Untuk</label><select id="ad_w" class="'+fieldCls+'">'+optsW+'</select><div id="ad_saldo" class="text-xs text-slate-500 mt-1.5"></div></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan *</label><input id="ad_label" type="text" class="'+fieldCls+'" placeholder="mis. air galon, kasbon minggu lalu"></div>'+
         '<div class="grid grid-cols-3 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Qty</label>'+numInputHtml('ad_qty','',fieldCls)+'</div>'+
-          '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Harga satuan</label>'+numInputHtml('ad_harga','',fieldCls)+'</div>'+
-          '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Atau jumlah (Rp)</label>'+numInputHtml('ad_jumlah','',fieldCls)+'</div></div>'+
+          '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Harga satuan</label>'+numInputHtml('ad_harga','',fieldCls,' data-money')+'</div>'+
+          '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Atau jumlah (Rp)</label>'+numInputHtml('ad_jumlah','',fieldCls,' data-money')+'</div></div>'+
         '<div class="text-xs text-slate-400">Isi Qty × Harga, atau langsung Jumlah. Contoh sheet: air galon 54 × 7.000 = 378.000.</div>'+
       '</div>',
       function(){
@@ -2849,7 +2878,7 @@ function payrollView(c, mode){
         return '<tr class="border-t border-slate-100"><td class="py-2 pr-2"><input type="checkbox" checked data-py-w="'+esc(r.worker_id)+'" class="w-4 h-4"></td>'+
           '<td class="py-2 pr-3 text-sm"><b>'+esc(r.nama)+'</b> <span class="text-xs text-slate-400">'+esc(r.grade_nama)+'</span></td>'+
           '<td class="py-2 pr-3 text-right text-xs text-slate-400 tabular-nums">sisa '+rp(r.sisa)+'</td>'+
-          '<td class="py-2"><input type="text" data-num inputmode="decimal" data-py-amt="'+esc(r.worker_id)+'" value="'+fmtIdNum(Math.round(r.sisa))+'" class="w-32 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-right tabular-nums"></td></tr>';
+          '<td class="py-2"><input type="text" data-num data-money inputmode="decimal" data-py-amt="'+esc(r.worker_id)+'" value="'+fmtIdNum(Math.round(r.sisa))+'" class="w-32 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-right tabular-nums"></td></tr>';
       }).join('');
       var grpHtml = Math.abs(grp)>=0.5 ? '<tr class="border-t border-slate-200 bg-slate-50"><td class="py-2 pr-2"><input type="checkbox" checked data-py-grp class="w-4 h-4"></td><td class="py-2 pr-3 text-sm font-bold">Penyesuaian grup</td>'+
         '<td class="py-2 pr-3 text-right text-xs text-slate-400">tambahan − potongan</td><td class="py-2 text-right font-bold tabular-nums pr-1">'+rp(grp)+'</td></tr>' : '';
@@ -3113,7 +3142,7 @@ PAGES.pekerja = function(c){
   function drawRates(){
     var pid = D.proj; if(!pid){ document.getElementById('trTable').innerHTML=''; return; }
     var tims = timsOf(pid), cols = [''].concat(tims);
-    var inp = function(id, v, ph){ return write ? numInputHtml(id, v||'', 'w-28 px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-right tabular-nums', ' placeholder="'+(ph||'0')+'"') : '<span class="tabular-nums">'+(v?rp(v):'<span class="text-slate-300">–</span>')+'</span>'; };
+    var inp = function(id, v, ph){ return write ? numInputHtml(id, v||'', 'w-28 px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-right tabular-nums', ' data-money placeholder="'+(ph||'0')+'"') : '<span class="tabular-nums">'+(v?rp(v):'<span class="text-slate-300">–</span>')+'</span>'; };
     document.getElementById('trTable').innerHTML = '<table class="w-full"><thead><tr><th class="'+TH_CLS+'">Status</th>'+
       cols.map(function(t){ return '<th class="'+TH_CLS+' text-center" colspan="1">'+(t ? esc(t) : 'Semua tim <span class="text-[10px] font-bold text-indigo-500">standar</span>')+'</th>'; }).join('')+'<th class="'+TH_CLS+'">Pekerja</th></tr></thead><tbody>'+
       GRADE_ORDER.map(function(g){
@@ -3198,7 +3227,7 @@ PAGES.pekerja = function(c){
           '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tim</label><select id="wk_timsel" class="'+fieldCls+'">'+timOptsFor(projSel, v('tim'))+'</select></div></div>'+
         '<input id="wk_timbaru" type="text" maxlength="80" class="'+fieldCls+' hidden" placeholder="Nama tim baru, mis. Tim Pondasi">'+
         '<div class="rounded-xl bg-slate-50 border border-slate-200 p-3"><div class="text-xs font-semibold text-slate-500 mb-2">Tarif pribadi (opsional — kosongkan agar ikut tarif status / tim)</div>'+
-          '<div class="grid grid-cols-2 gap-3"><div>'+numInputHtml('wk_h', v('tarif_harian',''), fieldCls, ' placeholder="harian"')+'</div><div>'+numInputHtml('wk_l', v('tarif_lembur',''), fieldCls, ' placeholder="lembur/jam"')+'</div></div></div>'+
+          '<div class="grid grid-cols-2 gap-3"><div>'+numInputHtml('wk_h', v('tarif_harian',''), fieldCls, ' data-money placeholder="harian"')+'</div><div>'+numInputHtml('wk_l', v('tarif_lembur',''), fieldCls, ' data-money placeholder="lembur/jam"')+'</div></div></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Rekening / e-wallet (opsional)</label><input id="wk_rek" type="text" value="'+esc(v('no_rek'))+'" class="'+fieldCls+'"></div>'+
         '<label class="flex items-center gap-2 text-sm font-semibold text-slate-600"><input type="checkbox" id="wk_aktif" class="w-4 h-4" '+(!w||w.aktif?'checked':'')+'> Aktif</label>'+
       '</div>',
@@ -3294,7 +3323,7 @@ function kasbonView(c, part, opts){
       openModal(multi ? 'Setujui Semua ('+g.rows.length+' baris)' : 'Setujui Kasbon',
         '<div class="space-y-4"><div class="text-sm text-slate-600"><b>'+g.rows.map(function(x){ return esc(kreqName(x))+' '+rp(x.jumlah); }).join('</b><br><b>')+'</b><div class="text-xs text-slate-400 mt-1">'+esc(r.project_nama)+(r.ket?' · '+esc(r.ket):'')+'</div></div>'+
         '<div class="grid grid-cols-2 gap-3">'+(multi ? '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Total disetujui</label><div class="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold tabular-nums">'+rp(sumJ(g))+'</div></div>'
-          : '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah disetujui (Rp)</label>'+numInputHtml('kr_ok_j', r.jumlah, fieldCls)+'</div>')+
+          : '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah disetujui (Rp)</label>'+numInputHtml('kr_ok_j', r.jumlah, fieldCls, ' data-money')+'</div>')+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal diberikan</label><input id="kr_ok_t" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Catatan</label><input id="kr_ok_c" type="text" class="'+fieldCls+'"></div>'+
         '<div class="text-xs text-slate-400">Setelah disetujui, otomatis tercatat di buku kasbon dan menambah saldo. Saldo dipotong otomatis dari gaji periode berikutnya.</div></div>',
@@ -3350,7 +3379,7 @@ function kasbonView(c, part, opts){
     openModal('Catat Kasbon',
       '<div class="space-y-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek *</label><select id="ks_proj" class="'+fieldCls+'">'+K.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===first?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('')+'</select></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Atas nama</label><select id="ks_w" class="'+fieldCls+'">'+opts2(first)+'</select></div>'+
-      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah (Rp) *</label>'+numInputHtml('ks_jum','',fieldCls)+'</div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah (Rp) *</label>'+numInputHtml('ks_jum','',fieldCls,' data-money')+'</div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal</label><input id="ks_tgl" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="ks_ket" type="text" class="'+fieldCls+'"></div></div>',
       function(){
@@ -3370,7 +3399,7 @@ function kasbonView(c, part, opts){
     openModal('Catat Pelunasan Kasbon',
       '<div class="space-y-4"><div class="text-sm text-slate-600">Dipakai bila pekerja / tim mengembalikan uang kasbon secara tunai (mis. proyek berhenti sebelum saldo lunas lewat gaji).</div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Atas nama</label><select id="pl_w" class="'+fieldCls+'">'+open.map(function(x, i){ return '<option value="'+i+'">'+esc(x.nama)+' · '+esc(x.project_nama)+' · sisa '+rp(x.saldo)+'</option>'; }).join('')+'</select></div>'+
-      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah dilunasi (Rp)</label>'+numInputHtml('pl_jum', open[0].saldo, fieldCls)+'</div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah dilunasi (Rp)</label>'+numInputHtml('pl_jum', open[0].saldo, fieldCls, ' data-money')+'</div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal</label><input id="pl_tgl" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
       '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="pl_ket" type="text" class="'+fieldCls+'" placeholder="mis. dibayar tunai ke kasir"></div></div>',
       function(){
@@ -3805,6 +3834,8 @@ function addDays(t, n){ var d=parseISO(t); d.setDate(d.getDate()+n); return loca
 function fmtTglPanjang(t){ var d=parseISO(t); return HARI_NAMA[d.getDay()]+', '+d.getDate()+' '+BULAN_PANJANG[d.getMonth()]+' '+d.getFullYear(); }
 function fmtTglPendek(t){ var d=parseISO(t); return d.getDate()+' '+BULAN_PANJANG[d.getMonth()].slice(0,3); }
 /* Weeks run Friday–Thursday (same as the paper "Absen Upah" sheet). */
+/* Period shown for a date: the loaded period (may be a part-week after an early submission), else the Fri–Thu week. */
+function perSpan(t){ var p = typeof ABSEN!=='undefined' && ABSEN.period; if(p && p.tgl_mulai && p.tgl_mulai<=t && p.tgl_akhir>=t) return {from:p.tgl_mulai, to:p.tgl_akhir}; return weekOf(t); }
 function weekOf(t){ var d=parseISO(t); var back=(d.getDay()+2)%7; var s=addDays(t,-back); return {from:s, to:addDays(s,6)}; }
 var PERIOD_STATUS = {draft:['neutral','Draft'], diajukan:['warn','Menunggu persetujuan'], disetujui:['info','Siap dibayar'], dibayar:['aman','Dibayar']};
 
@@ -3881,7 +3912,7 @@ function kreqName(r){ return r.worker_nama || (r.tim ? timLabel(r.tim) : 'Grup /
 function absenMissing(){
   var out = [], tgl = ABSEN.tgl;
   if(!ABSEN.workers.length || !ABSEN.weekFilled) return out;
-  var wk = weekOf(tgl), last = wk.to < today() ? wk.to : today();
+  var wk = perSpan(tgl), last = wk.to < today() ? wk.to : today();
   datesBetween(wk.from, last, 7).forEach(function(d){ if(!ABSEN.weekFilled[d] && d !== tgl) out.push(d); });
   return out;
 }
@@ -3923,7 +3954,7 @@ function setHadir(w, v){
 
 function drawAbsen(c){
   var tgl = ABSEN.tgl, ed = ABSEN.editable;
-  var wk = weekOf(tgl), st = ABSEN.period ? ABSEN.period.status : 'draft';
+  var wk = perSpan(tgl), st = ABSEN.period ? ABSEN.period.status : 'draft';
   var ps = PERIOD_STATUS[st] || PERIOD_STATUS.draft;
   var canNext = tgl < today();
   if(ABSEN.q == null) ABSEN.q = '';
@@ -4265,7 +4296,7 @@ function openKasbonRequest(c){
     return '<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3" data-kl="'+i+'">'+
       '<div class="flex items-center justify-between mb-1.5"><label class="block text-xs font-bold text-slate-500">Atas nama (tim atau pekerja)</label>'+(lines.length>1?'<button type="button" data-kl-del="'+i+'" class="text-xs font-bold text-red-500">Hapus</button>':'')+'</div>'+
       '<select data-kl-who="'+i+'" class="'+inputCls+'">'+opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===ln.who?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'+
-      '<div class="mt-2">'+numInputHtml('kl_j'+i, ln.jum, inputCls, ' placeholder="Jumlah (Rp), mis. 500.000" data-kl-jum="'+i+'"')+'</div></div>';
+      '<div class="mt-2">'+numInputHtml('kl_j'+i, ln.jum, inputCls, ' data-money placeholder="Jumlah (Rp), mis. 500.000" data-kl-jum="'+i+'"')+'</div></div>';
   }
   function draw(){
     document.getElementById('kl_rows').innerHTML = lines.map(function(_, i){ return rowHtml(i); }).join('<div class="h-2"></div>');
@@ -4319,13 +4350,13 @@ function openKasbonRequest(c){
 }
 
 function openAjukan(c){
-  var wk = weekOf(ABSEN.tgl), p = ABSEN.period || {};
+  var wk = perSpan(ABSEN.tgl), p = ABSEN.period || {};
   if(absenDirty()){ toast('Simpan absen dulu sebelum mengajukan.', true); return; }
   var gaps = absenMissing();
   openModal('Ajukan Absen Minggu Ini',
     '<div class="space-y-4">'+
       '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">Periode <b>'+esc(fmtTglPendek(wk.from))+' – '+esc(fmtTglPendek(wk.to))+'</b>. Satu pengajuan untuk <b>seluruh tim</b> di proyek ini. Setelah diajukan, absen minggu ini dikunci untuk Anda dan diteruskan ke pusat untuk dibayar.</div>'+
-      '<div class="rounded-xl bg-sky-50 border border-sky-100 px-4 py-2.5 text-xs text-sky-800">Proyek berhenti sebelum akhir minggu (mis. di hari ke-4)? Tidak apa-apa — ajukan sekarang. Hari yang tidak diisi dianggap tidak kerja.</div>'+
+      '<div class="rounded-xl bg-sky-50 border border-sky-100 px-4 py-2.5 text-xs text-sky-800">Proyek berhenti sebelum akhir minggu (mis. di hari ke-4)? Tidak apa-apa — ajukan sekarang. Hari yang tidak diisi dianggap tidak kerja. Bila minggu yang sama ternyata masih ada kerja, hari berikutnya tetap bisa diisi dan dibayar sebagai periode susulan.</div>'+
       (gaps.length ? '<div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-900"><b>Hari yang masih kosong:</b> '+gaps.map(function(d){ return esc(HARI_NAMA[parseISO(d).getDay()].slice(0,3)+' '+parseISO(d).getDate()); }).join(', ')+'. Hari kosong dihitung tidak kerja (tanpa gaji).</div>' : '')+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Penanggung jawab *</label><input id="aj_pj" type="text" autocomplete="off" class="'+inputCls+'" value="'+esc(p.pj_nama||'')+'" placeholder="mis. Arya"></div>'+
       '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Keterangan pekerjaan <span class="font-normal text-slate-400">(opsional)</span></label><input id="aj_cat" type="text" autocomplete="off" maxlength="200" class="'+inputCls+'" placeholder="mis. cor lantai 2, bongkar gudang"></div>'+
@@ -4335,7 +4366,7 @@ function openAjukan(c){
       if(!pj){ toast('Nama penanggung jawab wajib diisi.', true); return; }
       var sv = document.getElementById('mSave'); if(sv){ sv.disabled = true; sv.textContent = 'Mengirim…'; }
       apiFetch('/payroll_periods.php', {method:'POST', body:JSON.stringify({action:'ajukan', project_id:STATE.projectId, tgl:ABSEN.tgl, pj_nama:pj, catatan:fv('aj_cat')})})
-        .then(function(){ ABSEN.period = Object.assign({}, ABSEN.period||{}, {status:'diajukan', pj_nama:pj}); closeModal(); toast('Absen minggu ini sudah diajukan ✓'); drawAbsen(c); })
+        .then(function(){ closeModal(); toast('Absen sudah diajukan ✓'); renderAbsen(c); })
         .catch(function(e){ if(sv){ sv.disabled = false; sv.textContent = 'Simpan'; } toast(e.network ? 'Mengajukan butuh sinyal.' : e.message, true); });
     });
   var sv0 = document.getElementById('mSave'); if(sv0) sv0.textContent = 'Ajukan';

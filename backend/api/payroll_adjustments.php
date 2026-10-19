@@ -16,7 +16,7 @@ function adj_period_or_fail(string $projectId, string $tgl): array {
     payroll_period($projectId, $tgl);
     db()->beginTransaction(); // released by commit() after the insert; locks the week against a concurrent payment
     $st = db()->prepare('SELECT * FROM payroll_periods WHERE project_id = ? AND tgl_mulai = ? FOR UPDATE');
-    $st->execute([$projectId, payroll_week($tgl)[0]]);
+    $st->execute([$projectId, period_bounds($projectId, $tgl)[0]]);
     $p = $st->fetch();
     if ($p['status'] === 'dibayar') json_error('Periode ini sudah dibayar dan terkunci. Buat penyesuaian di periode berikutnya.', 409);
     return $p;
