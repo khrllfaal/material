@@ -2,7 +2,7 @@
    new frontend files. API responses are deliberately not cached here: stock
    and transaction data stay out of the browser cache, and offline writes go
    through the app's own outbox instead. */
-const VERSION = 'v5-2026-10-19';
+const VERSION = 'v6-2026-10-20';
 const SHELL = 'ms-shell-' + VERSION;
 const SHELL_FILES = [
   './', './index.html', './backend-config.js',
@@ -25,7 +25,8 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.indexOf('/backend/') !== -1) return;
+  // API calls are never cached, whatever folder the backend lives in (e.g. /backend/api, /coba/api).
+  if (url.pathname.indexOf('/backend/') !== -1 || url.pathname.indexOf('/api/') !== -1 || /\.php$/.test(url.pathname)) return;
 
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then(function (res) {
