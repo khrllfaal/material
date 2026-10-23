@@ -295,6 +295,23 @@ window.addEventListener('online', function(){ updateSyncBadge(); flushOutbox(); 
 window.addEventListener('offline', updateSyncBadge);
 setInterval(function(){ if(navigator.onLine && outboxGet().length) flushOutbox(); }, 30000);
 if('serviceWorker' in navigator){
+  /* A new release took over this phone: reload once so the new screen and styles show right away,
+     but only when nothing the user typed can be lost (no unsaved absen, no open window, not typing). */
+  var swHadController = !!navigator.serviceWorker.controller, swReloading = false;
+  var swSafeToReload = function(){
+    try{
+      if(typeof ABSEN !== 'undefined' && ABSEN.workers && ABSEN.workers.length && absenDirty()) return false;
+      var mb = document.getElementById('modalBack'); if(mb && !mb.classList.contains('hidden')) return false;
+      var a = document.activeElement; if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+      return true;
+    }catch(e){ return false; }
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(!swHadController || swReloading) return;
+    swReloading = true;
+    var tryReload = function(){ if(swSafeToReload()) location.reload(); else setTimeout(tryReload, 4000); };
+    tryReload();
+  });
   window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
