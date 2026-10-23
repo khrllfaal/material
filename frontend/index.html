@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#0ea5e9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'">
-<link rel="stylesheet" href="vendor/tailwind.css">
-<script src="vendor/icons.js"></script>
+<link rel="stylesheet" href="vendor/tailwind.css?v=20261023">
+<script src="vendor/icons.js?v=20261023"></script>
 <style>
   /* Platform-native font stack, not a self-hosted webfont: Inter was
      referenced here but never actually loaded (no @font-face), so the
@@ -809,7 +809,7 @@ function loadExcelJS(){
   if(_exceljsLoading) return _exceljsLoading;
   _exceljsLoading=new Promise(function(resolve,reject){
     var s=document.createElement('script');
-    s.src='vendor/exceljs.min.js';
+    s.src='vendor/exceljs.min.js?v=20261023';
     s.onload=function(){ resolve(); };
     s.onerror=function(){ _exceljsLoading=null; reject(new Error('Gagal memuat modul Excel.')); };
     document.head.appendChild(s);
@@ -915,10 +915,10 @@ function loadJsPdf(){
   if(_jspdfLoading) return _jspdfLoading;
   _jspdfLoading=new Promise(function(resolve,reject){
     var s1=document.createElement('script');
-    s1.src='vendor/jspdf.umd.min.js';
+    s1.src='vendor/jspdf.umd.min.js?v=20261023';
     s1.onload=function(){
       var s2=document.createElement('script');
-      s2.src='vendor/jspdf.autotable.min.js';
+      s2.src='vendor/jspdf.autotable.min.js?v=20261023';
       s2.onload=function(){ resolve(); };
       s2.onerror=function(){ _jspdfLoading=null; reject(new Error('Gagal memuat modul PDF.')); };
       document.head.appendChild(s2);

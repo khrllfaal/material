@@ -2,7 +2,7 @@
    new frontend files. API responses are deliberately not cached here: stock
    and transaction data stay out of the browser cache, and offline writes go
    through the app's own outbox instead. */
-const VERSION = 'v6-2026-10-20';
+const VERSION = 'v7-2026-10-23';
 const SHELL = 'ms-shell-' + VERSION;
 const SHELL_FILES = [
   './', './index.html', './backend-config.js',
@@ -11,7 +11,13 @@ const SHELL_FILES = [
 ];
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(SHELL).then(function (c) { return c.addAll(SHELL_FILES); }).then(function () { return self.skipWaiting(); }));
+  // cache:'reload' = fetch straight from the server, never from the browser's HTTP cache,
+  // so a new release can never be pre-cached from an old copy.
+  e.waitUntil(caches.open(SHELL).then(function (c) {
+    return Promise.all(SHELL_FILES.map(function (u) {
+      return fetch(new Request(u, { cache: 'reload' })).then(function (res) { if (res.ok) return c.put(u, res); });
+    }));
+  }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (e) {
@@ -37,6 +43,26 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
+  // Code and styles (css, js, manifest): always ask the server first (revalidated, so a 304 is cheap),
+  // and only fall back to the saved copy when there is no signal or the server is slow.
+  if (/\.(css|js|webmanifest)$/.test(url.pathname)) {
+    e.respondWith(new Promise(function (resolve) {
+      var done = false;
+      var fromCache = function () { return caches.match(req, { ignoreSearch: true }); };
+      var timer = setTimeout(function () { fromCache().then(function (hit) { if (hit && !done) { done = true; resolve(hit); } }); }, 5000);
+      fetch(new Request(req, { cache: 'no-cache' })).then(function (res) {
+        clearTimeout(timer);
+        if (res.ok) { var copy = res.clone(); caches.open(SHELL).then(function (c) { c.put(req, copy); }); }
+        if (!done) { done = true; resolve(res); }
+      }).catch(function () {
+        clearTimeout(timer);
+        fromCache().then(function (hit) { if (!done) { done = true; resolve(hit || Response.error()); } });
+      });
+    }));
+    return;
+  }
+
+  // Images and the rest: saved copy first, refreshed in the background.
   e.respondWith(caches.match(req).then(function (hit) {
     var net = fetch(req).then(function (res) {
       if (res.ok) { var copy = res.clone(); caches.open(SHELL).then(function (c) { c.put(req, copy); }); }
