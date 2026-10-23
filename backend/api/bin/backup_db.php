@@ -136,7 +136,7 @@ function dump_table(PDO $pdo, $out, string $table, bool $dataOnly, array $exclud
     return $rowCount;
 }
 
-$backupDir = rtrim(cfg()['backup_dir'], '/');
+$backupDir = rtrim(!empty(cfg()['backup_dir']) ? cfg()['backup_dir'] : app_dir('backups'), '/');
 $retentionDays = (int)cfg()['backup_retention_days'];
 
 if (!is_dir($backupDir) && !mkdir($backupDir, 0750, true) && !is_dir($backupDir)) {

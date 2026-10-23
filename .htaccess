@@ -6,6 +6,8 @@ Options -Indexes
 
 # Project files that must never be downloadable.
 RedirectMatch 403 ^/(docs|scripts|\.git)(/|$)
+# Folder pendamping API (susunan api/ + backend/): tidak pernah dilayani lewat web.
+RedirectMatch 403 ^/backend/(backups|sessions|mysql)(/|$)
 <FilesMatch "\.(sql|gz|md|sample|sh|bak|zip|log)$">
     <IfModule mod_authz_core.c>
         Require all denied

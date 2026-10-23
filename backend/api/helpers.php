@@ -102,6 +102,13 @@ class DbSessionHandler implements SessionHandlerInterface, SessionUpdateTimestam
     }
 }
 
+/** Folder pendamping API (sessions, backups, mysql). Mendukung dua susunan:
+ *  backend/api + backend/<nama>  (../<nama>)  atau  api/ + backend/<nama>  (../backend/<nama>). */
+function app_dir(string $name): string {
+    foreach ([__DIR__ . '/../' . $name, __DIR__ . '/../backend/' . $name] as $d) if (is_dir($d)) return $d;
+    return is_dir(__DIR__ . '/../backend') ? __DIR__ . '/../backend/' . $name : __DIR__ . '/../' . $name;
+}
+
 function start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
     $lifetime = 60 * 60 * 24 * 365; // signed in for a year after the last use, unless the user logs out
@@ -123,7 +130,7 @@ function start_session(): void {
         $usedDb = true;
     } catch (Throwable $e) {
         error_log('[material] DB sessions unavailable, using files: ' . $e->getMessage());
-        $dir = __DIR__ . '/../sessions';
+        $dir = app_dir('sessions');
         if (!is_dir($dir)) @mkdir($dir, 0700, true);
         if (is_dir($dir) && is_writable($dir)) session_save_path($dir);
     }
@@ -424,7 +431,7 @@ function ensure_payroll_controls(): void {
         };
         $tbl = $db->query("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'workers'")->fetchColumn();
         if (!$tbl) { // database lama belum punya tabel Tenaga Kerja: buat otomatis dari file SQL
-            $sql = (string)@file_get_contents(__DIR__ . '/../mysql/tenaga_kerja_tabel.sql');
+            $sql = (string)@file_get_contents(app_dir('mysql') . '/tenaga_kerja_tabel.sql');
             $sql = preg_replace('/^\s*--.*$/m', '', $sql);
             foreach (preg_split('/;\s*(\r?\n|$)/', $sql) as $stmt) { if (trim($stmt) !== '') $db->exec($stmt); }
         }

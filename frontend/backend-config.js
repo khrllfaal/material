@@ -3,4 +3,4 @@
    domain), so '../backend/api' resolves correctly from any page in
    frontend/ without extra web server config. Override if you deploy
    the API elsewhere, e.g. 'https://api.yourdomain.com'. */
-window.API_BASE_URL = '../backend/api';
+window.API_BASE_URL = '../backend/api'; // susunan api/ di public_html: ganti menjadi '../api'

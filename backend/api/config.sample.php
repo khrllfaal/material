@@ -17,7 +17,7 @@ return [
     // Where bin/backup_db.php writes its .sql.gz dumps. On Hostinger,
     // point this OUTSIDE public_html (e.g. one level up) so backups are
     // never reachable over HTTP.
-    'backup_dir' => __DIR__ . '/../backups',
+    'backup_dir' => '', // kosong = otomatis folder backups di sebelah api (backend/backups); isi path lain di luar public_html bila perlu
     // Dumps older than this are deleted each time the backup script runs.
     'backup_retention_days' => 14,
 ];
