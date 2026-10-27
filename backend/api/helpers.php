@@ -25,7 +25,18 @@ ini_set('log_errors', '1');
 if (extension_loaded('zlib') && !ini_get('zlib.output_compression')) {
     ob_start('ob_gzhandler');
 }
+// Kelas di src/ (namespace App\...) dimuat otomatis: App\Domain\X -> src/Domain/X.php
+spl_autoload_register(function (string $class): void {
+    if (strncmp($class, 'App\\', 4) !== 0) return;
+    $f = __DIR__ . '/src/' . str_replace('\\', '/', substr($class, 4)) . '.php';
+    if (is_file($f)) require $f;
+});
 set_exception_handler(function (Throwable $e): void {
+    if ($e instanceof \App\Domain\DomainError) { // aturan bisnis dilanggar: pesan untuk pengguna + kode status
+        if (!headers_sent()) { http_response_code($e->status()); header('Content-Type: application/json; charset=utf-8'); }
+        echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     error_log('[material] Unhandled ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     if (!headers_sent()) {
         http_response_code(500);
@@ -326,12 +337,7 @@ const WORKER_GRADES = [
 ];
 
 /** Gaji dibayar mingguan, Jumat–Kamis (sesuai lembar pengajuan absen). */
-function payroll_week(string $tgl): array {
-    $t = strtotime($tgl . ' 12:00:00');
-    $daysSinceFriday = ((int)date('N', $t) + 2) % 7; // N: Mon=1..Sun=7; Fri=5 -> 0
-    $start = strtotime("-$daysSinceFriday days", $t);
-    return [date('Y-m-d', $start), date('Y-m-d', strtotime('+6 days', $start))];
-}
+function payroll_week(string $tgl): array { return \App\Domain\PeriodRules::minggu($tgl); }
 
 /** Start/end of the payroll period that holds $tgl for a project. Normally the Fri–Thu week.
  *  When a week was submitted early (project stopped mid-week) its period was cut at the

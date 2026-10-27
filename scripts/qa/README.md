@@ -1,12 +1,14 @@
 # Uji otomatis (lokal)
 
+0. Tanpa database: `php scripts/qa/unit.php` (uji unit murni aturan gaji/kasbon/periode).
 1. `./scripts/qa/up_env.sh` membuat database uji + akun uji + server `php -S` di port 8899.
 2. Jalankan (Playwright + Chromium harus ada; `NODE_PATH` ke modul playwright):
+   - `node scripts/qa/golden.js` — 46 respons API harus identik dengan rekaman (`golden.json`); `golden.js simpan` hanya bila perubahan hitungan disengaja.
    - `node scripts/qa/core.js` — hitungan gaji, kasbon otomatis, periode susulan, peran, keamanan, hapus proyek.
    - `node scripts/qa/borongan_nonaktif_induk.js` — tim borongan, pekerja berhenti/aktif kembali, pekerja di dua proyek.
    - `node scripts/qa/borongan_pusat.js` / `borongan_dua_kali.js` — borongan dikelola pusat saja; satu tim dengan dua pekerjaan berjeda lama.
    - `node scripts/qa/ui.js` — HP lapangan dan layar Akuntan untuk fitur di atas.
-   - `node scripts/qa/crawl.js` — semua halaman Admin/Akuntan/Owner + 4 ukuran layar HP.
+   - `node scripts/qa/crawl.js` (jalankan setelah `borongan_nonaktif_induk.js` pada database yang sama: layar HP butuh pekerja di Proyek B) — semua halaman Admin/Akuntan/Owner + 4 ukuran layar HP.
    - `node scripts/qa/balapan.js` — permintaan bersamaan: persetujuan, pembayaran, kasbon, simpan absen tidak boleh ganda/menimpa.
      **Wajib** dengan server paralel: `PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8899 -t .` (server bawaan satu proses tidak menguji balapan sungguhan).
    - Beban: `python3 scripts/qa/data_besar.py | mysql -uroot material`, lalu `node scripts/qa/beban.js` dan `node scripts/qa/beban_panas.js`.

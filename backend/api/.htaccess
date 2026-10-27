@@ -5,10 +5,10 @@
 <FilesMatch "^(config|helpers|db|payroll_lib|resource_crud|scoped_resource)\.php$">
     Require all denied
 </FilesMatch>
-# CLI tools and session files are never served over HTTP.
+# CLI tools, session files and the class library (src/) are never served over HTTP.
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^(bin|sessions)/ - [F,L]
+    RewriteRule ^(bin|sessions|src)/ - [F,L]
 </IfModule>
 
 # Never let Apache list this directory's contents.
