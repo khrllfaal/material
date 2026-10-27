@@ -3,7 +3,9 @@
 # ditulis ke backend/api/config.php (sudah di .gitignore). Jangan dipakai di server sungguhan.
 set -e
 cd "$(dirname "$0")/../.."
-PW=$(head -c 12 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')
+# Kata sandi acak dibuat sekali; dipakai ulang bila config.php sudah ada (supaya server yang sedang berjalan tidak kehilangan akses)
+PW=$(grep -o "'db_pass'=>'[^']*'" backend/api/config.php 2>/dev/null | head -1 | sed "s/.*=>'//; s/'$//")
+[ -n "$PW" ] || PW=$(head -c 12 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')
 mysql -uroot -e "DROP DATABASE IF EXISTS material; CREATE DATABASE material CHARACTER SET utf8mb4; CREATE USER IF NOT EXISTS 'mt'@'127.0.0.1' IDENTIFIED BY '$PW'; ALTER USER 'mt'@'127.0.0.1' IDENTIFIED BY '$PW'; GRANT ALL ON material.* TO 'mt'@'127.0.0.1';"
 mysql -uroot material < backend/mysql/database_lengkap.sql
 cat > backend/api/config.php <<EOC

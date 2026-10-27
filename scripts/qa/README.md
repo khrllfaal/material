@@ -7,6 +7,9 @@
    - `node scripts/qa/borongan_pusat.js` / `borongan_dua_kali.js` — borongan dikelola pusat saja; satu tim dengan dua pekerjaan berjeda lama.
    - `node scripts/qa/ui.js` — HP lapangan dan layar Akuntan untuk fitur di atas.
    - `node scripts/qa/crawl.js` — semua halaman Admin/Akuntan/Owner + 4 ukuran layar HP.
+   - `node scripts/qa/balapan.js` — permintaan bersamaan: persetujuan, pembayaran, kasbon, simpan absen tidak boleh ganda/menimpa.
+     **Wajib** dengan server paralel: `PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8899 -t .` (server bawaan satu proses tidak menguji balapan sungguhan).
+   - Beban: `python3 scripts/qa/data_besar.py | mysql -uroot material`, lalu `node scripts/qa/beban.js` dan `node scripts/qa/beban_panas.js`.
 3. Bersihkan: hapus `backend/api/config.php`, `DROP DATABASE material`, matikan `php -S`.
 
 Tanggal di beberapa skrip (minggu 16–29 Okt 2026) mengikuti tanggal uji; ubah `D0/D1` bila dijalankan di minggu lain.

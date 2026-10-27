@@ -73,6 +73,9 @@ $up = $db->prepare(
 $del = $db->prepare('DELETE FROM attendance WHERE worker_id=? AND project_id=? AND tgl=?');
 $fmt = fn($v) => $v === null ? 'kosong' : (rtrim(rtrim(number_format($v[0], 1, ',', ''), '0'), ',') . 'h+' . rtrim(rtrim(number_format($v[1], 1, ',', ''), '0'), ',') . 'j');
 
+// Many phones saving at once can make the database pick one of two crossing transactions as a deadlock victim.
+// Nothing was written in that case, so the whole save is simply tried again (up to 4 times) instead of failing.
+for ($attempt = 1; ; $attempt++) { try {
 $db->beginTransaction();
 $saved = 0; $changes = []; $conflicts = [];
 // The period row is locked for the whole save: nobody can approve/pay the week
@@ -83,9 +86,10 @@ $period = $lk->fetch();
 if ($period['status'] === 'dibayar') json_error('Periode ini sudah dibayar dan terkunci. Koreksi dibuat sebagai penyesuaian di periode berikutnya.', 409);
 if ($isField && $period['status'] !== 'draft') json_error('Absen minggu ini sudah diajukan. Hubungi Admin Pusat untuk koreksi.', 409);
 
-// Before-state of this day (locked), for the audit trail and for conflict detection.
+// Before-state of this day, for the audit trail and for conflict detection (no row lock needed: the period row above
+// is already locked, and extra range locks here are what made saves from different projects deadlock).
 $before = [];
-$bq = $db->prepare('SELECT worker_id, hari, lembur_jam, rev FROM attendance WHERE project_id = ? AND tgl = ? FOR UPDATE');
+$bq = $db->prepare('SELECT worker_id, hari, lembur_jam, rev FROM attendance WHERE project_id = ? AND tgl = ?');
 $bq->execute([$projectId, $tgl]);
 foreach ($bq->fetchAll() as $o) $before[$o['worker_id']] = ['v' => [(float)$o['hari'], (float)$o['lembur_jam']], 'rev' => (int)$o['rev']];
 
@@ -138,6 +142,13 @@ if ($period['status'] === 'disetujui' && $changes) {
     $db->prepare("DELETE FROM payroll_adjustments WHERE period_id = ? AND kategori = 'kasbon' AND label LIKE '%(otomatis)'")->execute([$period['id']]); // recomputed on the next approval
 }
 $db->commit();
+break;
+} catch (PDOException $ex) {
+    if ($db->inTransaction()) $db->rollBack();
+    $code = (int)($ex->errorInfo[1] ?? 0);
+    if (($code === 1213 || $code === 1205) && $attempt < 4) { usleep(random_int(30, 120) * 1000 * $attempt); continue; }
+    throw $ex;
+} }
 
 $detail = "$tgl: $saved pekerja";
 if ($changes) {

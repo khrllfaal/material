@@ -33,6 +33,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
     $rows = [];       // key worker|project
     $pstat = [];      // project|week-start => attendance totals of that period
     $dates = [];      // project|tgl => filled
+    $gsum = [];       // person|tgl => days counted (to spot someone counted more than 1 day on one date)
     foreach ($att as $a) {
         $k = $a['worker_id'] . '|' . $a['project_id'];
         if (!isset($rows[$k])) {
@@ -59,6 +60,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         if ($l > 8 && !in_array('lembur_tinggi', $r['flags'], true)) $r['flags'][] = 'lembur_tinggi';
         unset($r);
         $dates[$a['project_id'] . '|' . $a['tgl']] = true;
+        $gk = ($a['induk_id'] ?: $a['worker_id']) . '|' . $a['tgl']; $gsum[$gk] = ($gsum[$gk] ?? 0.0) + $h;
         $pk = $a['project_id'] . '|' . $a['tgl']; // per day; summed per period below (a period can be a part-week)
         if (!isset($pstat[$pk])) $pstat[$pk] = ['hari' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0, 'workers' => []];
         $pstat[$pk]['hari'] += $h; $pstat[$pk]['gaji'] += $h * (float)$a['tarif_harian']; $pstat[$pk]['lembur_rp'] += $lp * (float)$a['tarif_lembur'];
@@ -67,15 +69,22 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
 
     // Same person counted more than 1 day on one date across projects (also when the person has a separate record per project).
     if ($rows) {
-        $orang = array_values(array_unique(array_column($rows, 'orang')));
-        $in = implode(',', array_fill(0, count($orang), '?'));
-        $g = $db->prepare("SELECT COALESCE(w.induk_id, w.id) AS orang, a.tgl, SUM(a.hari) h FROM attendance a JOIN workers w ON w.id = a.worker_id
-                            WHERE a.tgl BETWEEN ? AND ? AND (COALESCE(w.induk_id, w.id) IN ($in) OR w.id IN ($in)) GROUP BY COALESCE(w.induk_id, w.id), a.tgl HAVING h > 1");
-        $g->execute(array_merge([$from, $to], $orang, $orang));
-        foreach ($g->fetchAll() as $x) {
-            foreach ($rows as $k => &$r) if ($r['orang'] === $x['orang'] && isset($r['days'][$x['tgl']]) && !in_array('ganda', $r['flags'], true)) $r['flags'][] = 'ganda';
-            unset($r);
+        $gandaMap = [];
+        if ($projectIds === null) { // a whole-company view already holds every attendance row: no extra query
+            foreach ($gsum as $gk => $tot) if ($tot > 1.0001) $gandaMap[$gk] = true;
+        } else { // a project view only needs the people it lists, counted across all projects
+            $orang = array_values(array_unique(array_column($rows, 'orang')));
+            $in = implode(',', array_fill(0, count($orang), '?'));
+            $g = $db->prepare("SELECT COALESCE(w.induk_id, w.id) AS orang, a.tgl, SUM(a.hari) h FROM attendance a JOIN workers w ON w.id = a.worker_id
+                                WHERE a.tgl BETWEEN ? AND ? AND (COALESCE(w.induk_id, w.id) IN ($in) OR w.id IN ($in))
+                                GROUP BY COALESCE(w.induk_id, w.id), a.tgl HAVING h > 1");
+            $g->execute(array_merge([$from, $to], $orang, $orang));
+            foreach ($g->fetchAll() as $x) $gandaMap[$x['orang'] . '|' . $x['tgl']] = true;
         }
+        if ($gandaMap) foreach ($rows as $k => &$r) {
+            foreach ($r['days'] as $d => $_) if (isset($gandaMap[$r['orang'] . '|' . $d])) { if (!in_array('ganda', $r['flags'], true)) $r['flags'][] = 'ganda'; break; }
+        }
+        unset($r);
     }
 
     // Workers missing on dates that were otherwise filled in for their project.

@@ -337,6 +337,16 @@ function payroll_week(string $tgl): array {
  *  When a week was submitted early (project stopped mid-week) its period was cut at the
  *  last working day; the remaining days of that week form a follow-up period. */
 function period_bounds(string $projectId, string $tgl): array {
+    // Remembered for the rest of the request. Callers look this up BEFORE opening a transaction (via payroll_period()),
+    // so that the first read inside the transaction is the row lock itself: a read taken before the lock would give
+    // the transaction an older snapshot and let two simultaneous payments both see the same unpaid balance.
+    static $memo = [];
+    $mk = $projectId . '|' . $tgl;
+    if (isset($memo[$mk])) return $memo[$mk];
+    return $memo[$mk] = period_bounds_lookup($projectId, $tgl);
+}
+
+function period_bounds_lookup(string $projectId, string $tgl): array {
     $st = db()->prepare('SELECT tgl_mulai, tgl_akhir FROM payroll_periods WHERE project_id = ? AND tgl_mulai <= ? AND tgl_akhir >= ? ORDER BY tgl_mulai DESC LIMIT 1');
     $st->execute([$projectId, $tgl, $tgl]);
     if ($r = $st->fetch()) return [$r['tgl_mulai'], $r['tgl_akhir']];
