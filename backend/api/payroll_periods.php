@@ -89,7 +89,12 @@ if ($action === 'ajukan') {
     if ($p['status'] !== 'draft') json_error('Minggu ini sudah diajukan.', 409);
     $c = $db->prepare('SELECT COUNT(*) FROM attendance WHERE project_id = ? AND tgl BETWEEN ? AND ?');
     $c->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
-    if ((int)$c->fetchColumn() === 0) json_error('Belum ada absen pada minggu ini.', 422);
+    if ((int)$c->fetchColumn() === 0) {
+        // A week that only holds a borongan amount (no daily absen) is valid too: the Akuntan can submit it on the field's behalf.
+        $ad = $db->prepare('SELECT COUNT(*) FROM payroll_adjustments WHERE period_id = ?');
+        $ad->execute([$p['id']]);
+        if ((int)$ad->fetchColumn() === 0) json_error('Belum ada absen atau tambahan (mis. nominal borongan) pada minggu ini.', 422);
+    }
     // Submitted before the week is over (e.g. the project stopped on day 4): the period ends on the
     // last working day. If work resumes later that week, those days form their own follow-up period.
     $mx = $db->prepare('SELECT MAX(tgl) FROM attendance WHERE project_id = ? AND tgl BETWEEN ? AND ?');
