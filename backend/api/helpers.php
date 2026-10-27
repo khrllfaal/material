@@ -34,7 +34,7 @@ spl_autoload_register(function (string $class): void {
 set_exception_handler(function (Throwable $e): void {
     if ($e instanceof \App\Domain\DomainError) { // aturan bisnis dilanggar: pesan untuk pengguna + kode status
         if (!headers_sent()) { http_response_code($e->status()); header('Content-Type: application/json; charset=utf-8'); }
-        echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['error' => $e->getMessage()] + $e->extra(), JSON_UNESCAPED_UNICODE);
         exit;
     }
     error_log('[material] Unhandled ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());

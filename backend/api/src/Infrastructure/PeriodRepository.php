@@ -7,11 +7,7 @@ final class PeriodRepository {
     public function __construct(private \PDO $db) {}
 
     /** Menjalankan $fn dalam satu transaksi; gagal/tolak => batal semua. Pernyataan pertama $fn HARUS kunci(): kunci baris periode sebelum membaca apa pun. */
-    public function transaksi(callable $fn): mixed {
-        $this->db->beginTransaction();
-        try { $r = $fn(); $this->db->commit(); return $r; }
-        catch (\Throwable $e) { if ($this->db->inTransaction()) $this->db->rollBack(); throw $e; }
-    }
+    public function transaksi(callable $fn): mixed { return Tx::jalankan($this->db, $fn); }
 
     /** Mengunci baris periode yang memuat $tgl (permintaan lain menunggu), lalu mengembalikan status terkini. */
     public function kunci(string $projectId, string $tgl): array {

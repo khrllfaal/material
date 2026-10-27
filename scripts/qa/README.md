@@ -3,6 +3,7 @@
 0. Tanpa database: `php scripts/qa/unit.php` (uji unit murni aturan gaji/kasbon/periode).
 1. `./scripts/qa/up_env.sh` membuat database uji + akun uji + server `php -S` di port 8899.
 2. Jalankan (Playwright + Chromium harus ada; `NODE_PATH` ke modul playwright):
+   - `node scripts/qa/golden2.js` — 134 respons pekerja/absen/kasbon harus identik dengan `golden2.json` (database baru; tanggal minggu 23–29 Okt 2026).
    - `node scripts/qa/golden.js` — 46 respons API harus identik dengan rekaman (`golden.json`); `golden.js simpan` hanya bila perubahan hitungan disengaja.
    - `node scripts/qa/core.js` — hitungan gaji, kasbon otomatis, periode susulan, peran, keamanan, hapus proyek.
    - `node scripts/qa/borongan_nonaktif_induk.js` — tim borongan, pekerja berhenti/aktif kembali, pekerja di dua proyek.

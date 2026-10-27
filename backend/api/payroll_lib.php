@@ -29,3 +29,31 @@ function tim_label(string $t): string { return \App\Domain\KasbonPlanner::labelT
 function kasbon_saldo(string $projectId, ?string $workerId, string $tim = ''): float { return payroll_services()['kasbon']->saldo($projectId, $workerId, $tim); }
 function kasbon_saldo_map(?array $projectIds): array { return payroll_services()['kasbon']->saldoMap($projectIds); }
 function kasbon_auto_plan(string $projectId, array $p): array { return payroll_services()['kasbon']->rencanaPotong($projectId, $p); }
+
+/** Layanan absen (Application/AttendanceService) dengan ketergantungannya. */
+function attendance_service(): \App\Application\AttendanceService {
+    static $s = null;
+    if ($s === null) {
+        $pdo = db();
+        $s = new \App\Application\AttendanceService($pdo, new \App\Infrastructure\AttendanceRepository($pdo), new \App\Infrastructure\PeriodRepository($pdo),
+            'worker_rates', 'audit', 'payroll_period');
+    }
+    return $s;
+}
+
+function worker_service(): \App\Application\WorkerService {
+    static $s = null;
+    if ($s === null) $s = new \App\Application\WorkerService(new \App\Infrastructure\WorkerRepository(db()), WORKER_GRADES, 'require_project_access', 'audit', 'fill_zero_snapshots');
+    return $s;
+}
+
+function kasbon_buku_service(): \App\Application\KasbonBukuService {
+    static $s = null;
+    if ($s === null) $s = new \App\Application\KasbonBukuService(new \App\Infrastructure\KasbonBukuRepository(db()), payroll_services()['kasbon'], 'audit');
+    return $s;
+}
+function kasbon_request_service(): \App\Application\KasbonRequestService {
+    static $s = null;
+    if ($s === null) $s = new \App\Application\KasbonRequestService(db(), new \App\Infrastructure\KasbonRequestRepository(db()), 'audit', 'require_project_access', 'payroll_week');
+    return $s;
+}

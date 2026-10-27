@@ -2,7 +2,7 @@
 // Uji unit murni (tanpa database, tanpa server): php scripts/qa/unit.php
 declare(strict_types=1);
 spl_autoload_register(function ($c) { $f = __DIR__ . '/../../backend/api/src/' . str_replace('\\', '/', substr($c, 4)) . '.php'; if (is_file($f)) require $f; });
-use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError};
+use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError, AttendanceRules, WorkerRules, KasbonRules};
 
 $ok = 0; $bad = 0;
 function t(string $nama, bool $kondisi, string $info = ''): void { global $ok, $bad; if ($kondisi) $ok++; else { $bad++; echo "GAGAL: $nama $info\n"; } }
@@ -130,6 +130,66 @@ foreach ([['pastikanBisaDiajukan', 'diajukan', 409], ['pastikanBisaDisetujui', '
 foreach ([['pastikanBisaDiajukan', 'draft'], ['pastikanBisaDisetujui', 'diajukan'], ['pastikanBisaDibayar', 'disetujui'], ['pastikanBisaDikembalikan', 'disetujui']] as [$m, $st]) {
     try { PeriodRules::$m($st); t("$m($st) lolos", true); } catch (DomainError) { t("$m($st) lolos", false); }
 }
+
+function tolak(string $nama, callable $fn, int $kode): void { try { $fn(); t("$nama harus ditolak", false); } catch (DomainError $e) { t("$nama ditolak ($kode)", $e->status() === $kode, $e->getMessage()); } }
+function lolos(string $nama, callable $fn): void { try { $fn(); t("$nama lolos", true); } catch (DomainError $e) { t("$nama lolos", false, $e->getMessage()); } }
+
+// --- AttendanceRules
+tolak('absen lapangan tanggal depan', fn() => AttendanceRules::periksaTanggalLapangan('2026-10-28', '2026-10-27', '2026-10-20'), 422);
+tolak('absen lapangan >7 hari', fn() => AttendanceRules::periksaTanggalLapangan('2026-10-19', '2026-10-27', '2026-10-20'), 403);
+lolos('absen lapangan tepat 7 hari lalu', fn() => AttendanceRules::periksaTanggalLapangan('2026-10-20', '2026-10-27', '2026-10-20'));
+lolos('absen lapangan hari ini', fn() => AttendanceRules::periksaTanggalLapangan('2026-10-27', '2026-10-27', '2026-10-20'));
+tolak('periode dibayar terkunci (admin)', fn() => AttendanceRules::periksaStatusPeriode('dibayar', false), 409);
+tolak('lapangan setelah diajukan', fn() => AttendanceRules::periksaStatusPeriode('diajukan', true), 409);
+lolos('admin setelah diajukan', fn() => AttendanceRules::periksaStatusPeriode('diajukan', false));
+lolos('lapangan saat draft', fn() => AttendanceRules::periksaStatusPeriode('draft', true));
+tolak('hari 0,3', fn() => AttendanceRules::periksaNilai(0.3, 0), 422);
+tolak('lembur 0,3', fn() => AttendanceRules::periksaNilai(1, 0.3), 422);
+tolak('lembur 16,5', fn() => AttendanceRules::periksaNilai(1, 17), 422);
+tolak('lembur tanpa hadir', fn() => AttendanceRules::periksaNilai(0, 2), 422);
+t('nilai sah 0,5 hari + 1,5 jam', AttendanceRules::periksaNilai(0.5, 1.5) === [0.5, 1.5]);
+t('nilai sah 16 jam', AttendanceRules::periksaNilai(1, 16) === [1.0, 16.0]);
+t('versi: tanpa ver => simpan', AttendanceRules::periksaVersi(['v' => [1.0, 0.0], 'rev' => 2], ['hari' => 1], true) === 'simpan');
+t('versi cocok => simpan', AttendanceRules::periksaVersi(['v' => [1.0, 0.0], 'rev' => 2], ['hari' => 0.5, 'ver' => 2], true) === 'simpan');
+t('versi basi => bentrok', AttendanceRules::periksaVersi(['v' => [1.0, 0.0], 'rev' => 3], ['hari' => 0.5, 'ver' => 2], true) === 'bentrok');
+t('versi basi tapi nilai sama => lewati', AttendanceRules::periksaVersi(['v' => [1.0, 2.0], 'rev' => 3], ['hari' => 1, 'lembur_jam' => 2, 'ver' => 2], true) === 'lewati');
+t('baris baru (ver null) padahal sudah ada => bentrok', AttendanceRules::periksaVersi(['v' => [1.0, 0.0], 'rev' => 0], ['hari' => 0.5, 'ver' => null], true) === 'bentrok');
+t('hapus baris yang sudah tak ada => lewati', AttendanceRules::periksaVersi(null, ['hari' => null, 'ver' => 4], false) === 'lewati');
+t('format ringkas', AttendanceRules::format([1.0, 2.5]) === '1h+2,5j' && AttendanceRules::format(null) === 'kosong' && AttendanceRules::format([0.5, 0.0]) === '0,5h+0j');
+t('audit memuat peringatan setelah diajukan', str_contains(AttendanceRules::ringkasAudit('2026-10-27', 2, ['A: baru -> 1h+0j'], 'diajukan'), 'SETELAH DIAJUKAN (diajukan)'));
+t('audit draft tanpa penanda', !str_contains(AttendanceRules::ringkasAudit('2026-10-27', 2, ['x'], 'draft'), 'SETELAH'));
+t('pesan bentrok memotong >5 nama', str_contains(AttendanceRules::pesanBentrok(['a', 'b', 'c', 'd', 'e', 'f']), 'dll'));
+
+// --- WorkerRules
+t('normal: huruf besar & spasi', WorkerRules::normal('  Tim   A ') === 'tim a');
+t('rapikanNama', WorkerRules::rapikanNama("  Budi   Santoso ") === 'Budi Santoso');
+$grades = ['KTK' => 'a', 'TK' => 'b', 'LAIN' => 'c'];
+tolak('isian tanpa proyek', fn() => WorkerRules::periksaIsian('', 'X', 'TK', '', $grades), 422);
+tolak('isian nama kosong', fn() => WorkerRules::periksaIsian('P', '', 'TK', '', $grades), 422);
+tolak('isian nama >120', fn() => WorkerRules::periksaIsian('P', str_repeat('a', 121), 'TK', '', $grades), 422);
+tolak('isian grade salah', fn() => WorkerRules::periksaIsian('P', 'X', 'ZZ', '', $grades), 422);
+tolak('isian tim >80', fn() => WorkerRules::periksaIsian('P', 'X', 'TK', str_repeat('t', 81), $grades), 422);
+lolos('isian sah', fn() => WorkerRules::periksaIsian('P', 'X', 'TK', 'Tim A', $grades));
+t('ejaan tim disamakan', WorkerRules::samakanEjaanTim('tim a ', ['Tim B', 'Tim A']) === 'Tim A' && WorkerRules::samakanEjaanTim('Tim Z', ['Tim A']) === 'Tim Z');
+t('duplikat: nama & tim sama', WorkerRules::adaDuplikat([['nama' => 'Budi', 'tim' => 'Tim A']], ' budi', 'tim a') && !WorkerRules::adaDuplikat([['nama' => 'Budi', 'tim' => 'Tim A']], 'Budi', 'Tim B'));
+t('nonaktif sama nama', (WorkerRules::cariNonaktifSama([['id' => 'x', 'nama' => 'Endang', 'tim' => '']], 'ENDANG') ?? [])['id'] === 'x' && WorkerRules::cariNonaktifSama([], 'A') === null);
+
+// --- KasbonRules
+t('kunciNama', KasbonRules::kunciNama('w', '') === 'w' && KasbonRules::kunciNama(null, 'A') === 't:A' && KasbonRules::kunciNama(null, '') === 'g');
+tolak('jumlah 0', fn() => KasbonRules::periksaJumlahPengajuan(0), 422);
+tolak('jumlah 2 miliar', fn() => KasbonRules::periksaJumlahPengajuan(2e9), 422);
+lolos('jumlah 100.000', fn() => KasbonRules::periksaJumlahPengajuan(100000));
+tolak('id pengajuan salah', fn() => KasbonRules::periksaIdPengajuan('BAD'), 422);
+lolos('id pengajuan benar', fn() => KasbonRules::periksaIdPengajuan('ksr_abc123def456'));
+t('id batch', KasbonRules::idBatch('bat_abc123def') === 'bat_abc123def' && KasbonRules::idBatch('x') === null && KasbonRules::idBatch(null) === null);
+tolak('batas terbuka 60', fn() => KasbonRules::periksaBatasTerbuka(59, 2), 429);
+lolos('batas terbuka tepat 60', fn() => KasbonRules::periksaBatasTerbuka(58, 2));
+tolak('pelunasan > saldo', fn() => KasbonRules::periksaPelunasan(101.0, 100.0), 422);
+lolos('pelunasan = saldo', fn() => KasbonRules::periksaPelunasan(100.0, 100.0));
+tolak('hapus kasbon yang sudah terpotong', fn() => KasbonRules::periksaBisaDihapus(100.0, -50.0), 409);
+lolos('hapus kasbon belum terpotong', fn() => KasbonRules::periksaBisaDihapus(100.0, 0.0));
+lolos('hapus pelunasan (negatif) selalu boleh', fn() => KasbonRules::periksaBisaDihapus(-100.0, -500.0));
+t('nama pihak', KasbonRules::namaPihak('w', '') === 'pekerja ini' && KasbonRules::namaPihak(null, 'A') === 'Tim A' && KasbonRules::namaPihak(null, '') === 'grup');
 
 echo "== uji unit: LULUS $ok / GAGAL $bad\n";
 exit($bad ? 1 : 0);
