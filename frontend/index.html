@@ -3210,16 +3210,34 @@ PAGES.pekerja = function(c){
         return '<tr class="border-b border-slate-100 hover:bg-indigo-50/40 '+(w.aktif?'':'opacity-50')+'"><td class="py-3 pr-4"><b>'+esc(w.nama)+'</b>'+(w.borongan?' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">BORONGAN</span>':'')+(w.aktif?'':' <span class="text-xs text-slate-400">nonaktif</span>')+'</td>'+
           '<td class="py-3 pr-4"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(GRADE_CLS[w.grade]||GRADE_CLS.LAIN)+'">'+esc(w.borongan ? 'Tim borongan' : (GRADE_NAMA[w.grade]||w.grade))+'</span></td>'+
           '<td class="py-3 pr-4 text-slate-600">'+esc(w.tim||'–')+'</td><td class="py-3 pr-4 text-slate-600">'+esc(pn(w.project_id))+'</td>'+
-          '<td class="py-3 pr-4 tabular-nums">'+(w.borongan?'<span class="text-xs text-amber-700 font-semibold">per tim (Tambahan)</span>':(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>'))+(w.borongan?'':(e[2]?' <span class="text-[10px] font-bold text-indigo-500">pribadi</span>':(e[3]?' <span class="text-[10px] font-bold text-emerald-600">tarif tim</span>':'')))+'</td>'+
+          '<td class="py-3 pr-4 tabular-nums">'+(w.borongan?(write&&w.aktif?'<button class="'+btnGhostSm+' !text-amber-800 !bg-amber-50 !border-amber-200" data-w-nominal="'+esc(w.id)+'">Isi nominal borongan</button>':'<span class="text-xs text-amber-700 font-semibold">per tim</span>'):(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>'))+(w.borongan?'':(e[2]?' <span class="text-[10px] font-bold text-indigo-500">pribadi</span>':(e[3]?' <span class="text-[10px] font-bold text-emerald-600">tarif tim</span>':'')))+'</td>'+
           '<td class="py-3 pr-4 tabular-nums">'+(!w.borongan&&e[1]?rp(e[1]):'–')+'</td><td class="py-3 pr-4 text-xs text-slate-500">'+esc(w.no_rek||'–')+'</td>'+
           (write?'<td class="py-3 whitespace-nowrap"><button class="'+btnGhostSm+'" data-w-edit="'+esc(w.id)+'">Edit</button></td>':'')+'</tr>';
       }).join('') : '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada pekerja. Admin Lapangan bisa menambahkannya dari HP, atau tambahkan di sini.</td></tr>')+'</tbody>';
     renderPager(list.length, D.PG, drawWorkers);
     document.querySelectorAll('[data-w-edit]').forEach(function(b){ b.onclick = function(){ openWorker(b.getAttribute('data-w-edit')); }; });
+    document.querySelectorAll('[data-w-nominal]').forEach(function(b){ b.onclick = function(){ openNominalBorongan(b.getAttribute('data-w-nominal')); }; });
     var pnm = function(id){ return pn(id); };
     var headers = ['Nama','Status','Tim','Proyek','Tarif harian','Lembur per jam','Rekening / e-wallet','Aktif'];
     bindExportBtns('Pekerja_dan_Tarif', 'Pekerja & Tarif', 'Daftar pekerja beserta tarif berlaku', headers,
       function(){ return list.map(function(w){ var e = eff(w); return [w.nama, GRADE_NAMA[w.grade]||w.grade, w.tim||'', pnm(w.project_id), Math.round(e[0]||0), Math.round(e[1]||0), w.no_rek||'', w.aktif?'Ya':'Tidak']; }); }, null, null);
+  }
+  /* Nominal borongan: satu angka untuk tim itu pada minggu pekerjaannya (disimpan sebagai Tambahan; dibayar Akuntan lewat Pengajuan). */
+  function openNominalBorongan(id){
+    var w = D.workers.find(function(x){ return x.id===id; }); if(!w) return;
+    openModal('Nominal borongan — '+w.nama,
+      '<div class="space-y-4">'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nominal borongan (Rp) *</label>'+numInputHtml('bn_jumlah','',fieldCls,' data-money')+'</div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Pekerjaan</label><input id="bn_label" type="text" class="'+fieldCls+'" value="Borongan" placeholder="mis. Borongan cat lantai 2"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal pekerjaan</label><input id="bn_tgl" type="date" class="'+fieldCls+'" value="'+today()+'"><div class="text-xs text-slate-400 mt-1">Masuk ke minggu gaji (Jumat–Kamis) pada tanggal ini. Setelah itu: menu Pengajuan → Ajukan → Setujui → Bayar. Bisa diisi lagi untuk pekerjaan berikutnya.</div></div>'+
+      '</div>',
+      function(){
+        var j = parseIdNum(fv('bn_jumlah'));
+        if(Number.isNaN(j) || j<=0){ toast('Isi nominal borongan.', true); return; }
+        if(!fv('bn_tgl')){ toast('Isi tanggal pekerjaan.', true); return; }
+        apiFetch('/payroll_adjustments.php', {method:'POST', body:JSON.stringify({project_id:w.project_id, tgl:fv('bn_tgl'), jenis:'tambah', kategori:'tambahan', label:fv('bn_label')||'Borongan', worker_id:w.id, jumlah:j})})
+          .then(function(){ closeModal(); toast('Nominal '+rp(j)+' dicatat untuk '+w.nama+'. Lanjut di menu Pengajuan.'); }).catch(function(e){ toast(e.message, true); });
+      });
   }
   function openWorker(id, preset){
     var w = id ? D.workers.find(function(x){ return x.id===id; }) : null;
