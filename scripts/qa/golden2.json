@@ -1,0 +1,2684 @@
+{
+ "001 lap buat Kepala": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "KTK",
+   "id": "X",
+   "induk_id": null,
+   "ok": true,
+   "tim": "Tim A"
+  }
+ },
+ "002 lap buat Tukang (tim ejaan lain)": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "TK",
+   "id": "X",
+   "induk_id": null,
+   "ok": true,
+   "tim": "Tim A"
+  }
+ },
+ "003 lap buat Helper": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "LD",
+   "id": "X",
+   "induk_id": null,
+   "ok": true,
+   "tim": "Tim B"
+  }
+ },
+ "004 lap duplikat nama": {
+  "s": 409,
+  "j": {
+   "error": "Pekerja bernama sama (status dan tim sama) sudah ada di proyek ini. Pilih dari daftar, atau beri tambahan nama agar berbeda (mis. \"Endang B\")."
+  }
+ },
+ "005 lap tanpa nama": {
+  "s": 422,
+  "j": {
+   "error": "Nama pekerja wajib diisi (maksimal 120 karakter)."
+  }
+ },
+ "006 lap grade salah": {
+  "s": 422,
+  "j": {
+   "error": "Status pekerja tidak valid."
+  }
+ },
+ "007 lap tim kepanjangan": {
+  "s": 422,
+  "j": {
+   "error": "Nama tim terlalu panjang."
+  }
+ },
+ "008 lap proyek lain": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses ke proyek ini."
+  }
+ },
+ "009 lap tanpa proyek": {
+  "s": 422,
+  "j": {
+   "error": "Proyek wajib dipilih."
+  }
+ },
+ "010 lap ubah yang ada": {
+  "s": 403,
+  "j": {
+   "error": "Data pekerja sudah tersimpan. Perubahan dilakukan oleh Admin Pusat."
+  }
+ },
+ "011 lap buat tim borongan": {
+  "s": 200,
+  "j": {
+   "borongan": 1,
+   "grade": "LAIN",
+   "id": "X",
+   "induk_id": null,
+   "ok": true,
+   "tim": "Tim Kaca"
+  }
+ },
+ "012 admin buat dengan tarif pribadi": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "KTK",
+   "id": "X",
+   "ok": true,
+   "tim": "Tim A"
+  }
+ },
+ "013 akuntan ubah tarif Helper": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "LD",
+   "id": "X",
+   "ok": true,
+   "tim": "Tim B"
+  }
+ },
+ "014 admin tarif tidak valid": {
+  "s": 422,
+  "j": {
+   "error": "Tarif harian harus berupa angka nol atau lebih."
+  }
+ },
+ "015 admin ubah borongan paksa tarif nol": {
+  "s": 200,
+  "j": {
+   "borongan": 1,
+   "grade": "LAIN",
+   "id": "X",
+   "ok": true,
+   "tim": "Tim Kaca"
+  }
+ },
+ "016 owner tidak boleh": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses untuk aksi ini."
+  }
+ },
+ "017 id tidak valid": {
+  "s": 422,
+  "j": {
+   "error": "id tidak valid."
+  }
+ },
+ "018 lap3 buat pekerja sama di proyek B": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "TK",
+   "id": "X",
+   "induk_id": "X",
+   "ok": true,
+   "tim": "Tim A"
+  }
+ },
+ "019 induk di proyek yang sama": {
+  "s": 422,
+  "j": {
+   "error": "Pekerja di proyek lain tidak valid."
+  }
+ },
+ "020 induk tidak ada": {
+  "s": 422,
+  "j": {
+   "error": "Pekerja di proyek lain tidak valid."
+  }
+ },
+ "021 induk borongan": {
+  "s": 422,
+  "j": {
+   "error": "Pekerja di proyek lain tidak valid."
+  }
+ },
+ "022 daftar lapangan A": {
+  "s": 200,
+  "j": [
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W1",
+    "induk_id": null,
+    "nama": "Kepala",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W4",
+    "induk_id": null,
+    "nama": "Mandor",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "LD",
+    "id": "W3",
+    "induk_id": null,
+    "nama": "Helper",
+    "project_id": "proj_a",
+    "tim": "Tim B"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W2",
+    "induk_id": null,
+    "nama": "Tukang",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 1,
+    "diverifikasi": 1,
+    "grade": "LAIN",
+    "id": "W5",
+    "induk_id": null,
+    "nama": "Tim Kaca",
+    "project_id": "proj_a",
+    "tim": "Tim Kaca"
+   }
+  ]
+ },
+ "023 daftar admin A": {
+  "s": 200,
+  "j": [
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W1",
+    "induk_id": null,
+    "nama": "Kepala",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W4",
+    "induk_id": null,
+    "nama": "Mandor",
+    "no_rek": "BCA 123",
+    "project_id": "proj_a",
+    "tarif_harian": 200000,
+    "tarif_lembur": 25000,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LD",
+    "id": "W3",
+    "induk_id": null,
+    "nama": "Helper",
+    "no_rek": "BRI 9",
+    "project_id": "proj_a",
+    "tarif_harian": 115000,
+    "tarif_lembur": 14000,
+    "tim": "Tim B"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W2",
+    "induk_id": null,
+    "nama": "Tukang",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 1,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LAIN",
+    "id": "W5",
+    "induk_id": null,
+    "nama": "Tim Kaca",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": 0,
+    "tarif_lembur": 0,
+    "tim": "Tim Kaca"
+   }
+  ]
+ },
+ "024 daftar owner semua": {
+  "s": 200,
+  "j": [
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W1",
+    "induk_id": null,
+    "nama": "Kepala",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W4",
+    "induk_id": null,
+    "nama": "Mandor",
+    "no_rek": "BCA 123",
+    "project_id": "proj_a",
+    "tarif_harian": 200000,
+    "tarif_lembur": 25000,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LD",
+    "id": "W3",
+    "induk_id": null,
+    "nama": "Helper",
+    "no_rek": "BRI 9",
+    "project_id": "proj_a",
+    "tarif_harian": 115000,
+    "tarif_lembur": 14000,
+    "tim": "Tim B"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W2",
+    "induk_id": null,
+    "nama": "Tukang",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W6",
+    "induk_id": "W2",
+    "nama": "Tukang",
+    "no_rek": "",
+    "project_id": "proj_b",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 1,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LAIN",
+    "id": "W5",
+    "induk_id": null,
+    "nama": "Tim Kaca",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": 0,
+    "tarif_lembur": 0,
+    "tim": "Tim Kaca"
+   }
+  ]
+ },
+ "025 daftar lapangan tanpa proyek": {
+  "s": 200,
+  "j": [
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W1",
+    "induk_id": null,
+    "nama": "Kepala",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W4",
+    "induk_id": null,
+    "nama": "Mandor",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "LD",
+    "id": "W3",
+    "induk_id": null,
+    "nama": "Helper",
+    "project_id": "proj_a",
+    "tim": "Tim B"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W2",
+    "induk_id": null,
+    "nama": "Tukang",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 1,
+    "diverifikasi": 1,
+    "grade": "LAIN",
+    "id": "W5",
+    "induk_id": null,
+    "nama": "Tim Kaca",
+    "project_id": "proj_a",
+    "tim": "Tim Kaca"
+   }
+  ]
+ },
+ "026 daftar kandidat lap3": {
+  "s": 200,
+  "j": [
+   {
+    "grade": "KTK",
+    "id": "W1",
+    "nama": "Kepala",
+    "orang": "W1",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim A"
+   },
+   {
+    "grade": "KTK",
+    "id": "W4",
+    "nama": "Mandor",
+    "orang": "W4",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim A"
+   },
+   {
+    "grade": "LD",
+    "id": "W3",
+    "nama": "Helper",
+    "orang": "W3",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim B"
+   },
+   {
+    "grade": "TK",
+    "id": "W2",
+    "nama": "Tukang",
+    "orang": "W2",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim A"
+   }
+  ]
+ },
+ "027 kandidat lap1 (tak punya B)": {
+  "s": 200,
+  "j": [
+   {
+    "grade": "KTK",
+    "id": "W1",
+    "nama": "Kepala",
+    "orang": "W1",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim A"
+   },
+   {
+    "grade": "KTK",
+    "id": "W4",
+    "nama": "Mandor",
+    "orang": "W4",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim A"
+   },
+   {
+    "grade": "LD",
+    "id": "W3",
+    "nama": "Helper",
+    "orang": "W3",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim B"
+   },
+   {
+    "grade": "TK",
+    "id": "W2",
+    "nama": "Tukang",
+    "orang": "W2",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "tim": "Tim A"
+   }
+  ]
+ },
+ "028 set_aktif off lap": {
+  "s": 200,
+  "j": {
+   "aktif": 0,
+   "ok": true
+  }
+ },
+ "029 daftar tanpa nonaktif": {
+  "s": 200,
+  "j": [
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W1",
+    "induk_id": null,
+    "nama": "Kepala",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W4",
+    "induk_id": null,
+    "nama": "Mandor",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W2",
+    "induk_id": null,
+    "nama": "Tukang",
+    "project_id": "proj_a",
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 1,
+    "diverifikasi": 1,
+    "grade": "LAIN",
+    "id": "W5",
+    "induk_id": null,
+    "nama": "Tim Kaca",
+    "project_id": "proj_a",
+    "tim": "Tim Kaca"
+   }
+  ]
+ },
+ "030 daftar semua termasuk nonaktif": {
+  "s": 200,
+  "j": [
+   {
+    "aktif": 0,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LD",
+    "id": "W3",
+    "induk_id": null,
+    "nama": "Helper",
+    "no_rek": "BRI 9",
+    "project_id": "proj_a",
+    "tarif_harian": 115000,
+    "tarif_lembur": 14000,
+    "tim": "Tim B"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W1",
+    "induk_id": null,
+    "nama": "Kepala",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W4",
+    "induk_id": null,
+    "nama": "Mandor",
+    "no_rek": "BCA 123",
+    "project_id": "proj_a",
+    "tarif_harian": 200000,
+    "tarif_lembur": 25000,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W2",
+    "induk_id": null,
+    "nama": "Tukang",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 1,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LAIN",
+    "id": "W5",
+    "induk_id": null,
+    "nama": "Tim Kaca",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": 0,
+    "tarif_lembur": 0,
+    "tim": "Tim Kaca"
+   }
+  ]
+ },
+ "031 buat nama sama saat nonaktif": {
+  "s": 409,
+  "j": {
+   "error": "\"Helper\" pernah ada di proyek ini dan sedang tidak aktif.",
+   "nama": "Helper",
+   "nonaktif_id": "W3",
+   "tim": "Tim B"
+  }
+ },
+ "032 buat nama sama abaikan_nonaktif": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "LD",
+   "id": "X",
+   "induk_id": null,
+   "ok": true,
+   "tim": "Tim C"
+  }
+ },
+ "033 set_aktif on lap": {
+  "s": 200,
+  "j": {
+   "aktif": 1,
+   "ok": true
+  }
+ },
+ "034 set_aktif lap2 pada proyek A": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses ke proyek ini."
+  }
+ },
+ "035 set_aktif owner": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses untuk aksi ini."
+  }
+ },
+ "036 set_aktif tidak ada": {
+  "s": 404,
+  "j": {
+   "error": "Pekerja tidak ditemukan."
+  }
+ },
+ "037 verifikasi oleh admin": {
+  "s": 403,
+  "j": {
+   "error": "Hanya Akuntan yang memverifikasi pekerja baru."
+  }
+ },
+ "038 verifikasi oleh akuntan kosong": {
+  "s": 422,
+  "j": {
+   "error": "Tidak ada pekerja yang dipilih."
+  }
+ },
+ "039 verifikasi akuntan semua": {
+  "s": 422,
+  "j": {
+   "error": "Tidak ada pekerja yang dipilih."
+  }
+ },
+ "040 lap absen 1": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 0,
+    "W3": 0,
+    "W4": 0
+   },
+   "saved": 4
+  }
+ },
+ "041 GET lap absen": {
+  "s": 200,
+  "j": [
+   {
+    "hari": 0.5,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-23",
+    "worker_id": "W2"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-23",
+    "worker_id": "W3"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-23",
+    "worker_id": "W4"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 2,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-23",
+    "worker_id": "W1"
+   }
+  ]
+ },
+ "042 GET admin absen (dengan tarif)": {
+  "s": 200,
+  "j": [
+   {
+    "grade": "KTK",
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 200000,
+    "tarif_lembur": 25000,
+    "tgl": "2026-10-23",
+    "tim": "Tim A",
+    "worker_id": "W4"
+   },
+   {
+    "grade": "KTK",
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 2,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 175000,
+    "tarif_lembur": 21000,
+    "tgl": "2026-10-23",
+    "tim": "Tim A",
+    "worker_id": "W1"
+   },
+   {
+    "grade": "LD",
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 115000,
+    "tarif_lembur": 14000,
+    "tgl": "2026-10-23",
+    "tim": "Tim B",
+    "worker_id": "W3"
+   },
+   {
+    "grade": "TK",
+    "hari": 0.5,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 140000,
+    "tarif_lembur": 17500,
+    "tgl": "2026-10-23",
+    "tim": "Tim A",
+    "worker_id": "W2"
+   }
+  ]
+ },
+ "043 GET owner absen semua": {
+  "s": 200,
+  "j": [
+   {
+    "grade": "KTK",
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 200000,
+    "tarif_lembur": 25000,
+    "tgl": "2026-10-23",
+    "tim": "Tim A",
+    "worker_id": "W4"
+   },
+   {
+    "grade": "KTK",
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 2,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 175000,
+    "tarif_lembur": 21000,
+    "tgl": "2026-10-23",
+    "tim": "Tim A",
+    "worker_id": "W1"
+   },
+   {
+    "grade": "LD",
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 115000,
+    "tarif_lembur": 14000,
+    "tgl": "2026-10-23",
+    "tim": "Tim B",
+    "worker_id": "W3"
+   },
+   {
+    "grade": "TK",
+    "hari": 0.5,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tarif_harian": 140000,
+    "tarif_lembur": 17500,
+    "tgl": "2026-10-23",
+    "tim": "Tim A",
+    "worker_id": "W2"
+   }
+  ]
+ },
+ "044 GET lap2 tanpa akses proyek A": {
+  "s": 200,
+  "j": []
+ },
+ "045 lap koreksi dengan ver benar": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 1,
+    "W2": 0,
+    "W3": 0,
+    "W4": 0
+   },
+   "saved": 1
+  }
+ },
+ "046 lap koreksi dengan ver basi": {
+  "s": 409,
+  "j": {
+   "error": "Absen ini baru saja diubah orang lain (Kepala). Layar dimuat ulang supaya tidak saling menimpa."
+  }
+ },
+ "047 lap kirim ulang nilai sama (ver basi)": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 1,
+    "W2": 0,
+    "W3": 0,
+    "W4": 0
+   },
+   "saved": 1
+  }
+ },
+ "048 lap hapus isian w2": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 1,
+    "W3": 0,
+    "W4": 0
+   },
+   "saved": 1
+  }
+ },
+ "049 hari tidak valid": {
+  "s": 422,
+  "j": {
+   "error": "Kehadiran harus 0, ½, atau 1 hari."
+  }
+ },
+ "050 lembur tidak valid": {
+  "s": 422,
+  "j": {
+   "error": "Jam lembur 0–16 dalam kelipatan 0,5 jam."
+  }
+ },
+ "051 lembur >16": {
+  "s": 422,
+  "j": {
+   "error": "Jam lembur 0–16 dalam kelipatan 0,5 jam."
+  }
+ },
+ "052 lembur tanpa hadir": {
+  "s": 422,
+  "j": {
+   "error": "Lembur hanya untuk pekerja yang hadir."
+  }
+ },
+ "053 pekerja tidak ada": {
+  "s": 422,
+  "j": {
+   "error": "Pekerja tidak ditemukan. Muat ulang halaman."
+  }
+ },
+ "054 pekerja proyek lain (lap)": {
+  "s": 403,
+  "j": {
+   "error": "Pekerja bukan bagian dari proyek ini."
+  }
+ },
+ "055 tanggal depan": {
+  "s": 422,
+  "j": {
+   "error": "Tanggal absen tidak boleh di masa depan."
+  }
+ },
+ "056 lebih dari 7 hari (lap)": {
+  "s": 403,
+  "j": {
+   "error": "Absen lebih dari 7 hari lalu hanya bisa diubah Admin Pusat."
+  }
+ },
+ "057 tanpa entri": {
+  "s": 422,
+  "j": {
+   "error": "Tidak ada data absen untuk disimpan."
+  }
+ },
+ "058 tanpa proyek": {
+  "s": 422,
+  "j": {
+   "error": "Proyek wajib dipilih."
+  }
+ },
+ "059 lap2 menulis proyek A": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses ke proyek ini."
+  }
+ },
+ "060 owner menulis": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses untuk aksi ini."
+  }
+ },
+ "061 akuntan menulis": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses untuk aksi ini."
+  }
+ },
+ "062 ganda: B setengah hari + A 1 hari": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W6": 0
+   },
+   "saved": 1
+  }
+ },
+ "063 ganda: A tambah (peringatan)": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W2": 0
+   },
+   "saved": 1
+  }
+ },
+ "064 ganda: B pada tanggal sama": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [
+    "Tukang"
+   ],
+   "periode_status": "draft",
+   "revs": {
+    "W6": 0
+   },
+   "saved": 1
+  }
+ },
+ "065 admin menulis lintas proyek": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0
+   },
+   "saved": 1
+  }
+ },
+ "066 lap absen 2026-10-24": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W3": 0
+   },
+   "saved": 2
+  }
+ },
+ "067 lap absen 2026-10-25": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 0,
+    "W3": 0
+   },
+   "saved": 2
+  }
+ },
+ "068 ajukan minggu": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "069 lap setelah diajukan": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [
+    "Kepala"
+   ],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0
+   },
+   "saved": 1
+  }
+ },
+ "070 admin koreksi setelah diajukan": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "diajukan",
+   "revs": {
+    "W1": 1,
+    "W3": 0
+   },
+   "saved": 1
+  }
+ },
+ "071 setujui": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "orang": 0,
+   "potong_kasbon": 0,
+   "status": "disetujui"
+  }
+ },
+ "072 admin koreksi setelah disetujui (kembali diajukan)": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "diajukan",
+   "revs": {
+    "W1": 2,
+    "W3": 0
+   },
+   "saved": 1
+  }
+ },
+ "073 GET lap rentang": {
+  "s": 200,
+  "j": [
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-23",
+    "worker_id": "W3"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-23",
+    "worker_id": "W4"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-25",
+    "worker_id": "W1"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-25",
+    "worker_id": "W2"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-26",
+    "worker_id": "W1"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 0,
+    "project_id": "proj_a",
+    "rev": 2,
+    "tgl": "2026-10-24",
+    "worker_id": "W1"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 1,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-24",
+    "worker_id": "W3"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 1,
+    "project_id": "proj_a",
+    "rev": 0,
+    "tgl": "2026-10-25",
+    "worker_id": "W3"
+   },
+   {
+    "hari": 1,
+    "ket": "",
+    "lembur_jam": 3,
+    "project_id": "proj_a",
+    "rev": 1,
+    "tgl": "2026-10-23",
+    "worker_id": "W1"
+   }
+  ]
+ },
+ "074 hapus pekerja berabsen (admin)": {
+  "s": 409,
+  "j": {
+   "error": "Pekerja ini sudah punya riwayat absen, jadi tidak dihapus. Ubah menjadi Nonaktif."
+  }
+ },
+ "075 hapus oleh akuntan": {
+  "s": 403,
+  "j": {
+   "error": "Hanya Admin Pusat yang bisa menghapus pekerja. Nonaktifkan bila sudah pernah absen."
+  }
+ },
+ "076 hapus tanpa id": {
+  "s": 422,
+  "j": {
+   "error": "id wajib diisi"
+  }
+ },
+ "077 buat sementara": {
+  "s": 200,
+  "j": {
+   "borongan": 0,
+   "grade": "TK",
+   "id": "X",
+   "ok": true,
+   "tim": ""
+  }
+ },
+ "078 hapus pekerja tanpa absen": {
+  "s": 200,
+  "j": {
+   "ok": true
+  }
+ },
+ "079 rename_tim lapangan": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses untuk aksi ini."
+  }
+ },
+ "080 rename_tim sama": {
+  "s": 422,
+  "j": {
+   "error": "Nama tim baru sama dengan yang lama."
+  }
+ },
+ "081 rename_tim kosong": {
+  "s": 422,
+  "j": {
+   "error": "Isi tim asal dan nama tim baru (maksimal 80 karakter)."
+  }
+ },
+ "082 rename_tim ok": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "pekerja": 1
+  }
+ },
+ "083 daftar setelah rename": {
+  "s": 200,
+  "j": [
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W1",
+    "induk_id": null,
+    "nama": "Kepala",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "KTK",
+    "id": "W4",
+    "induk_id": null,
+    "nama": "Mandor",
+    "no_rek": "BCA 123",
+    "project_id": "proj_a",
+    "tarif_harian": 200000,
+    "tarif_lembur": 25000,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LD",
+    "id": "W3",
+    "induk_id": null,
+    "nama": "Helper",
+    "no_rek": "BRI 9",
+    "project_id": "proj_a",
+    "tarif_harian": 115000,
+    "tarif_lembur": 14000,
+    "tim": "Tim C"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LD",
+    "id": "X",
+    "induk_id": null,
+    "nama": "Helper",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim C"
+   },
+   {
+    "aktif": 1,
+    "borongan": 0,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "TK",
+    "id": "W2",
+    "induk_id": null,
+    "nama": "Tukang",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": null,
+    "tarif_lembur": null,
+    "tim": "Tim A"
+   },
+   {
+    "aktif": 1,
+    "borongan": 1,
+    "created_at": "TS",
+    "diverifikasi": 1,
+    "grade": "LAIN",
+    "id": "W5",
+    "induk_id": null,
+    "nama": "Tim Kaca",
+    "no_rek": "",
+    "project_id": "proj_a",
+    "tarif_harian": 0,
+    "tarif_lembur": 0,
+    "tim": "Tim Kaca"
+   }
+  ]
+ },
+ "084 metode tidak dikenal": {
+  "s": 405,
+  "j": {
+   "error": "Method not allowed"
+  }
+ },
+ "085 kasbon pekerja": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "ok": true
+  }
+ },
+ "086 kasbon tim": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "ok": true
+  }
+ },
+ "087 kasbon grup": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "ok": true
+  }
+ },
+ "088 kasbon lap ditolak": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses untuk aksi ini."
+  }
+ },
+ "089 kasbon jumlah 0": {
+  "s": 422,
+  "j": {
+   "error": "Proyek dan jumlah wajib diisi."
+  }
+ },
+ "090 kasbon tanggal salah": {
+  "s": 422,
+  "j": {
+   "error": "Tanggal kasbon tidak valid."
+  }
+ },
+ "091 kasbon pekerja proyek lain": {
+  "s": 422,
+  "j": {
+   "error": "Pekerja bukan bagian dari proyek ini."
+  }
+ },
+ "092 kasbon pekerja tidak ada": {
+  "s": 422,
+  "j": {
+   "error": "Pekerja tidak ditemukan."
+  }
+ },
+ "093 kasbon tim tidak ada": {
+  "s": 422,
+  "j": {
+   "error": "Tim tidak ditemukan di proyek ini."
+  }
+ },
+ "094 pelunasan melebihi saldo": {
+  "s": 422,
+  "j": {
+   "error": "Pelunasan melebihi saldo kasbon (200.000)."
+  }
+ },
+ "095 pelunasan sebagian": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "ok": true
+  }
+ },
+ "096 buku kasbon akuntan": {
+  "s": 200,
+  "j": {
+   "kasbon": [
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": -50000,
+     "ket": "Pelunasan: tunai",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-22",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 150000,
+     "ket": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-21",
+     "tim": "Tim C",
+     "worker_id": null,
+     "worker_nama": null
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 200000,
+     "ket": "beli alat",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-20",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 50000,
+     "ket": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-21",
+     "tim": "",
+     "worker_id": null,
+     "worker_nama": null
+    }
+   ],
+   "saldo": [
+    {
+     "nama": "Grup / penanggung jawab",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 50000,
+     "tim": "",
+     "worker_id": null
+    },
+    {
+     "nama": "Helper",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 150000,
+     "tim": "",
+     "worker_id": "W3"
+    },
+    {
+     "nama": "Tim C",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 150000,
+     "tim": "Tim C",
+     "worker_id": null
+    }
+   ]
+  }
+ },
+ "097 buku kasbon owner": {
+  "s": 200,
+  "j": {
+   "kasbon": [
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": -50000,
+     "ket": "Pelunasan: tunai",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-22",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 150000,
+     "ket": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-21",
+     "tim": "Tim C",
+     "worker_id": null,
+     "worker_nama": null
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 200000,
+     "ket": "beli alat",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-20",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 50000,
+     "ket": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-21",
+     "tim": "",
+     "worker_id": null,
+     "worker_nama": null
+    }
+   ],
+   "saldo": [
+    {
+     "nama": "Grup / penanggung jawab",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 50000,
+     "tim": "",
+     "worker_id": null
+    },
+    {
+     "nama": "Helper",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 150000,
+     "tim": "",
+     "worker_id": "W3"
+    },
+    {
+     "nama": "Tim C",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 150000,
+     "tim": "Tim C",
+     "worker_id": null
+    }
+   ]
+  }
+ },
+ "098 buku kasbon lap": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses untuk aksi ini."
+  }
+ },
+ "099 hapus kasbon grup": {
+  "s": 200,
+  "j": {
+   "ok": true
+  }
+ },
+ "100 hapus kasbon tidak ada": {
+  "s": 404,
+  "j": {
+   "error": "Data tidak ditemukan."
+  }
+ },
+ "101 lap ajukan satu pekerja": {
+  "s": 200,
+  "j": {
+   "batch_id": null,
+   "id": "X",
+   "ids": [
+    "X"
+   ],
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "102 lap kirim ulang id sama": {
+  "s": 403,
+  "j": {
+   "error": "Pengajuan sudah tersimpan."
+  }
+ },
+ "103 lap ajukan lagi pekerja sama minggu ini": {
+  "s": 409,
+  "j": {
+   "error": "Kasbon untuk pekerja ini sudah diajukan minggu ini. Satu kali per minggu — hubungi Akuntan bila perlu tambahan."
+  }
+ },
+ "104 lap batch tim+grup": {
+  "s": 200,
+  "j": {
+   "batch_id": "X",
+   "id": "X",
+   "ids": [
+    "X",
+    "X",
+    "X"
+   ],
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "105 lap batch baris dobel": {
+  "s": 422,
+  "j": {
+   "error": "Satu nama hanya boleh satu baris dalam satu pengajuan."
+  }
+ },
+ "106 lap jumlah nol": {
+  "s": 422,
+  "j": {
+   "error": "Jumlah kasbon harus lebih dari 0."
+  }
+ },
+ "107 lap jumlah terlalu besar": {
+  "s": 422,
+  "j": {
+   "error": "Jumlah terlalu besar."
+  }
+ },
+ "108 lap pekerja proyek lain": {
+  "s": 422,
+  "j": {
+   "error": "Pekerja bukan bagian dari proyek ini."
+  }
+ },
+ "109 lap tim tidak ada": {
+  "s": 422,
+  "j": {
+   "error": "Tim tidak ditemukan di proyek ini."
+  }
+ },
+ "110 lap id salah format": {
+  "s": 422,
+  "j": {
+   "error": "id tidak valid."
+  }
+ },
+ "111 lap tanpa proyek": {
+  "s": 422,
+  "j": {
+   "error": "Proyek wajib dipilih."
+  }
+ },
+ "112 lap2 proyek A": {
+  "s": 403,
+  "j": {
+   "error": "Anda tidak punya akses ke proyek ini."
+  }
+ },
+ "113 lap 21 baris": {
+  "s": 422,
+  "j": {
+   "error": "Isi 1 sampai 20 baris kasbon."
+  }
+ },
+ "114 akuntan ajukan atas nama lapangan": {
+  "s": 200,
+  "j": {
+   "batch_id": null,
+   "id": "X",
+   "ids": [
+    "X"
+   ],
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "115 daftar pengajuan lap": {
+  "s": 200,
+  "j": [
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 200000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim C",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 300000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim A",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 50000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": null,
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 100000,
+    "ket": "kasbon mingguan",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W2",
+    "worker_nama": "Tukang"
+   },
+   {
+    "batch_id": null,
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 75000,
+    "ket": "",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W1",
+    "worker_nama": "Kepala"
+   }
+  ]
+ },
+ "116 daftar pengajuan akuntan diajukan": {
+  "s": 200,
+  "j": [
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 200000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim C",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 300000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim A",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 50000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": null,
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 100000,
+    "ket": "kasbon mingguan",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W2",
+    "worker_nama": "Tukang"
+   },
+   {
+    "batch_id": null,
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 75000,
+    "ket": "",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W1",
+    "worker_nama": "Kepala"
+   }
+  ]
+ },
+ "117 daftar pengajuan owner": {
+  "s": 200,
+  "j": [
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 200000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim C",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 300000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim A",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 50000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": null,
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 100000,
+    "ket": "kasbon mingguan",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W2",
+    "worker_nama": "Tukang"
+   },
+   {
+    "batch_id": null,
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": null,
+    "id": "X",
+    "jumlah": 75000,
+    "ket": "",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "diajukan",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W1",
+    "worker_nama": "Kepala"
+   }
+  ]
+ },
+ "118 lap setujui (dilarang)": {
+  "s": 422,
+  "j": {
+   "error": "Proyek wajib dipilih."
+  }
+ },
+ "119 admin setujui (dilarang)": {
+  "s": 403,
+  "j": {
+   "error": "Hanya Akuntan yang memeriksa pengajuan kasbon."
+  }
+ },
+ "120 tolak tanpa alasan": {
+  "s": 422,
+  "j": {
+   "error": "Alasan penolakan wajib diisi."
+  }
+ },
+ "121 setujui dengan jumlah lain": {
+  "s": 200,
+  "j": {
+   "kasbon_id": "X",
+   "ok": true,
+   "status": "disetujui"
+  }
+ },
+ "122 setujui lagi (sudah diproses)": {
+  "s": 409,
+  "j": {
+   "error": "Pengajuan ini sudah diproses."
+  }
+ },
+ "123 setujui jumlah nol": {
+  "s": 422,
+  "j": {
+   "error": "Jumlah harus lebih dari 0."
+  }
+ },
+ "124 setujui tidak ada": {
+  "s": 404,
+  "j": {
+   "error": "Pengajuan tidak ditemukan."
+  }
+ },
+ "125 aksi tidak dikenal": {
+  "s": 422,
+  "j": {
+   "error": "Aksi tidak dikenal."
+  }
+ },
+ "126 tolak_batch tanpa alasan": {
+  "s": 422,
+  "j": {
+   "error": "Alasan penolakan wajib diisi."
+  }
+ },
+ "127 setujui_batch": {
+  "s": 200,
+  "j": {
+   "baris": 3,
+   "ok": true,
+   "status": "disetujui",
+   "total": 550000
+  }
+ },
+ "128 setujui_batch lagi": {
+  "s": 404,
+  "j": {
+   "error": "Pengajuan ini sudah diproses atau tidak ditemukan."
+  }
+ },
+ "129 tolak_batch tidak ada": {
+  "s": 404,
+  "j": {
+   "error": "Pengajuan ini sudah diproses atau tidak ditemukan."
+  }
+ },
+ "130 tolak satu dengan alasan": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "status": "ditolak"
+  }
+ },
+ "131 daftar pengajuan akhir": {
+  "s": 200,
+  "j": [
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": "TS",
+    "id": "X",
+    "jumlah": 200000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "disetujui",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim C",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": "TS",
+    "id": "X",
+    "jumlah": 300000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "disetujui",
+    "tgl_wib": "2026-10-27",
+    "tim": "Tim A",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": "X",
+    "catatan": "",
+    "created_at": "TS",
+    "diproses_at": "TS",
+    "id": "X",
+    "jumlah": 50000,
+    "ket": "batch",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "disetujui",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": null,
+    "worker_nama": null
+   },
+   {
+    "batch_id": null,
+    "catatan": "belum waktunya",
+    "created_at": "TS",
+    "diproses_at": "TS",
+    "id": "X",
+    "jumlah": 75000,
+    "ket": "",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "ditolak",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W1",
+    "worker_nama": "Kepala"
+   },
+   {
+    "batch_id": null,
+    "catatan": "dikurangi",
+    "created_at": "TS",
+    "diproses_at": "TS",
+    "id": "X",
+    "jumlah": 100000,
+    "ket": "kasbon mingguan",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "disetujui",
+    "tgl_wib": "2026-10-27",
+    "tim": "",
+    "worker_id": "W2",
+    "worker_nama": "Tukang"
+   }
+  ]
+ },
+ "132 buku kasbon akhir": {
+  "s": 200,
+  "j": {
+   "kasbon": [
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": -50000,
+     "ket": "Pelunasan: tunai",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-22",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 150000,
+     "ket": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-21",
+     "tim": "Tim C",
+     "worker_id": null,
+     "worker_nama": null
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 200000,
+     "ket": "Pengajuan lapangan (Tim C): batch",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-26",
+     "tim": "Tim C",
+     "worker_id": null,
+     "worker_nama": null
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 200000,
+     "ket": "beli alat",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-20",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 300000,
+     "ket": "Pengajuan lapangan (Tim A): batch",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-26",
+     "tim": "Tim A",
+     "worker_id": null,
+     "worker_nama": null
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 50000,
+     "ket": "Pengajuan lapangan: batch",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-26",
+     "tim": "",
+     "worker_id": null,
+     "worker_nama": null
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 80000,
+     "ket": "Pengajuan lapangan: kasbon mingguan",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-26",
+     "tim": "",
+     "worker_id": "W2",
+     "worker_nama": "Tukang"
+    }
+   ],
+   "saldo": [
+    {
+     "nama": "Grup / penanggung jawab",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 50000,
+     "tim": "",
+     "worker_id": null
+    },
+    {
+     "nama": "Helper",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 150000,
+     "tim": "",
+     "worker_id": "W3"
+    },
+    {
+     "nama": "Tim A",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 300000,
+     "tim": "Tim A",
+     "worker_id": null
+    },
+    {
+     "nama": "Tim C",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 350000,
+     "tim": "Tim C",
+     "worker_id": null
+    },
+    {
+     "nama": "Tukang",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 80000,
+     "tim": "",
+     "worker_id": "W2"
+    }
+   ]
+  }
+ },
+ "133 rekap akhir": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Kaca",
+     "project_id": "proj_a",
+     "tim": "Tim Kaca",
+     "worker_id": "W5"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|": 50000,
+    "proj_a|W2": 80000,
+    "proj_a|W3": 150000,
+    "proj_a|t:Tim A": 300000,
+    "proj_a|t:Tim C": 350000
+   },
+   "periods": [
+    {
+     "adj_potong": 0,
+     "adj_tambah": 0,
+     "adjustments": [],
+     "catatan": "",
+     "diajukan_at": "TS",
+     "diajukan_by": "X",
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 1210000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 8,
+     "id": "per_proj_a_2026-10-23",
+     "lembur_rp": 91000,
+     "payments": [],
+     "pekerja": 4,
+     "pj_nama": "Arya",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 1301000,
+     "status": "diajukan",
+     "tgl_akhir": "2026-10-25",
+     "tgl_mulai": "2026-10-23",
+     "total_bayar": 1301000
+    },
+    {
+     "adj_potong": 0,
+     "adj_tambah": 0,
+     "adjustments": [],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 175000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 1,
+     "id": "per_proj_a_2026-10-26",
+     "lembur_rp": 0,
+     "payments": [],
+     "pekerja": 1,
+     "pj_nama": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 175000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-29",
+     "tgl_mulai": "2026-10-26",
+     "total_bayar": 175000
+    }
+   ],
+   "range": {
+    "from": "2026-10-23",
+    "to": "2026-10-29"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-23": [
+       0,
+       1
+      ],
+      "2026-10-24": [
+       1,
+       1
+      ],
+      "2026-10-25": [
+       1,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 345000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 3,
+     "kosong": 0,
+     "lembur_jam": 2,
+     "lembur_jam_bayar": 2,
+     "lembur_rp": 28000,
+     "nama": "Helper",
+     "net": 373000,
+     "no_rek": "BRI 9",
+     "orang": "W3",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 373000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 115000,
+     "tarif_lembur": 14000,
+     "tim": "Tim C",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-23": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 200000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 1,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Mandor",
+     "net": 200000,
+     "no_rek": "BCA 123",
+     "orang": "W4",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 200000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 200000,
+     "tarif_lembur": 25000,
+     "tim": "Tim A",
+     "worker_id": "W4"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-23": [
+       1,
+       3
+      ],
+      "2026-10-24": [
+       0,
+       1
+      ],
+      "2026-10-25": [
+       0,
+       1
+      ],
+      "2026-10-26": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda"
+     ],
+     "gaji": 700000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 4,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 763000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 763000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-25": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda"
+     ],
+     "gaji": 140000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 1,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tukang",
+     "net": 140000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 140000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 4,
+    "dibayar": 0,
+    "gaji": 1385000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 9,
+    "lembur_jam": 5,
+    "lembur_jam_bayar": 5,
+    "lembur_rp": 91000,
+    "pekerja": 4,
+    "perlu_dicek": 2,
+    "potong": 0,
+    "sisa": 1476000,
+    "tambah": 0,
+    "total_bayar": 1476000
+   }
+  }
+ },
+ "134 log audit jumlah": {
+  "s": 200,
+  "j": {
+   "rows": [
+    {
+     "action": "create",
+     "created_at": "TS",
+     "detail": "1 baris, total 75000",
+     "entity": "kasbon_requests",
+     "entity_id": "X",
+     "id": 40,
+     "ip_address": "127.0.0.1",
+     "user_username": "akun1"
+    },
+    {
+     "action": "create",
+     "created_at": "TS",
+     "detail": "3 baris, total 550000",
+     "entity": "kasbon_requests",
+     "entity_id": "X",
+     "id": 39,
+     "ip_address": "127.0.0.1",
+     "user_username": "lap1"
+    },
+    {
+     "action": "update",
+     "created_at": "TS",
+     "detail": "disetujui 3 baris, total 550000",
+     "entity": "kasbon_requests",
+     "entity_id": "X",
+     "id": 42,
+     "ip_address": "127.0.0.1",
+     "user_username": "akun1"
+    },
+    {
+     "action": "update",
+     "created_at": "TS",
+     "detail": "disetujui 80000 -> X",
+     "entity": "kasbon_requests",
+     "entity_id": "X",
+     "id": 41,
+     "ip_address": "127.0.0.1",
+     "user_username": "akun1"
+    },
+    {
+     "action": "update",
+     "created_at": "TS",
+     "detail": "ditolak: belum waktunya",
+     "entity": "kasbon_requests",
+     "entity_id": "X",
+     "id": 43,
+     "ip_address": "127.0.0.1",
+     "user_username": "akun1"
+    }
+   ],
+   "total": 43
+  }
+ }
+}
