@@ -4,6 +4,7 @@
 2. Jalankan (Playwright + Chromium harus ada; `NODE_PATH` ke modul playwright):
    - `node scripts/qa/core.js` — hitungan gaji, kasbon otomatis, periode susulan, peran, keamanan, hapus proyek.
    - `node scripts/qa/borongan_nonaktif_induk.js` — tim borongan, pekerja berhenti/aktif kembali, pekerja di dua proyek.
+   - `node scripts/qa/borongan_pusat.js` / `borongan_dua_kali.js` — borongan dikelola pusat saja; satu tim dengan dua pekerjaan berjeda lama.
    - `node scripts/qa/ui.js` — HP lapangan dan layar Akuntan untuk fitur di atas.
    - `node scripts/qa/crawl.js` — semua halaman Admin/Akuntan/Owner + 4 ukuran layar HP.
 3. Bersihkan: hapus `backend/api/config.php`, `DROP DATABASE material`, matikan `php -S`.
