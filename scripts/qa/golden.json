@@ -1,0 +1,3650 @@
+{
+ "001 absen A 2026-10-16": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 0,
+    "W3": 0
+   },
+   "saved": 3
+  }
+ },
+ "002 absen A 2026-10-17": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 1,
+    "W3": 0
+   },
+   "saved": 4
+  }
+ },
+ "003 absen A 2026-10-19": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 0,
+    "W3": 0
+   },
+   "saved": 3
+  }
+ },
+ "004 absen A 2026-10-20": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 0,
+    "W3": 0
+   },
+   "saved": 3
+  }
+ },
+ "005 absen A 2026-10-21": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 0,
+    "W3": 0
+   },
+   "saved": 3
+  }
+ },
+ "006 absen A 2026-10-22": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [],
+   "periode_status": "draft",
+   "revs": {
+    "W1": 0,
+    "W2": 0,
+    "W3": 0
+   },
+   "saved": 3
+  }
+ },
+ "007 absen B setengah hari": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "peringatan_ganda": [
+    "Tukang"
+   ],
+   "periode_status": "draft",
+   "revs": {
+    "W5": 0
+   },
+   "saved": 1
+  }
+ },
+ "008 adj tambah": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "jumlah": 50000,
+   "ok": true
+  }
+ },
+ "009 adj borongan": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "jumlah": 4000000,
+   "ok": true
+  }
+ },
+ "010 adj potong": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "jumlah": 20000,
+   "ok": true
+  }
+ },
+ "011 kasbon w2": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "ok": true
+  }
+ },
+ "012 kasbon tim": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "ok": true
+  }
+ },
+ "013 kasbon besar w3": {
+  "s": 200,
+  "j": {
+   "id": "X",
+   "ok": true
+  }
+ },
+ "014 rekap A minggu": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W2": 300000,
+    "proj_a|W3": 2000000,
+    "proj_a|W6": 500000
+   },
+   "periods": [
+    {
+     "adj_potong": 20000,
+     "adj_tambah": 4050000,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 20000,
+       "kategori": "potongan",
+       "label": "Denda",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 4000000,
+       "kategori": "tambahan",
+       "label": "Borongan rangka",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 50000,
+       "kategori": "tambahan",
+       "label": "Bonus",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W1",
+       "worker_nama": "Kepala"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 2110000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 15,
+     "id": "per_proj_a_2026-10-16",
+     "lembur_rp": 286000,
+     "payments": [],
+     "pekerja": 3,
+     "pj_nama": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 6426000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 6426000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-22"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       0,
+       1
+      ],
+      "2026-10-19": [
+       0,
+       0.5
+      ],
+      "2026-10-20": [
+       1,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 605000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 5.5,
+     "kosong": 0,
+     "lembur_jam": 1,
+     "lembur_jam_bayar": 1,
+     "lembur_rp": 13000,
+     "nama": "Helper",
+     "net": 598000,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 20000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 598000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       1,
+       3
+      ],
+      "2026-10-19": [
+       0,
+       1
+      ],
+      "2026-10-20": [
+       0,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       0
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 875000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 5,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 988000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 988000,
+     "status_bayar": "belum",
+     "tambah": 50000,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       1,
+       2
+      ],
+      "2026-10-17": [
+       0,
+       0
+      ],
+      "2026-10-19": [
+       1,
+       10
+      ],
+      "2026-10-20": [
+       0,
+       0.5
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda",
+      "lembur_tinggi"
+     ],
+     "gaji": 630000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 4.5,
+     "kosong": 0,
+     "lembur_jam": 12,
+     "lembur_jam_bayar": 12,
+     "lembur_rp": 210000,
+     "nama": "Tukang",
+     "net": 840000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 840000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    },
+    {
+     "borongan": 1,
+     "days": [],
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 0,
+     "grade": "LAIN",
+     "grade_nama": "Tim borongan",
+     "hari": 0,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tim Alumunium",
+     "net": 4000000,
+     "no_rek": "",
+     "orang": "W6",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 4000000,
+     "status_bayar": "belum",
+     "tambah": 4000000,
+     "tarif_harian": 0,
+     "tarif_lembur": 0,
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 4,
+    "dibayar": 0,
+    "gaji": 2110000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 15,
+    "lembur_jam": 16,
+    "lembur_jam_bayar": 16,
+    "lembur_rp": 286000,
+    "pekerja": 4,
+    "perlu_dicek": 1,
+    "potong": 20000,
+    "sisa": 6426000,
+    "tambah": 4050000,
+    "total_bayar": 6426000
+   }
+  }
+ },
+ "015 rekap semua": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W2": 300000,
+    "proj_a|W3": 2000000,
+    "proj_a|W6": 500000
+   },
+   "periods": [
+    {
+     "adj_potong": 0,
+     "adj_tambah": 0,
+     "adjustments": [],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 70000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 0.5,
+     "id": "per_proj_b_2026-10-16",
+     "lembur_rp": 0,
+     "payments": [],
+     "pekerja": 1,
+     "pj_nama": "",
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 70000
+    },
+    {
+     "adj_potong": 20000,
+     "adj_tambah": 4050000,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 20000,
+       "kategori": "potongan",
+       "label": "Denda",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 4000000,
+       "kategori": "tambahan",
+       "label": "Borongan rangka",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 50000,
+       "kategori": "tambahan",
+       "label": "Bonus",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W1",
+       "worker_nama": "Kepala"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 2110000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 15,
+     "id": "per_proj_a_2026-10-16",
+     "lembur_rp": 286000,
+     "payments": [],
+     "pekerja": 3,
+     "pj_nama": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 6426000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 6426000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-29"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       0,
+       1
+      ],
+      "2026-10-19": [
+       0,
+       0.5
+      ],
+      "2026-10-20": [
+       1,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 605000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 5.5,
+     "kosong": 0,
+     "lembur_jam": 1,
+     "lembur_jam_bayar": 1,
+     "lembur_rp": 13000,
+     "nama": "Helper",
+     "net": 598000,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 20000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 598000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       1,
+       3
+      ],
+      "2026-10-19": [
+       0,
+       1
+      ],
+      "2026-10-20": [
+       0,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       0
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 875000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 5,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 988000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 988000,
+     "status_bayar": "belum",
+     "tambah": 50000,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       1,
+       2
+      ],
+      "2026-10-17": [
+       0,
+       0
+      ],
+      "2026-10-19": [
+       1,
+       10
+      ],
+      "2026-10-20": [
+       0,
+       0.5
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda",
+      "lembur_tinggi"
+     ],
+     "gaji": 630000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 4.5,
+     "kosong": 0,
+     "lembur_jam": 12,
+     "lembur_jam_bayar": 12,
+     "lembur_rp": 210000,
+     "nama": "Tukang",
+     "net": 840000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 840000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-19": [
+       0,
+       0.5
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda"
+     ],
+     "gaji": 70000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 0.5,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tukang",
+     "net": 70000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W5"
+    },
+    {
+     "borongan": 1,
+     "days": [],
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 0,
+     "grade": "LAIN",
+     "grade_nama": "Tim borongan",
+     "hari": 0,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tim Alumunium",
+     "net": 4000000,
+     "no_rek": "",
+     "orang": "W6",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 4000000,
+     "status_bayar": "belum",
+     "tambah": 4000000,
+     "tarif_harian": 0,
+     "tarif_lembur": 0,
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 5,
+    "dibayar": 0,
+    "gaji": 2180000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 15.5,
+    "lembur_jam": 16,
+    "lembur_jam_bayar": 16,
+    "lembur_rp": 286000,
+    "pekerja": 5,
+    "perlu_dicek": 2,
+    "potong": 20000,
+    "sisa": 6496000,
+    "tambah": 4050000,
+    "total_bayar": 6496000
+   }
+  }
+ },
+ "016 rekap semua owner": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W2": 300000,
+    "proj_a|W3": 2000000,
+    "proj_a|W6": 500000
+   },
+   "periods": [
+    {
+     "adj_potong": 0,
+     "adj_tambah": 0,
+     "adjustments": [],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 70000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 0.5,
+     "id": "per_proj_b_2026-10-16",
+     "lembur_rp": 0,
+     "payments": [],
+     "pekerja": 1,
+     "pj_nama": "",
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 70000
+    },
+    {
+     "adj_potong": 20000,
+     "adj_tambah": 4050000,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 20000,
+       "kategori": "potongan",
+       "label": "Denda",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 4000000,
+       "kategori": "tambahan",
+       "label": "Borongan rangka",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 50000,
+       "kategori": "tambahan",
+       "label": "Bonus",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W1",
+       "worker_nama": "Kepala"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 2110000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 15,
+     "id": "per_proj_a_2026-10-16",
+     "lembur_rp": 286000,
+     "payments": [],
+     "pekerja": 3,
+     "pj_nama": "",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 6426000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 6426000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-29"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       0,
+       1
+      ],
+      "2026-10-19": [
+       0,
+       0.5
+      ],
+      "2026-10-20": [
+       1,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 605000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 5.5,
+     "kosong": 0,
+     "lembur_jam": 1,
+     "lembur_jam_bayar": 1,
+     "lembur_rp": 13000,
+     "nama": "Helper",
+     "net": 598000,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 20000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 598000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       1,
+       3
+      ],
+      "2026-10-19": [
+       0,
+       1
+      ],
+      "2026-10-20": [
+       0,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       0
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 875000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 5,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 988000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 988000,
+     "status_bayar": "belum",
+     "tambah": 50000,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       1,
+       2
+      ],
+      "2026-10-17": [
+       0,
+       0
+      ],
+      "2026-10-19": [
+       1,
+       10
+      ],
+      "2026-10-20": [
+       0,
+       0.5
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda",
+      "lembur_tinggi"
+     ],
+     "gaji": 630000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 4.5,
+     "kosong": 0,
+     "lembur_jam": 12,
+     "lembur_jam_bayar": 12,
+     "lembur_rp": 210000,
+     "nama": "Tukang",
+     "net": 840000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 840000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-19": [
+       0,
+       0.5
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda"
+     ],
+     "gaji": 70000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 0.5,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tukang",
+     "net": 70000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W5"
+    },
+    {
+     "borongan": 1,
+     "days": [],
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 0,
+     "grade": "LAIN",
+     "grade_nama": "Tim borongan",
+     "hari": 0,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tim Alumunium",
+     "net": 4000000,
+     "no_rek": "",
+     "orang": "W6",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 4000000,
+     "status_bayar": "belum",
+     "tambah": 4000000,
+     "tarif_harian": 0,
+     "tarif_lembur": 0,
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 5,
+    "dibayar": 0,
+    "gaji": 2180000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 15.5,
+    "lembur_jam": 16,
+    "lembur_jam_bayar": 16,
+    "lembur_rp": 286000,
+    "pekerja": 5,
+    "perlu_dicek": 2,
+    "potong": 20000,
+    "sisa": 6496000,
+    "tambah": 4050000,
+    "total_bayar": 6496000
+   }
+  }
+ },
+ "017 rekap B": {
+  "s": 200,
+  "j": {
+   "borongan": [],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {},
+   "periods": [
+    {
+     "adj_potong": 0,
+     "adj_tambah": 0,
+     "adjustments": [],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 70000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 0.5,
+     "id": "per_proj_b_2026-10-16",
+     "lembur_rp": 0,
+     "payments": [],
+     "pekerja": 1,
+     "pj_nama": "",
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 70000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-22"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-19": [
+       0,
+       0.5
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda"
+     ],
+     "gaji": 70000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 0.5,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tukang",
+     "net": 70000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W5"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 1,
+    "dibayar": 0,
+    "gaji": 70000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 0.5,
+    "lembur_jam": 0,
+    "lembur_jam_bayar": 0,
+    "lembur_rp": 0,
+    "pekerja": 1,
+    "perlu_dicek": 1,
+    "potong": 0,
+    "sisa": 70000,
+    "tambah": 0,
+    "total_bayar": 70000
+   }
+  }
+ },
+ "018 periode A": {
+  "s": 200,
+  "j": {
+   "catatan": "",
+   "grup_nama": "",
+   "id": "per_proj_a_2026-10-16",
+   "pj_nama": "",
+   "project_id": "proj_a",
+   "status": "draft",
+   "tgl_akhir": "2026-10-22",
+   "tgl_mulai": "2026-10-16"
+  }
+ },
+ "019 daftar periode": {
+  "s": 200,
+  "j": [
+   {
+    "grup_nama": "",
+    "id": "per_proj_a_2026-10-16",
+    "n_absen": 18,
+    "pj_nama": "",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "draft",
+    "tgl_akhir": "2026-10-22",
+    "tgl_mulai": "2026-10-16"
+   },
+   {
+    "grup_nama": "",
+    "id": "per_proj_b_2026-10-16",
+    "n_absen": 1,
+    "pj_nama": "",
+    "project_id": "proj_b",
+    "project_nama": "Proyek B",
+    "status": "draft",
+    "tgl_akhir": "2026-10-22",
+    "tgl_mulai": "2026-10-16"
+   }
+  ]
+ },
+ "020 ajukan A": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "021 ajukan lagi": {
+  "s": 409,
+  "j": {
+   "error": "Minggu ini sudah diajukan."
+  }
+ },
+ "022 kembalikan": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "status": "draft"
+  }
+ },
+ "023 ajukan ulang": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "024 kasbon_plan": {
+  "s": 200,
+  "j": {
+   "catatan": "",
+   "grup_nama": "",
+   "id": "per_proj_a_2026-10-16",
+   "pj_nama": "Arya",
+   "project_id": "proj_a",
+   "status": "diajukan",
+   "tgl_akhir": "2026-10-22",
+   "tgl_mulai": "2026-10-16"
+  }
+ },
+ "025 bayar sebelum setuju": {
+  "s": 409,
+  "j": {
+   "error": "Periode belum diperiksa dan disetujui. Setujui dulu."
+  }
+ },
+ "026 setujui": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "orang": 3,
+   "potong_kasbon": 1398000,
+   "status": "disetujui"
+  }
+ },
+ "027 rekap A setelah setuju": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W3": 1402000
+   },
+   "periods": [
+    {
+     "adj_potong": 1418000,
+     "adj_tambah": 4050000,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 20000,
+       "kategori": "potongan",
+       "label": "Denda",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 300000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W2",
+       "worker_nama": "Tukang"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 500000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 598000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 4000000,
+       "kategori": "tambahan",
+       "label": "Borongan rangka",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 50000,
+       "kategori": "tambahan",
+       "label": "Bonus",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W1",
+       "worker_nama": "Kepala"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": "TS",
+     "diajukan_by": "X",
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": "TS",
+     "disetujui_by": "X",
+     "gaji": 2110000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 15,
+     "id": "per_proj_a_2026-10-16",
+     "lembur_rp": 286000,
+     "payments": [],
+     "pekerja": 3,
+     "pj_nama": "Arya",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 5028000,
+     "status": "disetujui",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 5028000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-22"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       0,
+       1
+      ],
+      "2026-10-19": [
+       0,
+       0.5
+      ],
+      "2026-10-20": [
+       1,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 605000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 5.5,
+     "kosong": 0,
+     "lembur_jam": 1,
+     "lembur_jam_bayar": 1,
+     "lembur_rp": 13000,
+     "nama": "Helper",
+     "net": 0,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 618000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "nol",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       1,
+       3
+      ],
+      "2026-10-19": [
+       0,
+       1
+      ],
+      "2026-10-20": [
+       0,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       0
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 875000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 5,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 988000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 988000,
+     "status_bayar": "belum",
+     "tambah": 50000,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       1,
+       2
+      ],
+      "2026-10-17": [
+       0,
+       0
+      ],
+      "2026-10-19": [
+       1,
+       10
+      ],
+      "2026-10-20": [
+       0,
+       0.5
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda",
+      "lembur_tinggi"
+     ],
+     "gaji": 630000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 4.5,
+     "kosong": 0,
+     "lembur_jam": 12,
+     "lembur_jam_bayar": 12,
+     "lembur_rp": 210000,
+     "nama": "Tukang",
+     "net": 540000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 300000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 540000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    },
+    {
+     "borongan": 1,
+     "days": [],
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 0,
+     "grade": "LAIN",
+     "grade_nama": "Tim borongan",
+     "hari": 0,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tim Alumunium",
+     "net": 3500000,
+     "no_rek": "",
+     "orang": "W6",
+     "potong": 500000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 3500000,
+     "status_bayar": "belum",
+     "tambah": 4000000,
+     "tarif_harian": 0,
+     "tarif_lembur": 0,
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 3,
+    "dibayar": 0,
+    "gaji": 2110000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 15,
+    "lembur_jam": 16,
+    "lembur_jam_bayar": 16,
+    "lembur_rp": 286000,
+    "pekerja": 4,
+    "perlu_dicek": 1,
+    "potong": 1418000,
+    "sisa": 5028000,
+    "tambah": 4050000,
+    "total_bayar": 5028000
+   }
+  }
+ },
+ "028 periode A setuju": {
+  "s": 200,
+  "j": {
+   "catatan": "",
+   "grup_nama": "",
+   "id": "per_proj_a_2026-10-16",
+   "pj_nama": "Arya",
+   "project_id": "proj_a",
+   "status": "disetujui",
+   "tgl_akhir": "2026-10-22",
+   "tgl_mulai": "2026-10-16"
+  }
+ },
+ "029 kasbon buku": {
+  "s": 200,
+  "j": {
+   "kasbon": [
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 2000000,
+     "ket": "besar",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-18",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 300000,
+     "ket": "kasbon",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-15",
+     "tim": "",
+     "worker_id": "W2",
+     "worker_nama": "Tukang"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 500000,
+     "ket": "kasbon tim",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-16",
+     "tim": "",
+     "worker_id": "W6",
+     "worker_nama": "Tim Alumunium"
+    }
+   ],
+   "saldo": [
+    {
+     "nama": "Helper",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 1402000,
+     "tim": "",
+     "worker_id": "W3"
+    }
+   ]
+  }
+ },
+ "030 bayar sebagian": {
+  "s": 200,
+  "j": {
+   "dibayar": 1100000,
+   "lunas": false,
+   "ok": true,
+   "status": "disetujui"
+  }
+ },
+ "031 rekap A setelah bayar sebagian": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W3": 1402000
+   },
+   "periods": [
+    {
+     "adj_potong": 1418000,
+     "adj_tambah": 4050000,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 20000,
+       "kategori": "potongan",
+       "label": "Denda",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 300000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W2",
+       "worker_nama": "Tukang"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 500000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 598000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 4000000,
+       "kategori": "tambahan",
+       "label": "Borongan rangka",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 50000,
+       "kategori": "tambahan",
+       "label": "Bonus",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W1",
+       "worker_nama": "Kepala"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": "TS",
+     "diajukan_by": "X",
+     "dibayar": 1100000,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": "TS",
+     "disetujui_by": "X",
+     "gaji": 2110000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 15,
+     "id": "per_proj_a_2026-10-16",
+     "lembur_rp": 286000,
+     "payments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 100000,
+       "ket": "",
+       "metode": "transfer",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W1"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 1000000,
+       "ket": "",
+       "metode": "transfer",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W6"
+      }
+     ],
+     "pekerja": 3,
+     "pj_nama": "Arya",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 3928000,
+     "status": "disetujui",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 5028000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-22"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       0,
+       1
+      ],
+      "2026-10-19": [
+       0,
+       0.5
+      ],
+      "2026-10-20": [
+       1,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 605000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 5.5,
+     "kosong": 0,
+     "lembur_jam": 1,
+     "lembur_jam_bayar": 1,
+     "lembur_rp": 13000,
+     "nama": "Helper",
+     "net": 0,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 618000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "nol",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       1,
+       3
+      ],
+      "2026-10-19": [
+       0,
+       1
+      ],
+      "2026-10-20": [
+       0,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       0
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 100000,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 875000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 5,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 988000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 888000,
+     "status_bayar": "sebagian",
+     "tambah": 50000,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       1,
+       2
+      ],
+      "2026-10-17": [
+       0,
+       0
+      ],
+      "2026-10-19": [
+       1,
+       10
+      ],
+      "2026-10-20": [
+       0,
+       0.5
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda",
+      "lembur_tinggi"
+     ],
+     "gaji": 630000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 4.5,
+     "kosong": 0,
+     "lembur_jam": 12,
+     "lembur_jam_bayar": 12,
+     "lembur_rp": 210000,
+     "nama": "Tukang",
+     "net": 540000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 300000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 540000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    },
+    {
+     "borongan": 1,
+     "days": [],
+     "dibayar": 1000000,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 0,
+     "grade": "LAIN",
+     "grade_nama": "Tim borongan",
+     "hari": 0,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tim Alumunium",
+     "net": 3500000,
+     "no_rek": "",
+     "orang": "W6",
+     "potong": 500000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 2500000,
+     "status_bayar": "sebagian",
+     "tambah": 4000000,
+     "tarif_harian": 0,
+     "tarif_lembur": 0,
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 3,
+    "dibayar": 1100000,
+    "gaji": 2110000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 15,
+    "lembur_jam": 16,
+    "lembur_jam_bayar": 16,
+    "lembur_rp": 286000,
+    "pekerja": 4,
+    "perlu_dicek": 1,
+    "potong": 1418000,
+    "sisa": 3928000,
+    "tambah": 4050000,
+    "total_bayar": 5028000
+   }
+  }
+ },
+ "032 bayar semua": {
+  "s": 200,
+  "j": {
+   "dibayar": 3928000,
+   "lunas": true,
+   "ok": true,
+   "status": "dibayar"
+  }
+ },
+ "033 periode A lunas": {
+  "s": 200,
+  "j": {
+   "catatan": "",
+   "grup_nama": "",
+   "id": "per_proj_a_2026-10-16",
+   "pj_nama": "Arya",
+   "project_id": "proj_a",
+   "status": "dibayar",
+   "tgl_akhir": "2026-10-22",
+   "tgl_mulai": "2026-10-16"
+  }
+ },
+ "034 rekap A akhir": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W3": 1402000
+   },
+   "periods": [
+    {
+     "adj_potong": 1418000,
+     "adj_tambah": 4050000,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 20000,
+       "kategori": "potongan",
+       "label": "Denda",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 300000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W2",
+       "worker_nama": "Tukang"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 500000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 598000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 4000000,
+       "kategori": "tambahan",
+       "label": "Borongan rangka",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 50000,
+       "kategori": "tambahan",
+       "label": "Bonus",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W1",
+       "worker_nama": "Kepala"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": "TS",
+     "diajukan_by": "X",
+     "dibayar": 5028000,
+     "dibayar_at": "TS",
+     "dibayar_by": "X",
+     "disetujui_at": "TS",
+     "disetujui_by": "X",
+     "gaji": 2110000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 15,
+     "id": "per_proj_a_2026-10-16",
+     "lembur_rp": 286000,
+     "payments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 100000,
+       "ket": "",
+       "metode": "transfer",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W1"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 1000000,
+       "ket": "",
+       "metode": "transfer",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W6"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 2500000,
+       "ket": "",
+       "metode": "tunai",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W6"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 540000,
+       "ket": "",
+       "metode": "tunai",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W2"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 888000,
+       "ket": "",
+       "metode": "tunai",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W1"
+      }
+     ],
+     "pekerja": 3,
+     "pj_nama": "Arya",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status": "dibayar",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 5028000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-22"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       0,
+       1
+      ],
+      "2026-10-19": [
+       0,
+       0.5
+      ],
+      "2026-10-20": [
+       1,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 605000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 5.5,
+     "kosong": 0,
+     "lembur_jam": 1,
+     "lembur_jam_bayar": 1,
+     "lembur_rp": 13000,
+     "nama": "Helper",
+     "net": 0,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 618000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "nol",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       1,
+       3
+      ],
+      "2026-10-19": [
+       0,
+       1
+      ],
+      "2026-10-20": [
+       0,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       0
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 988000,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 875000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 5,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 988000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "lunas",
+     "tambah": 50000,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       1,
+       2
+      ],
+      "2026-10-17": [
+       0,
+       0
+      ],
+      "2026-10-19": [
+       1,
+       10
+      ],
+      "2026-10-20": [
+       0,
+       0.5
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 540000,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda",
+      "lembur_tinggi"
+     ],
+     "gaji": 630000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 4.5,
+     "kosong": 0,
+     "lembur_jam": 12,
+     "lembur_jam_bayar": 12,
+     "lembur_rp": 210000,
+     "nama": "Tukang",
+     "net": 540000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 300000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "lunas",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    },
+    {
+     "borongan": 1,
+     "days": [],
+     "dibayar": 3500000,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 0,
+     "grade": "LAIN",
+     "grade_nama": "Tim borongan",
+     "hari": 0,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tim Alumunium",
+     "net": 3500000,
+     "no_rek": "",
+     "orang": "W6",
+     "potong": 500000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "lunas",
+     "tambah": 4000000,
+     "tarif_harian": 0,
+     "tarif_lembur": 0,
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 0,
+    "dibayar": 5028000,
+    "gaji": 2110000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 15,
+    "lembur_jam": 16,
+    "lembur_jam_bayar": 16,
+    "lembur_rp": 286000,
+    "pekerja": 4,
+    "perlu_dicek": 1,
+    "potong": 1418000,
+    "sisa": 0,
+    "tambah": 4050000,
+    "total_bayar": 5028000
+   }
+  }
+ },
+ "035 ajukan dipotong": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "036 periode 23-25": {
+  "s": 200,
+  "j": {
+   "catatan": "",
+   "grup_nama": "",
+   "id": "per_proj_a_2026-10-23",
+   "pj_nama": "Arya",
+   "project_id": "proj_a",
+   "status": "diajukan",
+   "tgl_akhir": "2026-10-25",
+   "tgl_mulai": "2026-10-23"
+  }
+ },
+ "037 periode susulan": {
+  "s": 200,
+  "j": {
+   "catatan": "",
+   "grup_nama": "",
+   "id": null,
+   "pj_nama": "Arya",
+   "project_id": "proj_a",
+   "status": "draft",
+   "tgl_akhir": "2026-10-29",
+   "tgl_mulai": "2026-10-26"
+  }
+ },
+ "038 kasbon_plan minggu 2": {
+  "s": 200,
+  "j": {
+   "catatan": "",
+   "grup_nama": "",
+   "id": "per_proj_a_2026-10-23",
+   "pj_nama": "Arya",
+   "project_id": "proj_a",
+   "status": "diajukan",
+   "tgl_akhir": "2026-10-25",
+   "tgl_mulai": "2026-10-23"
+  }
+ },
+ "039 setujui minggu 2": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "orang": 1,
+   "potong_kasbon": 330000,
+   "status": "disetujui"
+  }
+ },
+ "040 rekap minggu 2": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W3": 1072000
+   },
+   "periods": [
+    {
+     "adj_potong": 330000,
+     "adj_tambah": 0,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 330000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-23",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": "TS",
+     "diajukan_by": "X",
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": "TS",
+     "disetujui_by": "X",
+     "gaji": 750000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 6,
+     "id": "per_proj_a_2026-10-23",
+     "lembur_rp": 0,
+     "payments": [],
+     "pekerja": 2,
+     "pj_nama": "Arya",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 420000,
+     "status": "disetujui",
+     "tgl_akhir": "2026-10-25",
+     "tgl_mulai": "2026-10-23",
+     "total_bayar": 420000
+    }
+   ],
+   "range": {
+    "from": "2026-10-23",
+    "to": "2026-10-25"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-23": [
+       0,
+       1
+      ],
+      "2026-10-24": [
+       0,
+       1
+      ],
+      "2026-10-25": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 330000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 3,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Helper",
+     "net": 0,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 330000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "nol",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-23": [
+       0,
+       1
+      ],
+      "2026-10-24": [
+       0,
+       1
+      ],
+      "2026-10-25": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 420000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 3,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tukang",
+     "net": 420000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 420000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 1,
+    "dibayar": 0,
+    "gaji": 750000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 6,
+    "lembur_jam": 0,
+    "lembur_jam_bayar": 0,
+    "lembur_rp": 0,
+    "pekerja": 2,
+    "perlu_dicek": 0,
+    "potong": 330000,
+    "sisa": 420000,
+    "tambah": 0,
+    "total_bayar": 420000
+   }
+  }
+ },
+ "041 kasbon buku 2": {
+  "s": 200,
+  "j": {
+   "kasbon": [
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 2000000,
+     "ket": "besar",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-18",
+     "tim": "",
+     "worker_id": "W3",
+     "worker_nama": "Helper"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 300000,
+     "ket": "kasbon",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-15",
+     "tim": "",
+     "worker_id": "W2",
+     "worker_nama": "Tukang"
+    },
+    {
+     "created_at": "TS",
+     "created_by": "X",
+     "id": "X",
+     "jumlah": 500000,
+     "ket": "kasbon tim",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "tgl": "2026-10-16",
+     "tim": "",
+     "worker_id": "W6",
+     "worker_nama": "Tim Alumunium"
+    }
+   ],
+   "saldo": [
+    {
+     "nama": "Helper",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "saldo": 1072000,
+     "tim": "",
+     "worker_id": "W3"
+    }
+   ]
+  }
+ },
+ "042 daftar periode akhir": {
+  "s": 200,
+  "j": [
+   {
+    "grup_nama": "",
+    "id": "per_proj_a_2026-10-16",
+    "n_absen": 18,
+    "pj_nama": "Arya",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "dibayar",
+    "tgl_akhir": "2026-10-22",
+    "tgl_mulai": "2026-10-16"
+   },
+   {
+    "grup_nama": "",
+    "id": "per_proj_a_2026-10-23",
+    "n_absen": 6,
+    "pj_nama": "Arya",
+    "project_id": "proj_a",
+    "project_nama": "Proyek A",
+    "status": "disetujui",
+    "tgl_akhir": "2026-10-25",
+    "tgl_mulai": "2026-10-23"
+   },
+   {
+    "grup_nama": "",
+    "id": "per_proj_b_2026-10-16",
+    "n_absen": 1,
+    "pj_nama": "",
+    "project_id": "proj_b",
+    "project_nama": "Proyek B",
+    "status": "draft",
+    "tgl_akhir": "2026-10-22",
+    "tgl_mulai": "2026-10-16"
+   }
+  ]
+ },
+ "043 rekap semua akhir": {
+  "s": 200,
+  "j": {
+   "borongan": [
+    {
+     "nama": "Tim Alumunium",
+     "project_id": "proj_a",
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "grades": {
+    "KTK": "Kepala Tukang",
+    "LAIN": "Lainnya",
+    "LD": "Laden",
+    "OBK": "Operator Beko",
+    "OMX": "Operator Mixer",
+    "SPR": "Supir",
+    "TK": "Tukang"
+   },
+   "kasbon_saldo": {
+    "proj_a|W3": 1072000
+   },
+   "periods": [
+    {
+     "adj_potong": 0,
+     "adj_tambah": 0,
+     "adjustments": [],
+     "catatan": "",
+     "diajukan_at": null,
+     "diajukan_by": null,
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": null,
+     "disetujui_by": null,
+     "gaji": 70000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 0.5,
+     "id": "per_proj_b_2026-10-16",
+     "lembur_rp": 0,
+     "payments": [],
+     "pekerja": 1,
+     "pj_nama": "",
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status": "draft",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 70000
+    },
+    {
+     "adj_potong": 1418000,
+     "adj_tambah": 4050000,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 20000,
+       "kategori": "potongan",
+       "label": "Denda",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 300000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W2",
+       "worker_nama": "Tukang"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 500000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 598000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 4000000,
+       "kategori": "tambahan",
+       "label": "Borongan rangka",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W6",
+       "worker_nama": "Tim Alumunium"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "tambah",
+       "jumlah": 50000,
+       "kategori": "tambahan",
+       "label": "Bonus",
+       "period_id": "per_proj_a_2026-10-16",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W1",
+       "worker_nama": "Kepala"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": "TS",
+     "diajukan_by": "X",
+     "dibayar": 5028000,
+     "dibayar_at": "TS",
+     "dibayar_by": "X",
+     "disetujui_at": "TS",
+     "disetujui_by": "X",
+     "gaji": 2110000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 15,
+     "id": "per_proj_a_2026-10-16",
+     "lembur_rp": 286000,
+     "payments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 100000,
+       "ket": "",
+       "metode": "transfer",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W1"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 1000000,
+       "ket": "",
+       "metode": "transfer",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W6"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 2500000,
+       "ket": "",
+       "metode": "tunai",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W6"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 540000,
+       "ket": "",
+       "metode": "tunai",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W2"
+      },
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "id": "X",
+       "jumlah": 888000,
+       "ket": "",
+       "metode": "tunai",
+       "period_id": "per_proj_a_2026-10-16",
+       "tgl_bayar": "2026-10-27",
+       "worker_id": "W1"
+      }
+     ],
+     "pekerja": 3,
+     "pj_nama": "Arya",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status": "dibayar",
+     "tgl_akhir": "2026-10-22",
+     "tgl_mulai": "2026-10-16",
+     "total_bayar": 5028000
+    },
+    {
+     "adj_potong": 330000,
+     "adj_tambah": 0,
+     "adjustments": [
+      {
+       "created_at": "TS",
+       "created_by": "X",
+       "harga": null,
+       "id": "X",
+       "jenis": "potong",
+       "jumlah": 330000,
+       "kategori": "kasbon",
+       "label": "Potong kasbon (otomatis)",
+       "period_id": "per_proj_a_2026-10-23",
+       "qty": null,
+       "tim": "",
+       "worker_id": "W3",
+       "worker_nama": "Helper"
+      }
+     ],
+     "catatan": "",
+     "diajukan_at": "TS",
+     "diajukan_by": "X",
+     "dibayar": 0,
+     "dibayar_at": null,
+     "dibayar_by": null,
+     "disetujui_at": "TS",
+     "disetujui_by": "X",
+     "gaji": 750000,
+     "grup_dibayar": 0,
+     "grup_nama": "",
+     "grup_net": 0,
+     "grup_potong": 0,
+     "grup_tambah": 0,
+     "hari": 6,
+     "id": "per_proj_a_2026-10-23",
+     "lembur_rp": 0,
+     "payments": [],
+     "pekerja": 2,
+     "pj_nama": "Arya",
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 420000,
+     "status": "disetujui",
+     "tgl_akhir": "2026-10-25",
+     "tgl_mulai": "2026-10-23",
+     "total_bayar": 420000
+    }
+   ],
+   "range": {
+    "from": "2026-10-16",
+    "to": "2026-10-29"
+   },
+   "rows": [
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       0,
+       1
+      ],
+      "2026-10-19": [
+       0,
+       0.5
+      ],
+      "2026-10-20": [
+       1,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ],
+      "2026-10-23": [
+       0,
+       1
+      ],
+      "2026-10-24": [
+       0,
+       1
+      ],
+      "2026-10-25": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 935000,
+     "grade": "LD",
+     "grade_nama": "Laden",
+     "hari": 8.5,
+     "kosong": 0,
+     "lembur_jam": 1,
+     "lembur_jam_bayar": 1,
+     "lembur_rp": 13000,
+     "nama": "Helper",
+     "net": 0,
+     "no_rek": "",
+     "orang": "W3",
+     "potong": 948000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "nol",
+     "tambah": 0,
+     "tarif_harian": 110000,
+     "tarif_lembur": 13000,
+     "tim": "Tim B",
+     "worker_id": "W3"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       0,
+       1
+      ],
+      "2026-10-17": [
+       1,
+       3
+      ],
+      "2026-10-19": [
+       0,
+       1
+      ],
+      "2026-10-20": [
+       0,
+       1
+      ],
+      "2026-10-21": [
+       0,
+       0
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 988000,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 875000,
+     "grade": "KTK",
+     "grade_nama": "Kepala Tukang",
+     "hari": 5,
+     "kosong": 0,
+     "lembur_jam": 3,
+     "lembur_jam_bayar": 3,
+     "lembur_rp": 63000,
+     "nama": "Kepala",
+     "net": 988000,
+     "no_rek": "",
+     "orang": "W1",
+     "potong": 0,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "lunas",
+     "tambah": 50000,
+     "tarif_harian": 175000,
+     "tarif_lembur": 21000,
+     "tim": "Tim A",
+     "worker_id": "W1"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-16": [
+       1,
+       2
+      ],
+      "2026-10-17": [
+       0,
+       0
+      ],
+      "2026-10-19": [
+       1,
+       10
+      ],
+      "2026-10-20": [
+       0,
+       0.5
+      ],
+      "2026-10-21": [
+       0,
+       1
+      ],
+      "2026-10-22": [
+       0,
+       1
+      ],
+      "2026-10-23": [
+       0,
+       1
+      ],
+      "2026-10-24": [
+       0,
+       1
+      ],
+      "2026-10-25": [
+       0,
+       1
+      ]
+     },
+     "dibayar": 540000,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda",
+      "lembur_tinggi"
+     ],
+     "gaji": 1050000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 7.5,
+     "kosong": 0,
+     "lembur_jam": 12,
+     "lembur_jam_bayar": 12,
+     "lembur_rp": 210000,
+     "nama": "Tukang",
+     "net": 960000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 300000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 420000,
+     "status_bayar": "sebagian",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W2"
+    },
+    {
+     "borongan": 0,
+     "days": {
+      "2026-10-19": [
+       0,
+       0.5
+      ]
+     },
+     "dibayar": 0,
+     "diverifikasi": 1,
+     "flags": [
+      "ganda"
+     ],
+     "gaji": 70000,
+     "grade": "TK",
+     "grade_nama": "Tukang",
+     "hari": 0.5,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tukang",
+     "net": 70000,
+     "no_rek": "",
+     "orang": "W2",
+     "potong": 0,
+     "project_id": "proj_b",
+     "project_nama": "Proyek B",
+     "sisa": 70000,
+     "status_bayar": "belum",
+     "tambah": 0,
+     "tarif_harian": 140000,
+     "tarif_lembur": 17500,
+     "tim": "Tim A",
+     "worker_id": "W5"
+    },
+    {
+     "borongan": 1,
+     "days": [],
+     "dibayar": 3500000,
+     "diverifikasi": 1,
+     "flags": [],
+     "gaji": 0,
+     "grade": "LAIN",
+     "grade_nama": "Tim borongan",
+     "hari": 0,
+     "kosong": 0,
+     "lembur_jam": 0,
+     "lembur_jam_bayar": 0,
+     "lembur_rp": 0,
+     "nama": "Tim Alumunium",
+     "net": 3500000,
+     "no_rek": "",
+     "orang": "W6",
+     "potong": 500000,
+     "project_id": "proj_a",
+     "project_nama": "Proyek A",
+     "sisa": 0,
+     "status_bayar": "lunas",
+     "tambah": 4000000,
+     "tarif_harian": 0,
+     "tarif_lembur": 0,
+     "tim": "Tim Alumunium",
+     "worker_id": "W6"
+    }
+   ],
+   "totals": {
+    "belum_dibayar": 2,
+    "dibayar": 5028000,
+    "gaji": 2930000,
+    "grup_potong": 0,
+    "grup_tambah": 0,
+    "hari": 21.5,
+    "lembur_jam": 16,
+    "lembur_jam_bayar": 16,
+    "lembur_rp": 286000,
+    "pekerja": 5,
+    "perlu_dicek": 2,
+    "potong": 1748000,
+    "sisa": 490000,
+    "tambah": 4050000,
+    "total_bayar": 5518000
+   }
+  }
+ },
+ "044 absen terkunci": {
+  "s": 409,
+  "j": {
+   "error": "Periode ini sudah dibayar dan terkunci. Koreksi dibuat sebagai penyesuaian di periode berikutnya."
+  }
+ },
+ "045 ajukan tarif nol": {
+  "s": 200,
+  "j": {
+   "ok": true,
+   "status": "diajukan"
+  }
+ },
+ "046 setujui tarif nol": {
+  "s": 409,
+  "j": {
+   "error": "Tarif belum diisi untuk: Tanpa Tarif. Isi dulu di Pekerja & Tarif."
+  }
+ }
+}
