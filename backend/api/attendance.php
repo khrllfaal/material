@@ -149,4 +149,19 @@ $rq = $db->prepare('SELECT worker_id, rev FROM attendance WHERE project_id = ? A
 $rq->execute([$projectId, $tgl]);
 $revs = [];
 foreach ($rq->fetchAll() as $r) $revs[$r['worker_id']] = (int)$r['rev'];
-json_response(['ok' => true, 'saved' => $saved, 'revs' => $revs, 'periode_status' => ($period['status'] === 'disetujui' && $changes) ? 'diajukan' : $period['status']]);
+// Same person recorded in two projects on this day with more than one day in total: tell the person saving (names only).
+$peringatan = [];
+$keys = [];
+foreach ($entries as $e) {
+    $w = $wMap[(string)($e['worker_id'] ?? '')] ?? null;
+    if ($w && array_key_exists('hari', $e) && $e['hari'] !== null && (float)$e['hari'] > 0) $keys[($w['induk_id'] ?? null) ?: $w['id']] = true;
+}
+if ($keys) {
+    $ks = array_keys($keys);
+    $gq = $db->prepare('SELECT MIN(w.nama) AS nama FROM attendance a JOIN workers w ON w.id = a.worker_id
+                         WHERE a.tgl = ? AND COALESCE(w.induk_id, w.id) IN (' . implode(',', array_fill(0, count($ks), '?')) . ')
+                         GROUP BY COALESCE(w.induk_id, w.id) HAVING SUM(a.hari) > 1');
+    $gq->execute(array_merge([$tgl], $ks));
+    $peringatan = array_column($gq->fetchAll(), 'nama');
+}
+json_response(['ok' => true, 'saved' => $saved, 'revs' => $revs, 'periode_status' => ($period['status'] === 'disetujui' && $changes) ? 'diajukan' : $period['status'], 'peringatan_ganda' => $peringatan]);

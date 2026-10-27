@@ -33,9 +33,12 @@ CREATE TABLE IF NOT EXISTS workers (
   diverifikasi  TINYINT(1) NOT NULL DEFAULT 1,   -- selalu 1 (verifikasi pekerja baru dinonaktifkan)
   diverifikasi_by VARCHAR(40) NULL,
   diverifikasi_at DATETIME NULL,
+  borongan      TINYINT(1) NOT NULL DEFAULT 0,   -- 1 = tim borongan: satu penerima, dibayar per tim lewat Tambahan (tarif harian 0)
+  induk_id      VARCHAR(40) NULL,                -- pekerja yang sama di proyek lain (setengah hari di dua proyek)
   created_by    VARCHAR(40) NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_workers_project (project_id, aktif),
+  INDEX idx_workers_induk (induk_id),
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

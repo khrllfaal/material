@@ -24,7 +24,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
     }
     $st = $db->prepare(
         "SELECT a.worker_id, a.project_id, a.tgl, a.hari, a.lembur_jam, a.grade, a.tim, a.tarif_harian, a.tarif_lembur,
-                w.nama, w.no_rek, w.aktif, w.diverifikasi, p.nama AS project_nama
+                w.nama, w.no_rek, w.aktif, w.diverifikasi, w.borongan, w.induk_id, p.nama AS project_nama
            FROM attendance a JOIN workers w ON w.id = a.worker_id JOIN projects p ON p.id = a.project_id
           WHERE a.tgl BETWEEN ? AND ? $pc ORDER BY a.tgl");
     $st->execute(array_merge([$from, $to], $pp));
@@ -38,11 +38,12 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         if (!isset($rows[$k])) {
             $rows[$k] = [
                 'worker_id' => $a['worker_id'], 'nama' => $a['nama'], 'no_rek' => $a['no_rek'],
-                'grade' => $a['grade'], 'grade_nama' => WORKER_GRADES[$a['grade']] ?? $a['grade'], 'tim' => $a['tim'],
+                'grade' => $a['grade'], 'grade_nama' => (int)$a['borongan'] ? 'Tim borongan' : (WORKER_GRADES[$a['grade']] ?? $a['grade']), 'tim' => $a['tim'],
                 'project_id' => $a['project_id'], 'project_nama' => $a['project_nama'], 'diverifikasi' => 1,
                 'hari' => 0.0, 'lembur_jam' => 0.0, 'lembur_jam_bayar' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0,
                 'tarif_harian' => (float)$a['tarif_harian'], 'tarif_lembur' => (float)$a['tarif_lembur'],
                 'days' => [], 'flags' => [], 'tambah' => 0.0, 'potong' => 0.0,
+                'borongan' => (int)$a['borongan'], 'orang' => $a['induk_id'] ?: $a['worker_id'],
             ];
         }
         $r = &$rows[$k];
@@ -53,7 +54,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         $r['lembur_rp'] += $lp * (float)$a['tarif_lembur'];
         $r['days'][$a['tgl']] = [$h, $l];
         $r['tarif_harian'] = (float)$a['tarif_harian']; $r['tarif_lembur'] = (float)$a['tarif_lembur'];
-        if ($h > 0 && (float)$a['tarif_harian'] <= 0 && !in_array('tarif_kosong', $r['flags'], true)) $r['flags'][] = 'tarif_kosong';
+        if ($h > 0 && !(int)$a['borongan'] && (float)$a['tarif_harian'] <= 0 && !in_array('tarif_kosong', $r['flags'], true)) $r['flags'][] = 'tarif_kosong';
         if ($h > 0 && false && !in_array('belum_verifikasi', $r['flags'], true)) $r['flags'][] = 'belum_verifikasi';
         if ($l > 8 && !in_array('lembur_tinggi', $r['flags'], true)) $r['flags'][] = 'lembur_tinggi';
         unset($r);
@@ -64,20 +65,21 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         if ($h > 0) $pstat[$pk]['workers'][$a['worker_id']] = 1;
     }
 
-    // Same person counted more than 1 day on one date across projects.
+    // Same person counted more than 1 day on one date across projects (also when the person has a separate record per project).
     if ($rows) {
-        $wids = array_values(array_unique(array_column($rows, 'worker_id')));
-        $in = implode(',', array_fill(0, count($wids), '?'));
-        $g = $db->prepare("SELECT worker_id, tgl, SUM(hari) h FROM attendance WHERE tgl BETWEEN ? AND ? AND worker_id IN ($in) GROUP BY worker_id, tgl HAVING h > 1");
-        $g->execute(array_merge([$from, $to], $wids));
+        $orang = array_values(array_unique(array_column($rows, 'orang')));
+        $in = implode(',', array_fill(0, count($orang), '?'));
+        $g = $db->prepare("SELECT COALESCE(w.induk_id, w.id) AS orang, a.tgl, SUM(a.hari) h FROM attendance a JOIN workers w ON w.id = a.worker_id
+                            WHERE a.tgl BETWEEN ? AND ? AND (COALESCE(w.induk_id, w.id) IN ($in) OR w.id IN ($in)) GROUP BY COALESCE(w.induk_id, w.id), a.tgl HAVING h > 1");
+        $g->execute(array_merge([$from, $to], $orang, $orang));
         foreach ($g->fetchAll() as $x) {
-            foreach ($rows as $k => &$r) if ($r['worker_id'] === $x['worker_id'] && isset($r['days'][$x['tgl']]) && !in_array('ganda', $r['flags'], true)) $r['flags'][] = 'ganda';
+            foreach ($rows as $k => &$r) if ($r['orang'] === $x['orang'] && isset($r['days'][$x['tgl']]) && !in_array('ganda', $r['flags'], true)) $r['flags'][] = 'ganda';
             unset($r);
         }
     }
 
     // Workers missing on dates that were otherwise filled in for their project.
-    $act = $db->query('SELECT id, project_id, DATE(created_at) AS since FROM workers WHERE aktif = 1')->fetchAll();
+    $act = $db->query('SELECT id, project_id, DATE(created_at) AS since FROM workers WHERE aktif = 1 AND borongan = 0')->fetchAll(); // a borongan tim has no daily absen to fill
     $byProj = []; $since = [];
     foreach ($act as $w) { $byProj[$w['project_id']][] = $w['id']; $since[$w['id']] = $w['since']; }
     $kosong = [];
@@ -118,13 +120,14 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
     // Workers with an adjustment but no attendance in range still get a row.
     foreach ($periods as $p) foreach ($p['adjustments'] as $x) {
         if ($x['worker_id'] && !isset($rows[$x['worker_id'] . '|' . $p['project_id']])) {
-            $w = $db->prepare('SELECT nama, grade, tim, no_rek FROM workers WHERE id = ?'); $w->execute([$x['worker_id']]); $wr = $w->fetch();
+            $w = $db->prepare('SELECT nama, grade, tim, no_rek, borongan, induk_id FROM workers WHERE id = ?'); $w->execute([$x['worker_id']]); $wr = $w->fetch();
             if ($wr) $rows[$x['worker_id'] . '|' . $p['project_id']] = [
                 'worker_id' => $x['worker_id'], 'nama' => $wr['nama'], 'no_rek' => $wr['no_rek'], 'grade' => $wr['grade'],
-                'grade_nama' => WORKER_GRADES[$wr['grade']] ?? $wr['grade'], 'tim' => $wr['tim'],
+                'grade_nama' => (int)$wr['borongan'] ? 'Tim borongan' : (WORKER_GRADES[$wr['grade']] ?? $wr['grade']), 'tim' => $wr['tim'],
                 'project_id' => $p['project_id'], 'project_nama' => $p['project_nama'], 'diverifikasi' => 1,
                 'hari' => 0.0, 'lembur_jam' => 0.0, 'lembur_jam_bayar' => 0.0, 'gaji' => 0.0, 'lembur_rp' => 0.0, 'tarif_harian' => 0.0, 'tarif_lembur' => 0.0,
                 'days' => [], 'flags' => [], 'tambah' => 0.0, 'potong' => 0.0,
+                'borongan' => (int)$wr['borongan'], 'orang' => $wr['induk_id'] ?: $x['worker_id'],
             ];
         }
     }
@@ -150,6 +153,7 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
         $r['kosong'] = $kosong[$k] ?? 0;
         if ($r['kosong'] > 0) $r['flags'][] = 'belum_diisi';
         if ($r['net'] < -0.005) $r['flags'][] = 'net_minus'; // deductions larger than the pay
+        if ($r['borongan'] && $r['hari'] > 0 && $r['tambah'] <= 0.005) $r['flags'][] = 'borongan_kosong'; // worked, but no borongan amount entered yet
         ksort($r['days']);
     }
     unset($r);
@@ -180,7 +184,9 @@ function payroll_compute(?array $projectIds, string $from, string $to): array {
     }
     unset($p);
 
-    return ['rows' => $rows, 'periods' => array_values($periods), 'totals' => payroll_totals($rows, array_values($periods))];
+    $bq = 'SELECT id AS worker_id, nama, tim, project_id FROM workers WHERE borongan = 1 AND aktif = 1' . ($projectIds !== null ? ' AND project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')' : '') . ' ORDER BY nama';
+    $bs = $db->prepare($bq); $bs->execute($projectIds !== null ? $projectIds : []);
+    return ['rows' => $rows, 'periods' => array_values($periods), 'totals' => payroll_totals($rows, array_values($periods)), 'borongan' => $bs->fetchAll()];
 }
 
 function payroll_totals(array $rows, array $periods): array {

@@ -116,7 +116,7 @@ if ($action === 'setujui') {
     $p = lock_period($projectId, $tgl);
     if ($p['status'] !== 'diajukan') json_error($p['status'] === 'draft' ? 'Periode belum diajukan oleh lapangan.' : 'Periode ini sudah disetujui.', 409);
     $zero = $db->prepare("SELECT w.nama FROM attendance a JOIN workers w ON w.id = a.worker_id
-                            WHERE a.project_id = ? AND a.tgl BETWEEN ? AND ? AND a.hari > 0 AND a.tarif_harian <= 0 GROUP BY w.id, w.nama LIMIT 5");
+                            WHERE a.project_id = ? AND a.tgl BETWEEN ? AND ? AND a.hari > 0 AND a.tarif_harian <= 0 AND w.borongan = 0 GROUP BY w.id, w.nama LIMIT 5");
     $zero->execute([$projectId, $p['tgl_mulai'], $p['tgl_akhir']]);
     $zn = array_column($zero->fetchAll(), 'nama');
     if ($zn) json_error('Tarif belum diisi untuk: ' . implode(', ', $zn) . '. Isi dulu di Pekerja & Tarif.', 409);

@@ -421,7 +421,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
  *  fails quietly otherwise. */
 function ensure_payroll_controls(): void {
     start_session();
-    if ((int)($_SESSION['controls_ok'] ?? 0) >= 5) return; // bump the number whenever a new migration is added
+    if ((int)($_SESSION['controls_ok'] ?? 0) >= 6) return; // bump the number whenever a new migration is added
     try {
         $db = db();
         $has = function (string $table, string $col) use ($db): bool {
@@ -461,7 +461,10 @@ function ensure_payroll_controls(): void {
         // remaining days of that week can still be filled in (they become a follow-up period).
         $mx = "(SELECT MAX(a.tgl) FROM attendance a WHERE a.project_id = p.project_id AND a.tgl BETWEEN p.tgl_mulai AND p.tgl_akhir)";
         $db->exec("UPDATE payroll_periods p SET p.tgl_akhir = $mx WHERE p.status <> 'draft' AND p.tgl_akhir >= CURDATE() AND $mx IS NOT NULL AND $mx < p.tgl_akhir");
-        $_SESSION['controls_ok'] = 5;
+        // v6: tim borongan (satu penerima, dibayar per tim) dan penghubung pekerja yang sama di dua proyek.
+        if (!$has('workers', 'borongan')) $db->exec("ALTER TABLE workers ADD COLUMN borongan TINYINT(1) NOT NULL DEFAULT 0");
+        if (!$has('workers', 'induk_id')) $db->exec("ALTER TABLE workers ADD COLUMN induk_id VARCHAR(40) NULL, ADD INDEX idx_workers_induk (induk_id)");
+        $_SESSION['controls_ok'] = 6;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
     }

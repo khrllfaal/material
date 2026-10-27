@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#0ea5e9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'">
-<link rel="stylesheet" href="vendor/tailwind.css?v=20261023">
-<script src="vendor/icons.js?v=20261023"></script>
+<link rel="stylesheet" href="vendor/tailwind.css?v=20261027">
+<script src="vendor/icons.js?v=20261027"></script>
 <style>
   /* Platform-native font stack, not a self-hosted webfont: Inter was
      referenced here but never actually loaded (no @font-face), so the
@@ -826,7 +826,7 @@ function loadExcelJS(){
   if(_exceljsLoading) return _exceljsLoading;
   _exceljsLoading=new Promise(function(resolve,reject){
     var s=document.createElement('script');
-    s.src='vendor/exceljs.min.js?v=20261023';
+    s.src='vendor/exceljs.min.js?v=20261027';
     s.onload=function(){ resolve(); };
     s.onerror=function(){ _exceljsLoading=null; reject(new Error('Gagal memuat modul Excel.')); };
     document.head.appendChild(s);
@@ -932,10 +932,10 @@ function loadJsPdf(){
   if(_jspdfLoading) return _jspdfLoading;
   _jspdfLoading=new Promise(function(resolve,reject){
     var s1=document.createElement('script');
-    s1.src='vendor/jspdf.umd.min.js?v=20261023';
+    s1.src='vendor/jspdf.umd.min.js?v=20261027';
     s1.onload=function(){
       var s2=document.createElement('script');
-      s2.src='vendor/jspdf.autotable.min.js?v=20261023';
+      s2.src='vendor/jspdf.autotable.min.js?v=20261027';
       s2.onload=function(){ resolve(); };
       s2.onerror=function(){ _jspdfLoading=null; reject(new Error('Gagal memuat modul PDF.')); };
       document.head.appendChild(s2);
@@ -2316,7 +2316,7 @@ function rp(n){ n = Number(n)||0; return (n<0?'−':'')+'Rp '+Math.abs(Math.roun
 function canWritePay(){ return !!(STATE.user && (STATE.user.role==='admin' || STATE.user.role==='akuntan')); }
 var HARI_ABBR = ['MG','SN','SL','RB','KM','JM','SB'];
 var PAY_BADGE = {lunas:['aman','Lunas'], sebagian:['warn','Sebagian'], belum:['danger','Belum dibayar'], nol:['neutral','—']};
-var FLAG_LABEL = {net_minus:'Gaji minus: potongan lebih besar dari gaji', tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan'};
+var FLAG_LABEL = {net_minus:'Gaji minus: potongan lebih besar dari gaji', tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan', borongan_kosong:'Tim borongan: nominal belum diisi (Tambahan / Potongan)'};
 function fmtHariVal(v){ return v===1 ? '1' : (v===0.5 ? '½' : (v>0 ? String(v).replace('.',',') : '–')); }
 function datesBetween(from, to, max){ var out=[], d=from; while(d<=to && out.length<(max||62)){ out.push(d); d=addDays(d,1); } return out; }
 function periodStatusBadge(st){ var m = PERIOD_STATUS[st]||PERIOD_STATUS.draft; return badge(m[0], m[1]); }
@@ -2843,14 +2843,15 @@ function payrollView(c, mode){
   }
   function openAdjustment(p){
     var ws = G.data.rows.filter(function(r){ return r.project_id===p.project_id; });
-    var timsHere = Array.from(new Set(ws.map(function(r){ return r.tim||''; }))).filter(function(x){ return x; }).sort();
-    var optsW = '<option value="">Seluruh grup (satu angka untuk semua)</option>'+timsHere.map(function(t){ return '<option value="t:'+esc(t)+'">'+esc(timLabel(t))+' (seluruh tim)</option>'; }).join('')+ws.map(function(r){ return '<option value="'+esc(r.worker_id)+'">'+esc(r.nama)+' · '+esc(r.grade_nama)+'</option>'; }).join('');
+    var timsHere = Array.from(new Set(ws.filter(function(r){ return !r.borongan; }).map(function(r){ return r.tim||''; }))).filter(function(x){ return x; }).sort();
+    var borongHere = (G.data.borongan||[]).filter(function(b){ return b.project_id===p.project_id && !ws.some(function(r){ return r.worker_id===b.worker_id; }); });
+    var optsW = '<option value="">Seluruh grup (satu angka untuk semua)</option>'+timsHere.map(function(t){ return '<option value="t:'+esc(t)+'">'+esc(timLabel(t))+' (seluruh tim)</option>'; }).join('')+borongHere.map(function(b){ return '<option value="'+esc(b.worker_id)+'">'+esc(b.nama)+' · Tim borongan</option>'; }).join('')+ws.map(function(r){ return '<option value="'+esc(r.worker_id)+'">'+esc(r.nama)+' · '+esc(r.grade_nama)+'</option>'; }).join('');
     openModal('Tambahan / Potongan — '+p.project_nama,
       '<div class="space-y-4">'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis</label><select id="ad_kat" class="'+fieldCls+'">'+
           '<option value="tambahan|tambah">Tambahan (mis. air galon, uang makan)</option><option value="bonus|tambah">Bonus</option>'+
           '<option value="potongan|potong">Potongan (denda, alat hilang)</option><option value="kasbon|potong">Potong kasbon</option></select></div>'+
-        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Untuk</label><select id="ad_w" class="'+fieldCls+'">'+optsW+'</select><div id="ad_saldo" class="text-xs text-slate-500 mt-1.5"></div></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Untuk</label><select id="ad_w" class="'+fieldCls+'">'+optsW+'</select><div id="ad_saldo" class="text-xs text-slate-500 mt-1.5"></div>'+(borongHere.length||ws.some(function(r){ return r.borongan; }) ? '<div class="text-xs text-amber-700 mt-1.5">Tim borongan: pilih timnya, jenis <b>Tambahan</b>, isi nama pekerjaan di Keterangan dan nominal borongan di Jumlah.</div>' : '')+'</div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan *</label><input id="ad_label" type="text" class="'+fieldCls+'" placeholder="mis. air galon, kasbon minggu lalu"></div>'+
         '<div class="grid grid-cols-3 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Qty</label>'+numInputHtml('ad_qty','',fieldCls)+'</div>'+
           '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Harga satuan</label>'+numInputHtml('ad_harga','',fieldCls,' data-money')+'</div>'+
@@ -3107,7 +3108,7 @@ PAGES.pekerja = function(c){
       '<div class="flex items-center gap-2 flex-wrap justify-end">'+
         '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button>'+
         '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button>'+
-        (write ? '<button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>Pekerja</button>' : '')+'</div>')+
+        (write ? '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnAddBorong" title="Tim cat, aluminium, dst: dibayar per tim"><i data-lucide="users" class="w-3.5 h-3.5"></i>Tim borongan</button><button class="'+btnPrimary+'" id="btnAdd"><i data-lucide="plus" class="w-4 h-4"></i>Pekerja</button>' : '')+'</div>')+
     '<div id="wkCards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>'+
     panel('<div class="flex items-center justify-between flex-wrap gap-3 mb-1"><div class="font-extrabold text-slate-800">Tarif upah</div>'+
       '<div class="flex items-center gap-2 flex-wrap">'+(write ? '<button class="'+btnGhostSm+'" id="btnRenameTim" title="Ganti nama atau gabungkan tim">Ganti nama / gabung tim</button>' : '')+'<select id="trProj" class="'+selCls+' min-w-[220px]"></select></div></div>'+
@@ -3133,10 +3134,10 @@ PAGES.pekerja = function(c){
     var l = w.tarif_lembur!=null ? w.tarif_lembur : (w.tarif_harian==null && r.tarif_lembur>0 ? r.tarif_lembur : Math.floor(h/8/500)*500);
     return [h, l, w.tarif_harian!=null || w.tarif_lembur!=null, !!rateOf(w.project_id, w.grade, w.tim) && !!w.tim];
   }
-  function timsOf(pid){ var t = {}; D.workers.forEach(function(w){ if(w.project_id===pid && w.tim && w.aktif) t[w.tim] = 1; }); D.rates.forEach(function(r){ if(r.project_id===pid && r.tim) t[r.tim] = 1; }); return Object.keys(t).sort(); }
+  function timsOf(pid){ var t = {}; D.workers.forEach(function(w){ if(w.project_id===pid && w.tim && w.aktif && !w.borongan) t[w.tim] = 1; }); D.rates.forEach(function(r){ if(r.project_id===pid && r.tim) t[r.tim] = 1; }); return Object.keys(t).sort(); }
   function drawCards(){
     var act = D.workers.filter(function(w){ return w.aktif; });
-    var noRate = act.filter(function(w){ return !eff(w)[0]; }).length;
+    var noRate = act.filter(function(w){ return !w.borongan && !eff(w)[0]; }).length;
     var noRek = act.filter(function(w){ return !w.no_rek; }).length;
     var tims = {}; act.forEach(function(w){ tims[w.project_id+'|'+(w.tim||'')] = 1; });
     var card = function(icon, color, label, val, sub, attr){ return '<'+(attr?'button type="button" '+attr:'div')+' class="flex flex-col items-start text-left rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'+(attr?' hover:shadow-md':'')+'"><div class="flex items-center gap-2 text-sm font-semibold text-slate-600"><i data-lucide="'+icon+'" class="w-4 h-4 '+color+'"></i>'+label+'</div><div class="text-2xl font-extrabold text-slate-900 mt-3 leading-none tabular-nums">'+val+'</div><div class="text-xs text-slate-400 mt-2">'+sub+'</div></'+(attr?'button':'div')+'>'; };
@@ -3154,7 +3155,7 @@ PAGES.pekerja = function(c){
     document.getElementById('trTable').innerHTML = '<table class="w-full"><thead><tr><th class="'+TH_CLS+'">Status</th>'+
       cols.map(function(t){ return '<th class="'+TH_CLS+' text-center" colspan="1">'+(t ? esc(t) : 'Semua tim <span class="text-[10px] font-bold text-indigo-500">standar</span>')+'</th>'; }).join('')+'<th class="'+TH_CLS+'">Pekerja</th></tr></thead><tbody>'+
       GRADE_ORDER.map(function(g){
-        var n = D.workers.filter(function(w){ return w.project_id===pid && w.grade===g && w.aktif; }).length;
+        var n = D.workers.filter(function(w){ return w.project_id===pid && w.grade===g && w.aktif && !w.borongan; }).length;
         return '<tr class="border-b border-slate-100 align-top"><td class="py-3 pr-4"><b>'+esc(GRADE_NAMA[g])+'</b> <span class="text-xs text-slate-400">'+g+'</span></td>'+
           cols.map(function(t){
             var r = rateOf(pid, g, t), k = g+'|'+t;
@@ -3205,11 +3206,11 @@ PAGES.pekerja = function(c){
     document.getElementById('tbl').innerHTML = '<thead><tr>'+cols.map(function(h){ return '<th class="'+TH_CLS+'">'+h+'</th>'; }).join('')+'</tr></thead><tbody>'+
       (list.length ? pagedSlice(list, D.PG).map(function(w){
         var e = eff(w);
-        return '<tr class="border-b border-slate-100 hover:bg-indigo-50/40 '+(w.aktif?'':'opacity-50')+'"><td class="py-3 pr-4"><b>'+esc(w.nama)+'</b>'+(w.aktif?'':' <span class="text-xs text-slate-400">nonaktif</span>')+'</td>'+
-          '<td class="py-3 pr-4"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(GRADE_CLS[w.grade]||GRADE_CLS.LAIN)+'">'+esc(GRADE_NAMA[w.grade]||w.grade)+'</span></td>'+
+        return '<tr class="border-b border-slate-100 hover:bg-indigo-50/40 '+(w.aktif?'':'opacity-50')+'"><td class="py-3 pr-4"><b>'+esc(w.nama)+'</b>'+(w.borongan?' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">BORONGAN</span>':'')+(w.aktif?'':' <span class="text-xs text-slate-400">nonaktif</span>')+'</td>'+
+          '<td class="py-3 pr-4"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(GRADE_CLS[w.grade]||GRADE_CLS.LAIN)+'">'+esc(w.borongan ? 'Tim borongan' : (GRADE_NAMA[w.grade]||w.grade))+'</span></td>'+
           '<td class="py-3 pr-4 text-slate-600">'+esc(w.tim||'–')+'</td><td class="py-3 pr-4 text-slate-600">'+esc(pn(w.project_id))+'</td>'+
-          '<td class="py-3 pr-4 tabular-nums">'+(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>')+(e[2]?' <span class="text-[10px] font-bold text-indigo-500">pribadi</span>':(e[3]?' <span class="text-[10px] font-bold text-emerald-600">tarif tim</span>':''))+'</td>'+
-          '<td class="py-3 pr-4 tabular-nums">'+(e[1]?rp(e[1]):'–')+'</td><td class="py-3 pr-4 text-xs text-slate-500">'+esc(w.no_rek||'–')+'</td>'+
+          '<td class="py-3 pr-4 tabular-nums">'+(w.borongan?'<span class="text-xs text-amber-700 font-semibold">per tim (Tambahan)</span>':(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>'))+(w.borongan?'':(e[2]?' <span class="text-[10px] font-bold text-indigo-500">pribadi</span>':(e[3]?' <span class="text-[10px] font-bold text-emerald-600">tarif tim</span>':'')))+'</td>'+
+          '<td class="py-3 pr-4 tabular-nums">'+(!w.borongan&&e[1]?rp(e[1]):'–')+'</td><td class="py-3 pr-4 text-xs text-slate-500">'+esc(w.no_rek||'–')+'</td>'+
           (write?'<td class="py-3 whitespace-nowrap"><button class="'+btnGhostSm+'" data-w-edit="'+esc(w.id)+'">Edit</button></td>':'')+'</tr>';
       }).join('') : '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada pekerja. Admin Lapangan bisa menambahkannya dari HP, atau tambahkan di sini.</td></tr>')+'</tbody>';
     renderPager(list.length, D.PG, drawWorkers);
@@ -3219,23 +3220,29 @@ PAGES.pekerja = function(c){
     bindExportBtns('Pekerja_dan_Tarif', 'Pekerja & Tarif', 'Daftar pekerja beserta tarif berlaku', headers,
       function(){ return list.map(function(w){ var e = eff(w); return [w.nama, GRADE_NAMA[w.grade]||w.grade, w.tim||'', pnm(w.project_id), Math.round(e[0]||0), Math.round(e[1]||0), w.no_rek||'', w.aktif?'Ya':'Tidak']; }); }, null, null);
   }
-  function openWorker(id){
+  function openWorker(id, preset){
     var w = id ? D.workers.find(function(x){ return x.id===id; }) : null;
+    var isB = w ? !!w.borongan : !!(preset && preset.borongan);
     var v = function(k, d){ return w && w[k]!=null ? w[k] : (d===undefined?'':d); };
     var projSel = w ? w.project_id : (D.proj||fv('fProj'));
     var timOptsFor = function(pid, cur){
       var tims = timsOf(pid); if(cur && tims.indexOf(cur)<0) tims.push(cur);
       return tims.map(function(t){ return '<option value="'+esc(t)+'"'+(t===cur?' selected':'')+'>'+esc(t)+'</option>'; }).join('')+'<option value="__none__"'+(!cur?' selected':'')+'>Tanpa tim</option><option value="__new__">＋ Tim baru…</option>';
     };
-    openModal(w?'Edit Pekerja':'Tambah Pekerja',
+    openModal(w?'Edit Pekerja':(isB?'Tambah Tim Borongan':'Tambah Pekerja'),
       '<div class="space-y-4">'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek *</label><select id="wk_proj" class="'+fieldCls+'">'+D.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===projSel?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('')+'</select></div>'+
+        '<label class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm cursor-pointer"><input type="checkbox" id="wk_borong" class="mt-0.5 w-4 h-4 shrink-0" '+(isB?'checked':'')+'><span><b>Tim borongan</b> <span class="text-slate-600">(cat, aluminium, dst). Satu penerima, dibayar per tim; nominalnya diisi lewat Tambahan / Potongan. Tidak memakai tarif harian.</span></span></label>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama *</label><input id="wk_nama" type="text" value="'+esc(v('nama'))+'" class="'+fieldCls+'"></div>'+
+        '<div id="wk_biasa" class="space-y-4'+(isB?' hidden':'')+'">'+
         '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Status *</label><select id="wk_grade" class="'+fieldCls+'">'+GRADE_ORDER.map(function(g){ return '<option value="'+g+'"'+(g===v('grade','TK')?' selected':'')+'>'+esc(GRADE_NAMA[g])+'</option>'; }).join('')+'</select></div>'+
           '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tim</label><select id="wk_timsel" class="'+fieldCls+'">'+timOptsFor(projSel, v('tim'))+'</select></div></div>'+
         '<input id="wk_timbaru" type="text" maxlength="80" class="'+fieldCls+' hidden" placeholder="Nama tim baru, mis. Tim Pondasi">'+
         '<div class="rounded-xl bg-slate-50 border border-slate-200 p-3"><div class="text-xs font-semibold text-slate-500 mb-2">Tarif pribadi (opsional — kosongkan agar ikut tarif status / tim)</div>'+
           '<div class="grid grid-cols-2 gap-3"><div>'+numInputHtml('wk_h', v('tarif_harian',''), fieldCls, ' data-money placeholder="harian"')+'</div><div>'+numInputHtml('wk_l', v('tarif_lembur',''), fieldCls, ' data-money placeholder="lembur/jam"')+'</div></div></div>'+
+        (!w ? '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Orang yang sama sudah ada di proyek lain? (setengah hari di dua proyek)</label><select id="wk_induk" class="'+fieldCls+'"><option value="">Tidak, orang baru</option>'+
+          D.workers.filter(function(x){ return x.aktif && !x.borongan && x.project_id!==projSel; }).map(function(x){ var pj = D.projects.find(function(q){ return q.id===x.project_id; }); return '<option value="'+esc(x.id)+'" data-g="'+esc(x.grade)+'">'+esc(x.nama)+' · '+esc(pj?pj.nama:'')+'</option>'; }).join('')+'</select></div>' : '')+
+        '</div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Rekening / e-wallet (opsional)</label><input id="wk_rek" type="text" value="'+esc(v('no_rek'))+'" class="'+fieldCls+'"></div>'+
         '<label class="flex items-center gap-2 text-sm font-semibold text-slate-600"><input type="checkbox" id="wk_aktif" class="w-4 h-4" '+(!w||w.aktif?'checked':'')+'> Aktif</label>'+
       '</div>',
@@ -3243,12 +3250,17 @@ PAGES.pekerja = function(c){
         var h = parseIdNum(fv('wk_h')), l = parseIdNum(fv('wk_l')), sel = fv('wk_timsel');
         var tim = sel==='__new__' ? fv('wk_timbaru') : (sel==='__none__' ? '' : sel);
         if(sel==='__new__' && !tim){ toast('Isi nama tim baru.', true); return; }
-        var body = {id:id||'', project_id:fv('wk_proj'), nama:fv('wk_nama'), grade:fv('wk_grade'), tim:tim, no_rek:fv('wk_rek'), aktif:document.getElementById('wk_aktif').checked,
-          tarif_harian: Number.isNaN(h)?null:h, tarif_lembur: Number.isNaN(l)?null:l};
+        var borong = document.getElementById('wk_borong').checked;
+        var body = {id:id||'', project_id:fv('wk_proj'), nama:fv('wk_nama'), grade:borong?'LAIN':fv('wk_grade'), tim:borong?'':tim, no_rek:fv('wk_rek'), aktif:document.getElementById('wk_aktif').checked,
+          tarif_harian: (borong||Number.isNaN(h))?null:h, tarif_lembur: (borong||Number.isNaN(l))?null:l, borongan: borong};
+        var indukEl = document.getElementById('wk_induk'); if(!borong && indukEl && indukEl.value) body.induk_id = indukEl.value;
         if(!id) delete body.id;
         if(!body.nama){ toast('Nama wajib diisi.', true); return; }
         apiFetch('/workers.php', {method:'POST', body:JSON.stringify(body)}).then(function(){ closeModal(); toast('Disimpan.'); return load(); }).catch(function(e){ toast(e.message, true); });
       });
+    document.getElementById('wk_borong').addEventListener('change', function(){ document.getElementById('wk_biasa').classList.toggle('hidden', this.checked); });
+    var wi = document.getElementById('wk_induk');
+    if(wi) wi.addEventListener('change', function(){ var o = wi.options[wi.selectedIndex]; if(!wi.value || !o) return; var nm = document.getElementById('wk_nama'); if(!nm.value) nm.value = (o.textContent||'').split(' · ')[0]; var g = o.getAttribute('data-g'); if(g){ document.getElementById('wk_grade').value = g; document.getElementById('wk_grade').dispatchEvent(new Event('ss-refresh')); } });
     var ts = document.getElementById('wk_timsel');
     ts.addEventListener('change', function(){ var nb = document.getElementById('wk_timbaru'); nb.classList.toggle('hidden', ts.value!=='__new__'); if(ts.value==='__new__') nb.focus(); });
     document.getElementById('wk_proj').addEventListener('change', function(){ ts.innerHTML = timOptsFor(this.value, ''); ts.dispatchEvent(new Event('ss-refresh')); });
@@ -3288,6 +3300,7 @@ PAGES.pekerja = function(c){
   ['q'].forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ D.PG.page=1; drawWorkers(); }); });
   ['fProj','fTim','fGrade','fOff'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ D.PG.page=1; drawWorkers(); }); });
   var ba = document.getElementById('btnAdd'); if(ba) ba.onclick = function(){ openWorker(null); };
+  var bb = document.getElementById('btnAddBorong'); if(bb) bb.onclick = function(){ openWorker(null, {borongan:true}); };
 };
 
 /* Kasbon, used inside the two pay screens:
@@ -4134,7 +4147,7 @@ function renderAbList(){
         return '<div class="bg-white rounded-xl border '+(x.h===null?'border-slate-200':'border-slate-100')+' shadow-sm mb-1.5 overflow-hidden">'+
           '<div class="flex items-center gap-2 pl-3 pr-2 py-1.5">'+
             '<button type="button" data-ab-exp="'+esc(w.id)+'" class="min-w-0 flex-1 text-left py-1"><div class="font-bold text-[15px] leading-tight truncate">'+esc(w.nama)+'</div>'+
-            '<div data-ab-sub="'+esc(w.id)+'" class="text-[11.5px] text-slate-400 leading-tight mt-0.5 truncate">'+esc(GRADE_NAMA[w.grade]||w.grade)+(x.h>0 && x.l>0 ? ' · <b class="text-indigo-600">lembur '+fmtJam(x.l)+' j</b>' : '')+'</div></button>'+
+            '<div data-ab-sub="'+esc(w.id)+'" class="text-[11.5px] text-slate-400 leading-tight mt-0.5 truncate">'+(w.borongan ? '<b class="text-amber-700">Tim borongan</b>' : esc(GRADE_NAMA[w.grade]||w.grade))+(x.h>0 && x.l>0 ? ' · <b class="text-indigo-600">lembur '+fmtJam(x.l)+' j</b>' : '')+'</div></button>'+
             '<div class="flex gap-1.5 shrink-0">'+sq(w,1,x.h===1,'bg-emerald-600 text-white','✓')+sq(w,0.5,x.h===0.5,'bg-amber-500 text-white','½')+sq(w,0,x.h===0,'bg-red-500 text-white','✕')+'</div></div>'+
           (isOpen ? '<div class="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-100"><span class="text-xs font-semibold text-slate-500">Lembur</span>'+
             '<div class="flex items-center gap-2"><button type="button" '+(ed?'':'disabled')+' data-ab-l="'+esc(w.id)+'|-" class="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-600 flex items-center justify-center"><i data-lucide="minus" class="w-4 h-4"></i></button>'+
@@ -4236,6 +4249,7 @@ function saveAbsen(c){
       var wasLibur = ABSEN.markLibur; ABSEN.markLibur = false;
       if(wasLibur){ toast('Hari '+fmtTglPendek(tgl)+' ditandai libur ✓'); ABSEN.libur = true; ABSEN.workers.forEach(function(w){ ABSEN.orig[w.id] = {h:0, l:0}; }); if(ABSEN.weekFilled) ABSEN.weekFilled[tgl] = true; drawAbsen(c); }
       else done('Absen '+fmtTglPendek(tgl)+' tersimpan ✓');
+      if(r.peringatan_ganda && r.peringatan_ganda.length) setTimeout(function(){ toast('Perhatian: '+r.peringatan_ganda.slice(0,3).join(', ')+' tercatat lebih dari 1 hari di proyek lain pada tanggal ini.', true); }, 1400);
     })
     .catch(function(e){
       if(e.network || e.auth){
@@ -4248,45 +4262,121 @@ function saveAbsen(c){
 
 var GRADE_SORT = function(g){ var i = GRADE_ORDER.indexOf(g); return i < 0 ? 99 : i; };
 function openAddWorker(c){
-  var tims = []; ABSEN.workers.forEach(function(w){ if(w.tim && tims.indexOf(w.tim)<0) tims.push(w.tim); });
-  var firstTim = ABSEN.tim || (tims.length ? tims[tims.length-1] : '');
+  var tims = []; ABSEN.workers.forEach(function(w){ if(!w.borongan && w.tim && tims.indexOf(w.tim)<0) tims.push(w.tim); });
+  var firstTim = (ABSEN.tim && tims.indexOf(ABSEN.tim)>=0) ? ABSEN.tim : (tims.length ? tims[tims.length-1] : '');
   var timOpts = tims.map(function(t){ return '<option value="'+esc(t)+'"'+(t===firstTim?' selected':'')+'>'+esc(t)+'</option>'; }).join('')+
     '<option value="__none__"'+(!tims.length?' selected':'')+'>Tanpa tim</option><option value="__new__">＋ Tim baru…</option>';
+  var lbl = 'block text-xs font-bold text-slate-500 mb-1.5';
   openModal('Tambah Pekerja',
     '<div class="space-y-4">'+
-      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Nama pekerja *</label><input id="nw_nama" type="text" autocomplete="off" class="'+inputCls+'" placeholder="mis. Asep"></div>'+
-      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Status *</label><select id="nw_grade" class="'+inputCls+'">'+
-        GRADE_ORDER.map(function(g){ return '<option value="'+g+'"'+(g==='TK'?' selected':'')+'>'+esc(GRADE_NAMA[g])+'</option>'; }).join('')+'</select></div>'+
-      '<div><label class="block text-xs font-bold text-slate-500 mb-1.5">Tim</label><select id="nw_timsel" class="'+inputCls+'">'+timOpts+'</select>'+
-        '<input id="nw_timbaru" type="text" autocomplete="off" maxlength="80" class="'+inputCls+' mt-2 hidden" placeholder="Nama tim baru, mis. Tim Pondasi"></div>'+
-      '<div class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Upah mengikuti tarif status (dan tarif tim bila ada) yang diatur Admin Pusat/Akuntan.</div>'+
+      '<label class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm cursor-pointer"><input type="checkbox" id="nw_borong" class="mt-0.5 w-5 h-5 shrink-0">'+
+        '<span><b>Tim borongan</b> <span class="text-slate-600">(mis. tim cat, aluminium). Dibayar per tim oleh Akuntan. Anda cukup menandai hadir.</span></span></label>'+
+      '<div><label id="nw_namalbl" class="'+lbl+'">Nama pekerja *</label><input id="nw_nama" type="text" autocomplete="off" class="'+inputCls+'" placeholder="mis. Asep"></div>'+
+      '<div id="nw_biasa" class="space-y-4">'+
+        '<div><label class="'+lbl+'">Status *</label><select id="nw_grade" class="'+inputCls+'">'+
+          GRADE_ORDER.map(function(g){ return '<option value="'+g+'"'+(g==='TK'?' selected':'')+'>'+esc(GRADE_NAMA[g])+'</option>'; }).join('')+'</select></div>'+
+        '<div><label class="'+lbl+'">Tim</label><select id="nw_timsel" class="'+inputCls+'">'+timOpts+'</select>'+
+          '<input id="nw_timbaru" type="text" autocomplete="off" maxlength="80" class="'+inputCls+' mt-2 hidden" placeholder="Nama tim baru, mis. Tim Pondasi"></div>'+
+        '<div id="nw_induk_wrap" class="hidden"><label class="'+lbl+'">Orang ini juga bekerja di proyek lain?</label><select id="nw_induk" class="'+inputCls+'"></select>'+
+          '<div class="text-xs text-slate-400 mt-1.5">Pilih bila orang yang sama bekerja setengah hari di sini dan setengah hari di proyek lain. Aplikasi memberi peringatan bila totalnya lebih dari 1 hari.</div></div>'+
+      '</div>'+
+      '<div id="nw_note" class="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500">Upah mengikuti tarif status (dan tarif tim bila ada) yang diatur Admin Pusat/Akuntan.</div>'+
+      '<button type="button" id="nw_kelola" class="text-sm font-bold text-emerald-700 underline underline-offset-2 py-1">Ada yang sudah tidak bekerja? Kelola daftar pekerja</button>'+
     '</div>',
     function(){
+      var borong = document.getElementById('nw_borong').checked;
       var nama = fv('nw_nama'), grade = fv('nw_grade'), sel = fv('nw_timsel');
-      var tim = sel === '__new__' ? fv('nw_timbaru') : (sel === '__none__' ? '' : sel);
-      if(!nama){ toast('Nama pekerja wajib diisi.', true); return; }
-      if(sel === '__new__' && !tim){ toast('Isi nama tim baru.', true); return; }
+      var tim = borong ? '' : (sel === '__new__' ? fv('nw_timbaru') : (sel === '__none__' ? '' : sel));
+      if(!nama){ toast(borong ? 'Nama tim borongan wajib diisi.' : 'Nama pekerja wajib diisi.', true); return; }
+      if(!borong && sel === '__new__' && !tim){ toast('Isi nama tim baru.', true); return; }
       var id = 'wrk_'+Math.random().toString(36).slice(2,8)+Date.now().toString(36);
-      var body = {id:id, project_id:STATE.projectId, nama:nama, grade:grade, tim:tim};
+      var body = {id:id, project_id:STATE.projectId, nama:nama, grade:borong?'LAIN':grade, tim:tim};
+      if(borong) body.borongan = true;
+      var induk = borong ? '' : fv('nw_induk'); if(induk) body.induk_id = induk;
       var sv = document.getElementById('mSave'); if(sv){ sv.disabled = true; sv.textContent = 'Menyimpan…'; }
       apiFetch('/workers.php', {method:'POST', body:JSON.stringify(body)}).then(function(r){
-        var w = {id:r.id || id, project_id:STATE.projectId, nama:nama.replace(/\s+/g,' '), grade:grade, tim:tim, aktif:1, diverifikasi:1};
+        var w = {id:r.id || id, project_id:STATE.projectId, nama:nama.replace(/\s+/g,' '), grade:r.grade||body.grade, tim:(r.tim!=null?r.tim:tim), aktif:1, diverifikasi:1, borongan:r.borongan?1:0, induk_id:r.induk_id||null};
         // Show the new person at once (same order the server uses: tim, status, nama) instead of reloading the screen.
         ABSEN.workers.push(w); ABSEN.cur[w.id] = {h:null, l:0}; ABSEN.orig[w.id] = {h:null, l:0};
         ABSEN.workers.sort(function(a,b){ return (a.tim||'').localeCompare(b.tim||'') || GRADE_SORT(a.grade)-GRADE_SORT(b.grade) || a.nama.localeCompare(b.nama); });
         lsSet('ms_workers_'+STATE.projectId, ABSEN.workers);
-        closeModal(); toast('"'+w.nama+'" ditambahkan.'); drawAbsen(c);
-      }).catch(function(e){ if(sv){ sv.disabled = false; sv.textContent = 'Simpan'; } toast(e.network ? 'Tambah pekerja butuh sinyal. Coba lagi saat ada sinyal.' : e.message, true); });
+        closeModal(); toast('"'+w.nama+'" ditambahkan'+(w.borongan?' sebagai tim borongan':'')+'.'); drawAbsen(c);
+      }).catch(function(e){
+        if(sv){ sv.disabled = false; sv.textContent = 'Simpan'; }
+        if(e.data && e.data.nonaktif_id){ // the same name was stopped earlier: bring that person back instead of making a duplicate
+          var nid = e.data.nonaktif_id;
+          closeModal();
+          confirmModal('Pernah ada di proyek ini', '<b>'+esc(e.data.nama||nama)+'</b> pernah ada dan sedang tidak aktif. Aktifkan kembali orang yang sama (riwayat absen tetap)?', function(){
+            apiFetch('/workers.php', {method:'POST', body:JSON.stringify({action:'set_aktif', id:nid, aktif:true})})
+              .then(function(){ toast('"'+(e.data.nama||nama)+'" aktif kembali.'); if(absenDirty()) { drawAbsen(c); toast('Muat ulang layar Absen setelah menyimpan agar nama muncul.'); } else renderAbsen(c); })
+              .catch(function(e2){ toast(e2.message, true); });
+          });
+          return;
+        }
+        toast(e.network ? 'Tambah pekerja butuh sinyal. Coba lagi saat ada sinyal.' : e.message, true);
+      });
     });
   var ts = document.getElementById('nw_timsel');
   var syncTim = function(){ var nb = document.getElementById('nw_timbaru'); nb.classList.toggle('hidden', ts.value !== '__new__'); if(ts.value === '__new__') nb.focus(); };
   ts.addEventListener('change', syncTim);
+  var bor = document.getElementById('nw_borong');
+  bor.addEventListener('change', function(){
+    var on = bor.checked;
+    document.getElementById('nw_biasa').classList.toggle('hidden', on);
+    document.getElementById('nw_namalbl').textContent = on ? 'Nama tim borongan *' : 'Nama pekerja *';
+    document.getElementById('nw_nama').placeholder = on ? 'mis. Tim Cat' : 'mis. Asep';
+    document.getElementById('nw_note').textContent = on ? 'Tim borongan dibayar langsung per tim. Akuntan mengisi nominal borongannya; kasbon tim ikut dipotong otomatis. Tandai hadir hanya sebagai catatan.' : 'Upah mengikuti tarif status (dan tarif tim bila ada) yang diatur Admin Pusat/Akuntan.';
+  });
+  document.getElementById('nw_kelola').onclick = function(){ closeModal(); openManageWorkers(c); };
+  // "Orang ini juga bekerja di proyek lain?" appears only when someone else's project has people to pick from.
+  apiFetch('/workers.php?kandidat=1&project_id='+encodeURIComponent(STATE.projectId)).then(function(list){
+    if(!Array.isArray(list) || !list.length || !document.getElementById('nw_induk')) return;
+    var si = document.getElementById('nw_induk');
+    si.innerHTML = '<option value="">Tidak, orang baru</option>'+list.map(function(w){ return '<option value="'+esc(w.id)+'" data-g="'+esc(w.grade)+'">'+esc(w.nama)+' · '+esc(w.project_nama)+'</option>'; }).join('');
+    document.getElementById('nw_induk_wrap').classList.remove('hidden');
+    if(si._enhanced) si.dispatchEvent(new Event('ss-refresh')); else enhanceSelect(si);
+    si.addEventListener('change', function(){
+      var o = si.options[si.selectedIndex]; if(!si.value || !o) return;
+      var nm = document.getElementById('nw_nama'); if(!nm.value) nm.value = (o.textContent||'').split(' · ')[0];
+      var g = o.getAttribute('data-g'); if(g && document.getElementById('nw_grade')){ document.getElementById('nw_grade').value = g; document.getElementById('nw_grade').dispatchEvent(new Event('ss-refresh')); }
+    });
+  }).catch(function(){});
+}
+
+/* Stop / resume workers from the phone: only the "aktif" switch changes, so the absen history stays and the
+   same person can be brought back later. */
+function openManageWorkers(c){
+  openModal('Kelola Daftar Pekerja', '<div id="mw_body" class="text-sm text-slate-400 py-6 text-center">Memuat…</div>', null);
+  var cancel = document.getElementById('mCancel'); if(cancel) cancel.textContent = 'Tutup';
+  var load = function(){
+    apiFetch('/workers.php?all=1&project_id='+encodeURIComponent(STATE.projectId)).then(function(all){
+      var host = document.getElementById('mw_body'); if(!host) return;
+      var act = all.filter(function(w){ return w.aktif; }), off = all.filter(function(w){ return !w.aktif; });
+      var row = function(w, on){
+        return '<div class="flex items-center gap-2 py-2 border-b border-slate-100 last:border-0"><div class="min-w-0 flex-1"><div class="font-bold text-[15px] truncate">'+esc(w.nama)+'</div>'+
+          '<div class="text-[11.5px] text-slate-400 truncate">'+(w.borongan?'Tim borongan':esc(GRADE_NAMA[w.grade]||w.grade))+(w.tim && !w.borongan ? ' · '+esc(w.tim) : '')+'</div></div>'+
+          '<button type="button" data-mw="'+esc(w.id)+'|'+(on?0:1)+'" class="shrink-0 h-10 px-4 rounded-xl text-sm font-bold '+(on?'bg-red-50 text-red-600 border border-red-100':'bg-emerald-600 text-white')+'">'+(on?'Berhenti':'Aktifkan')+'</button></div>';
+      };
+      host.className = 'text-left';
+      host.innerHTML = '<div class="text-xs font-extrabold uppercase tracking-wide text-slate-500 mb-1">Bekerja ('+act.length+')</div>'+(act.length?act.map(function(w){ return row(w,true); }).join(''):'<div class="text-sm text-slate-400 py-3">Belum ada.</div>')+
+        '<div class="text-xs font-extrabold uppercase tracking-wide text-slate-500 mt-5 mb-1">Tidak bekerja lagi ('+off.length+')</div>'+(off.length?off.map(function(w){ return row(w,false); }).join(''):'<div class="text-sm text-slate-400 py-3">Tidak ada.</div>')+
+        '<div class="text-xs text-slate-400 mt-4">Riwayat absen dan gaji tidak hilang. Bila orangnya bekerja lagi, ketuk Aktifkan.</div>';
+      host.querySelectorAll('[data-mw]').forEach(function(b){ b.onclick = function(){
+        if(absenDirty()){ toast('Simpan absen dulu sebelum mengubah daftar pekerja.', true); return; }
+        var p = b.getAttribute('data-mw').split('|'); b.disabled = true;
+        apiFetch('/workers.php', {method:'POST', body:JSON.stringify({action:'set_aktif', id:p[0], aktif:p[1]==='1'})})
+          .then(function(){ toast(p[1]==='1' ? 'Pekerja aktif kembali ✓' : 'Ditandai tidak bekerja lagi ✓'); load(); renderAbsen(c); })
+          .catch(function(e){ b.disabled = false; toast(e.network ? 'Butuh sinyal.' : e.message, true); });
+      }; });
+    }).catch(function(e){ var host = document.getElementById('mw_body'); if(host) host.textContent = e.network ? 'Butuh sinyal untuk mengelola daftar.' : e.message; });
+  };
+  load();
 }
 
 /* Kasbon: ONE request can hold several lines (e.g. Tim A and Tim B). "Atas nama" = a whole tim first, then
    individual workers, all searchable. One request per name per week (the server enforces it too). */
 function openKasbonRequest(c){
-  var tims = []; ABSEN.workers.forEach(function(w){ if(w.tim && tims.indexOf(w.tim)<0) tims.push(w.tim); });
+  var tims = []; ABSEN.workers.forEach(function(w){ if(!w.borongan && w.tim && tims.indexOf(w.tim)<0) tims.push(w.tim); });
   var wkNow = weekOf(today()), asked = {};
   (ABSEN.kreqAll||[]).forEach(function(k){
     var d = String(k.tgl_wib || k.created_at || '').slice(0,10);
@@ -4296,7 +4386,7 @@ function openKasbonRequest(c){
   var opts = [];
   tims.forEach(function(t){ opts.push(['t:'+t, 'Tim · '+t+tag('t:'+t)]); });
   if(!tims.length) opts.push(['g', 'Grup / penanggung jawab'+tag('g')]);
-  ABSEN.workers.forEach(function(w){ opts.push(['w:'+w.id, 'Pekerja · '+w.nama+' ('+(GRADE_NAMA[w.grade]||w.grade)+(w.tim?', '+w.tim:'')+')'+tag('w:'+w.id)]); });
+  ABSEN.workers.forEach(function(w){ opts.push(['w:'+w.id, (w.borongan ? 'Tim borongan · '+w.nama+tag('w:'+w.id) : 'Pekerja · '+w.nama+' ('+(GRADE_NAMA[w.grade]||w.grade)+(w.tim?', '+w.tim:'')+')'+tag('w:'+w.id))]); });
   var free = opts.filter(function(o){ return !asked[o[0]]; });
   var lines = [{who:(free[0]||opts[0])[0], jum:''}];
   function rowHtml(i){

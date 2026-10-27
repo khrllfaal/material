@@ -25,12 +25,24 @@ if ($method === 'GET') {
     }
     if (!empty($_GET['project_id'])) { $conds[] = 'project_id = ?'; $params[] = $_GET['project_id']; }
     if (empty($_GET['all'])) $conds[] = 'aktif = 1';
-    $cols = $isField ? 'id, project_id, nama, grade, tim, aktif, diverifikasi'
-                     : 'id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif, diverifikasi, created_at';
+    if (!empty($_GET['kandidat'])) { // the same person already listed in another project (for "setengah hari di proyek lain")
+        $cur = (string)($_GET['project_id'] ?? '');
+        $kc = ["w.aktif = 1", "w.borongan = 0", "w.project_id <> ?"]; $kp = [$cur];
+        if ($scope !== null) {
+            if (!$scope) json_response([]);
+            $kc[] = 'w.project_id IN (' . implode(',', array_fill(0, count($scope), '?')) . ')'; $kp = array_merge($kp, $scope);
+        }
+        $q = db()->prepare('SELECT w.id, w.project_id, p.nama AS project_nama, w.nama, w.grade, w.tim, COALESCE(w.induk_id, w.id) AS orang
+                              FROM workers w JOIN projects p ON p.id = w.project_id WHERE ' . implode(' AND ', $kc) . ' ORDER BY w.nama LIMIT 500');
+        $q->execute($kp);
+        json_response($q->fetchAll());
+    }
+    $cols = $isField ? 'id, project_id, nama, grade, tim, aktif, diverifikasi, borongan, induk_id'
+                     : 'id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif, diverifikasi, borongan, induk_id, created_at';
     $st = db()->prepare("SELECT $cols FROM workers" . ($conds ? ' WHERE ' . implode(' AND ', $conds) : '') . ' ORDER BY tim, FIELD(grade,\'KTK\',\'TK\',\'LD\',\'OBK\',\'SPR\',\'OMX\',\'LAIN\'), nama');
     $st->execute($params);
     $rows = array_map(function ($r) use ($isField) {
-        $r['aktif'] = (int)$r['aktif'];
+        $r['aktif'] = (int)$r['aktif']; $r['borongan'] = (int)$r['borongan'];
         $r['diverifikasi'] = 1; // verifikasi pekerja baru dinonaktifkan
         if (!$isField) {
             $r['tarif_harian'] = $r['tarif_harian'] === null ? null : (float)$r['tarif_harian'];
@@ -59,6 +71,18 @@ if ($method === 'POST') {
         audit('update', 'workers', 'verifikasi', "$n pekerja diverifikasi");
         json_response(['ok' => true, 'diverifikasi' => $n]);
     }
+    // Stop / resume a worker: only the "aktif" switch changes, history stays. Lapangan may do this for their own projects.
+    if (($b['action'] ?? '') === 'set_aktif') {
+        $wid = (string)($b['id'] ?? '');
+        $q = db()->prepare('SELECT id, project_id, nama, aktif FROM workers WHERE id = ?'); $q->execute([$wid]);
+        $w0 = $q->fetch();
+        if (!$w0) json_error('Pekerja tidak ditemukan.', 404);
+        require_project_access($user, $w0['project_id']);
+        $val = !empty($b['aktif']) ? 1 : 0;
+        db()->prepare('UPDATE workers SET aktif = ? WHERE id = ?')->execute([$val, $wid]);
+        audit('update', 'workers', $wid, ($val ? 'diaktifkan kembali: ' : 'tidak bekerja lagi: ') . $w0['nama']);
+        json_response(['ok' => true, 'aktif' => $val]);
+    }
     // Merge or rename a tim everywhere (workers, tim rates, kasbon, open periods) so nothing is orphaned.
     if (($b['action'] ?? '') === 'rename_tim') {
         if ($isField) json_error('Anda tidak punya akses untuk aksi ini.', 403);
@@ -84,11 +108,22 @@ if ($method === 'POST') {
     $nama = trim(preg_replace('/\s+/u', ' ', (string)($b['nama'] ?? '')));
     $grade = (string)($b['grade'] ?? '');
     $tim = trim((string)($b['tim'] ?? ''));
+    $borongan = !empty($b['borongan']);
+    if ($borongan) $grade = 'LAIN'; // a borongan tim is one payee: no status, no daily wage
     if ($projectId === '') json_error('Proyek wajib dipilih.', 422);
     if ($nama === '' || mb_strlen($nama) > 120) json_error('Nama pekerja wajib diisi (maksimal 120 karakter).', 422);
     if (!isset(WORKER_GRADES[$grade])) json_error('Status pekerja tidak valid.', 422);
     if (mb_strlen($tim) > 80) json_error('Nama tim terlalu panjang.', 422);
     require_project_access($user, $projectId);
+    if ($borongan && $tim === '') $tim = $nama; // the tim carries the name of the borongan team
+    $induk = null;
+    if (!empty($b['induk_id'])) { // the same person is already listed in another project
+        $q = db()->prepare('SELECT id, project_id, induk_id, borongan FROM workers WHERE id = ?'); $q->execute([(string)$b['induk_id']]);
+        $iw = $q->fetch();
+        if (!$iw || $iw['project_id'] === $projectId || (int)$iw['borongan'] === 1) json_error('Pekerja di proyek lain tidak valid.', 422);
+        require_project_access($user, $iw['project_id']);
+        $induk = $iw['induk_id'] ?: $iw['id'];
+    }
     if ($tim !== '') { // "tim a" / "Tim A " must not become a second team: reuse the spelling already in this project
         $tq = db()->prepare('SELECT tim FROM workers WHERE project_id = ? AND tim <> \'\' GROUP BY tim'); $tq->execute([$projectId]);
         foreach ($tq->fetchAll() as $t0) if (norm_name($t0['tim']) === norm_name($tim)) { $tim = $t0['tim']; break; }
@@ -103,6 +138,13 @@ if ($method === 'POST') {
     }
     if ($isField && $exists) json_error('Data pekerja sudah tersimpan. Perubahan dilakukan oleh Admin Pusat.', 403);
 
+    // Same name already on the list but stopped: offer to bring that person back instead of making a second record.
+    if (!$exists && empty($b['abaikan_nonaktif'])) {
+        $nq = db()->prepare('SELECT id, nama, tim FROM workers WHERE project_id = ? AND aktif = 0'); $nq->execute([$projectId]);
+        foreach ($nq->fetchAll() as $n0) if (norm_name($n0['nama']) === norm_name($nama)) {
+            json_response(['error' => '"' . $n0['nama'] . '" pernah ada di proyek ini dan sedang tidak aktif.', 'nonaktif_id' => $n0['id'], 'nama' => $n0['nama'], 'tim' => $n0['tim']], 409);
+        }
+    }
     // Same name + status + team in one project = almost certainly a duplicate.
     $dup = db()->prepare('SELECT id, nama, tim FROM workers WHERE project_id = ? AND grade = ? AND id <> ?');
     $dup->execute([$projectId, $grade, $id]);
@@ -115,18 +157,20 @@ if ($method === 'POST') {
     $aktif = array_key_exists('aktif', $b) ? ((int)(bool)$b['aktif']) : 1;
     if ($isField) {
         $id = $id !== '' ? $id : new_id('wrk_');
-        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, aktif, diverifikasi, created_by) VALUES (?,?,?,?,?,1,1,?)')
-            ->execute([$id, $projectId, $nama, $grade, $tim, $user['id']]);
-        audit('create', 'workers', $id, "$nama ($grade)");
-        json_response(['ok' => true, 'id' => $id]);
+        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, aktif, diverifikasi, borongan, induk_id, created_by) VALUES (?,?,?,?,?,?,?,1,1,?,?,?)')
+            ->execute([$id, $projectId, $nama, $grade, $tim, $borongan ? 0 : null, $borongan ? 0 : null, $borongan ? 1 : 0, $induk, $user['id']]);
+        audit('create', 'workers', $id, "$nama ($grade)" . ($borongan ? ' [borongan]' : '') . ($induk ? ' [pekerja yang sama di proyek lain]' : ''));
+        json_response(['ok' => true, 'id' => $id, 'borongan' => $borongan ? 1 : 0, 'induk_id' => $induk, 'grade' => $grade, 'tim' => $tim]);
     }
 
     $harian = (isset($b['tarif_harian']) && $b['tarif_harian'] !== '') ? money_in($b['tarif_harian'], 'Tarif harian') : null;
     $lembur = (isset($b['tarif_lembur']) && $b['tarif_lembur'] !== '') ? money_in($b['tarif_lembur'], 'Tarif lembur') : null;
     $rek = mb_substr(trim((string)($b['no_rek'] ?? '')), 0, 80);
+    if ($borongan) { $harian = 0.0; $lembur = 0.0; } // a borongan tim never earns a daily wage; its amount comes from Tambahan
     if ($exists) {
-        db()->prepare('UPDATE workers SET project_id=?, nama=?, grade=?, tim=?, tarif_harian=?, tarif_lembur=?, no_rek=?, aktif=? WHERE id=?')
-            ->execute([$projectId, $nama, $grade, $tim, $harian, $lembur, $rek, $aktif, $id]);
+        if (!array_key_exists('borongan', $b)) { $borongan = (int)$exists['borongan'] === 1; if ($borongan) { $harian = 0.0; $lembur = 0.0; $grade = 'LAIN'; } }
+        db()->prepare('UPDATE workers SET project_id=?, nama=?, grade=?, tim=?, tarif_harian=?, tarif_lembur=?, no_rek=?, aktif=?, borongan=? WHERE id=?')
+            ->execute([$projectId, $nama, $grade, $tim, $harian, $lembur, $rek, $aktif, $borongan ? 1 : 0, $id]);
         $detail = '';
         if ((string)$exists['tarif_harian'] !== (string)$harian || (string)$exists['tarif_lembur'] !== (string)$lembur || $exists['grade'] !== $grade) {
             $detail = sprintf('tarif/status: %s %s/%s -> %s %s/%s', $exists['grade'], $exists['tarif_harian'] ?? '-', $exists['tarif_lembur'] ?? '-', $grade, $harian ?? '-', $lembur ?? '-');
@@ -134,12 +178,12 @@ if ($method === 'POST') {
         audit('update', 'workers', $id, $detail);
     } else {
         $id = $id !== '' ? $id : new_id('wrk_');
-        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
-            ->execute([$id, $projectId, $nama, $grade, $tim, $harian, $lembur, $rek, $aktif, $user['id']]);
+        db()->prepare('INSERT INTO workers (id, project_id, nama, grade, tim, tarif_harian, tarif_lembur, no_rek, aktif, borongan, induk_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+            ->execute([$id, $projectId, $nama, $grade, $tim, $harian, $lembur, $rek, $aktif, $borongan ? 1 : 0, $induk, $user['id']]);
         audit('create', 'workers', $id, "$nama ($grade)");
     }
     fill_zero_snapshots($projectId, null, $id);
-    json_response(['ok' => true, 'id' => $id]);
+    json_response(['ok' => true, 'id' => $id, 'borongan' => $borongan ? 1 : 0, 'grade' => $grade, 'tim' => $tim]);
 }
 
 if ($method === 'DELETE') {
