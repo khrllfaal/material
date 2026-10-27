@@ -8,6 +8,7 @@
    - `node scripts/qa/core.js` — hitungan gaji, kasbon otomatis, periode susulan, peran, keamanan, hapus proyek.
    - `node scripts/qa/borongan_nonaktif_induk.js` — tim borongan, pekerja berhenti/aktif kembali, pekerja di dua proyek.
    - `node scripts/qa/borongan_pusat.js` / `borongan_dua_kali.js` — borongan dikelola pusat saja; satu tim dengan dua pekerjaan berjeda lama.
+   - `node scripts/qa/ui_borongan_pusat.js` — Akuntan mengajukan/menyetujui minggu borongan tanpa absen lewat tombol di layar (database baru).
    - `node scripts/qa/ui.js` — HP lapangan dan layar Akuntan untuk fitur di atas.
    - `node scripts/qa/crawl.js` (jalankan setelah `borongan_nonaktif_induk.js` pada database yang sama: layar HP butuh pekerja di Proyek B) — semua halaman Admin/Akuntan/Owner + 4 ukuran layar HP.
    - `node scripts/qa/balapan.js` — permintaan bersamaan: persetujuan, pembayaran, kasbon, simpan absen tidak boleh ganda/menimpa.

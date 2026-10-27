@@ -1,0 +1,24 @@
+// Layar Akuntan untuk borongan yang dikelola pusat (tanpa absen): Tambahan -> Ajukan -> Setujui, semua lewat tombol di layar.
+const {chromium}=require('/opt/node22/lib/node_modules/playwright');const {C}=require('./lib.js');
+const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String(d).slice(0,160):''));
+(async()=>{const k=new C();await k.login('akun1','AkuntanTest123');
+ const P='proj_a',D='2026-10-22';
+ const tim=(await k.r('workers.php','POST',{project_id:P,nama:'Tim Kaca',borongan:true})).j.id;
+ await k.r('payroll_adjustments.php','POST',{project_id:P,tgl:D,jenis:'tambah',kategori:'tambahan',label:'Borongan kaca',worker_id:tim,jumlah:5000000});
+ await k.r('payroll_periods.php','POST',{action:'header',project_id:P,tgl:D,pj_nama:'Pak Budi'});
+ const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});const ctx=await br.newContext({viewport:{width:1280,height:900}});const d=await ctx.newPage();const errs=[];d.on('pageerror',e=>errs.push(e.message));
+ await d.goto('http://127.0.0.1:8899/frontend/index.html');await d.fill('#loginEmail','akun1');await d.fill('#loginPassword','AkuntanTest123');await d.click('#loginSubmit');await d.waitForTimeout(2300);
+ await d.click('.nav-link[data-page="pengajuan"]');await d.waitForSelector('[data-pj-ajukan]',{timeout:8000}).catch(()=>{});
+ const txt=(await d.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ');
+ ok('minggu borongan tanpa absen: tombol "Ajukan minggu borongan" tampil',/Ajukan minggu borongan/.test(txt));
+ ok('catatan menjelaskan minggu ini diisi pusat (bukan menunggu lapangan)',/hanya berisi nominal/.test(txt)&&!/Menunggu lapangan mengajukan absen minggu ini/.test(txt));
+ await d.click('[data-pj-ajukan]');await d.waitForSelector('#mSave');await d.click('#mSave');await d.waitForTimeout(1800);
+ let x=await k.r('payroll_periods.php?project_id='+P+'&tgl='+D);ok('klik Ajukan: status periode menjadi diajukan',x.j.status==='diajukan',x.j.status);
+ await d.waitForSelector('[data-pj-setuju]',{timeout:8000}).catch(()=>{});
+ await d.click('[data-pj-setuju]');await d.waitForSelector('#mSave');await d.click('#mSave');await d.waitForTimeout(1800);
+ x=await k.r('payroll_periods.php?project_id='+P+'&tgl='+D);ok('klik Setujui: status periode menjadi disetujui',x.j.status==='disetujui',x.j.status);
+ await d.waitForSelector('[data-pj-bayar]',{timeout:8000}).catch(()=>{});
+ ok('tombol Catat Pembayaran tersedia',(await d.$('[data-pj-bayar]'))!==null);
+ x=await k.r('payroll_periods.php','POST',{action:'bayar',project_id:P,tgl:D,tgl_bayar:D,metode:'transfer',semua:true});ok('dibayar 5.000.000 sampai lunas',x.j.dibayar===5000000&&x.j.lunas===true,JSON.stringify(x.j));
+ ok('tidak ada error halaman',errs.length===0,errs.join('|'));
+ await br.close();console.log(R.join('\n'));console.log('== ui borongan pusat: PASS '+R.filter(r=>r.startsWith('PASS')).length+' / FAIL '+R.filter(r=>r.startsWith('FAIL')).length);})();

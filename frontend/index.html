@@ -2735,11 +2735,12 @@ function payrollView(c, mode){
       }).join('');
       var btn = function(attr, icon, label, primary){ return '<button type="button" '+attr+' class="'+(primary?btnPrimary:btnGhostSm+' flex items-center gap-1')+'">'+(icon?'<i data-lucide="'+icon+'" class="w-3.5 h-3.5"></i>':'')+label+'</button>'; };
       var acts = '', isAk = STATE.user.role==='akuntan';
-      var stepNote = {draft:'Menunggu lapangan mengajukan absen minggu ini.', diajukan:'Menunggu pemeriksaan dan persetujuan Akuntan.', disetujui:'Sudah disetujui — siap dibayar.', dibayar:'Sudah dibayar dan terkunci.'}[p.status]||'';
+      var soloBor = p.status==='draft' && !(p.hari>0) && p.adjustments.length>0; // minggu yang hanya berisi nominal (mis. borongan): tidak ada absen harian
+      var stepNote = {draft: soloBor ? 'Minggu ini hanya berisi nominal (mis. borongan), tanpa absen harian — diisi pusat. Isi PJ lewat "Ubah PJ", lalu ajukan langsung di sini.' : 'Menunggu lapangan mengajukan absen minggu ini.', diajukan:'Menunggu pemeriksaan dan persetujuan Akuntan.', disetujui:'Sudah disetujui — siap dibayar.', dibayar:'Sudah dibayar dan terkunci.'}[p.status]||'';
       if(isAk && p.status==='diajukan') acts += btn('data-pj-setuju="'+esc(p.id)+'"','check','Periksa & Setujui', true);
       if(isAk && p.status==='disetujui') acts += btn('data-pj-bayar="'+esc(p.id)+'"','banknote','Catat Pembayaran', true);
       if(write && !locked) acts += btn('data-pj-adj="'+esc(p.id)+'"','plus','Tambahan / Potongan');
-      if(isAk && p.status==='draft') acts += btn('data-pj-ajukan="'+esc(p.id)+'"','send','Ajukan (atas nama lapangan)');
+      if(isAk && p.status==='draft') acts += btn('data-pj-ajukan="'+esc(p.id)+'"','send', soloBor ? 'Ajukan minggu borongan' : 'Ajukan (atas nama lapangan)');
       if(isAk && (p.status==='diajukan' || p.status==='disetujui') && !p.payments.length) acts += btn('data-pj-kembali="'+esc(p.id)+'"','','Kembalikan ke lapangan');
       if(write && !locked) acts += btn('data-pj-head="'+esc(p.id)+'"','','Ubah PJ');
       acts += btn('data-pj-xls="'+esc(p.id)+'"','file-down','Absen Upah (Excel)');
@@ -4270,7 +4271,7 @@ function openAddWorker(c){
   openModal('Tambah Pekerja',
     '<div class="space-y-4">'+
       '<label class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm cursor-pointer"><input type="checkbox" id="nw_borong" class="mt-0.5 w-5 h-5 shrink-0">'+
-        '<span><b>Tim borongan</b> <span class="text-slate-600">(mis. tim cat, aluminium). Dibayar per tim oleh Akuntan. Anda cukup menandai hadir.</span></span></label>'+
+        '<span><b>Tim borongan</b> <span class="text-slate-600">(mis. tim cat, aluminium). Dibayar per tim; nominalnya diisi Akuntan/Admin Pusat. Menandai hadir di sini boleh, tidak wajib.</span></span></label>'+
       '<div><label id="nw_namalbl" class="'+lbl+'">Nama pekerja *</label><input id="nw_nama" type="text" autocomplete="off" class="'+inputCls+'" placeholder="mis. Asep"></div>'+
       '<div id="nw_biasa" class="space-y-4">'+
         '<div><label class="'+lbl+'">Status *</label><select id="nw_grade" class="'+inputCls+'">'+
@@ -4325,7 +4326,7 @@ function openAddWorker(c){
     document.getElementById('nw_biasa').classList.toggle('hidden', on);
     document.getElementById('nw_namalbl').textContent = on ? 'Nama tim borongan *' : 'Nama pekerja *';
     document.getElementById('nw_nama').placeholder = on ? 'mis. Tim Cat' : 'mis. Asep';
-    document.getElementById('nw_note').textContent = on ? 'Tim borongan dibayar langsung per tim. Akuntan mengisi nominal borongannya; kasbon tim ikut dipotong otomatis. Tandai hadir hanya sebagai catatan.' : 'Upah mengikuti tarif status (dan tarif tim bila ada) yang diatur Admin Pusat/Akuntan.';
+    document.getElementById('nw_note').textContent = on ? 'Tim borongan dibayar langsung per tim. Nominal borongannya diisi Akuntan/Admin Pusat; kasbon tim ikut dipotong otomatis. Menandai hadir hanya catatan (opsional).' : 'Upah mengikuti tarif status (dan tarif tim bila ada) yang diatur Admin Pusat/Akuntan.';
   });
   document.getElementById('nw_kelola').onclick = function(){ closeModal(); openManageWorkers(c); };
   // "Orang ini juga bekerja di proyek lain?" appears only when someone else's project has people to pick from.
