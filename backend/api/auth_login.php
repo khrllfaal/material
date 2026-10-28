@@ -10,6 +10,10 @@ $username = trim(strtolower((string)($body['username'] ?? '')));
 $password = (string)($body['password'] ?? '');
 if ($username === '' || $password === '') json_error('Username dan password wajib diisi.', 422);
 
+$throttle = new \App\Infrastructure\LoginThrottle(db());
+$ip = client_ip();
+if ($throttle->terlalumBanyak($ip)) json_error('Terlalu banyak percobaan masuk dari jaringan ini. Coba lagi sekitar 10 menit lagi.', 429);
+
 $stmt = db()->prepare('SELECT * FROM users WHERE username = ?');
 $stmt->execute([$username]);
 $user = $stmt->fetch();
@@ -20,6 +24,7 @@ if (!$user) {
     // Don't reveal whether the username exists at all — not by message and not
     // by timing: burn the same bcrypt time a real account would have cost.
     password_verify($password, '$2y$12$87NVJUTXMsKZBFotZQt5OuPKbEkGUTggdYc3.2PJgWj8z3uU3lA2S');
+    $throttle->catatGagal($ip);
     json_error($generic_error, 401);
 }
 
@@ -32,6 +37,7 @@ if (!password_verify($password, $user['password_hash'])) {
     $lockUntil = $attempts >= 5 ? date('Y-m-d H:i:s', time() + 15 * 60) : null;
     $upd = db()->prepare('UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?');
     $upd->execute([$attempts, $lockUntil, $user['id']]);
+    $throttle->catatGagal($ip);
     json_error($generic_error, 401);
 }
 

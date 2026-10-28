@@ -2,6 +2,9 @@
 # from third-party hosts, so the policy can stay strict.
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
+    # Browser hanya memakai HTTPS untuk situs ini (dikirim hanya bila sambungan memang HTTPS, termasuk lewat Cloudflare).
+    Header always set Strict-Transport-Security "max-age=31536000" "expr=%{HTTPS} == 'on' || %{HTTP:X-Forwarded-Proto} == 'https'"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
     Header set X-Frame-Options "DENY"
     Header set Referrer-Policy "same-origin"
     Header set Permissions-Policy "camera=(), microphone=(), geolocation=()"

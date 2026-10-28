@@ -2,7 +2,7 @@
 // Uji unit murni (tanpa database, tanpa server): php scripts/qa/unit.php
 declare(strict_types=1);
 spl_autoload_register(function ($c) { $f = __DIR__ . '/../../backend/api/src/' . str_replace('\\', '/', substr($c, 4)) . '.php'; if (is_file($f)) require $f; });
-use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError, AttendanceRules, WorkerRules, KasbonRules};
+use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError, AttendanceRules, WorkerRules, KasbonRules, ClientIp};
 
 $ok = 0; $bad = 0;
 function t(string $nama, bool $kondisi, string $info = ''): void { global $ok, $bad; if ($kondisi) $ok++; else { $bad++; echo "GAGAL: $nama $info\n"; } }
@@ -190,6 +190,16 @@ tolak('hapus kasbon yang sudah terpotong', fn() => KasbonRules::periksaBisaDihap
 lolos('hapus kasbon belum terpotong', fn() => KasbonRules::periksaBisaDihapus(100.0, 0.0));
 lolos('hapus pelunasan (negatif) selalu boleh', fn() => KasbonRules::periksaBisaDihapus(-100.0, -500.0));
 t('nama pihak', KasbonRules::namaPihak('w', '') === 'pekerja ini' && KasbonRules::namaPihak(null, 'A') === 'Tim A' && KasbonRules::namaPihak(null, '') === 'grup');
+
+// --- ClientIp (Cloudflare)
+t('IP Cloudflare dikenali (IPv4)', ClientIp::dalamRentang('172.67.10.20', ClientIp::CLOUDFLARE) && ClientIp::dalamRentang('104.18.5.5', ClientIp::CLOUDFLARE));
+t('IP Cloudflare dikenali (IPv6)', ClientIp::dalamRentang('2606:4700:10::1', ClientIp::CLOUDFLARE));
+t('IP biasa bukan Cloudflare', !ClientIp::dalamRentang('36.70.1.1', ClientIp::CLOUDFLARE) && !ClientIp::dalamRentang('127.0.0.1', ClientIp::CLOUDFLARE) && !ClientIp::dalamRentang('2001:db8::1', ClientIp::CLOUDFLARE));
+t('batas rentang /20 tepat (173.245.48.0 - 173.245.63.255)', ClientIp::dalamRentang('173.245.63.255', ClientIp::CLOUDFLARE) && !ClientIp::dalamRentang('173.245.64.0', ClientIp::CLOUDFLARE));
+t('lewat Cloudflare: pakai CF-Connecting-IP', ClientIp::resolve(['REMOTE_ADDR' => '172.67.10.20', 'HTTP_CF_CONNECTING_IP' => '36.70.1.1']) === '36.70.1.1');
+t('langsung ke server: header CF palsu diabaikan', ClientIp::resolve(['REMOTE_ADDR' => '36.70.9.9', 'HTTP_CF_CONNECTING_IP' => '1.2.3.4']) === '36.70.9.9');
+t('header CF berisi sampah diabaikan', ClientIp::resolve(['REMOTE_ADDR' => '172.67.10.20', 'HTTP_CF_CONNECTING_IP' => 'bukan-ip']) === '172.67.10.20');
+t('tanpa header: REMOTE_ADDR', ClientIp::resolve(['REMOTE_ADDR' => '36.70.9.9']) === '36.70.9.9' && ClientIp::resolve([]) === '');
 
 echo "== uji unit: LULUS $ok / GAGAL $bad\n";
 exit($bad ? 1 : 0);

@@ -289,6 +289,9 @@ function require_project_access(array $user, string $projectId): void {
     }
 }
 
+/** IP pengunjung sebenarnya (memperhitungkan Cloudflare bila ada). */
+function client_ip(): string { return \App\Domain\ClientIp::resolve($_SERVER); }
+
 function audit(string $action, string $entity, string $entityId, string $detail = ''): void {
     $u = current_user();
     $stmt = db()->prepare(
@@ -296,7 +299,7 @@ function audit(string $action, string $entity, string $entityId, string $detail 
     );
     $stmt->execute([
         $u['id'] ?? null, $u['username'] ?? null, $action, substr($entity, 0, 40), substr($entityId, 0, 40), $detail,
-        $_SERVER['REMOTE_ADDR'] ?? null,
+        client_ip() ?: null,
         substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255) ?: null,
     ]);
 }

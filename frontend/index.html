@@ -50,6 +50,17 @@
   body.is-mobile #toastWrap > div{bottom:5.5rem!important}
   
   @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+  /* Kontras teks (WCAG AA, 4,5:1): abu-abu muda di latar terang digelapkan sedikit; di sidebar gelap tetap terang. */
+  .text-slate-400{color:#5b6b80}
+  .text-slate-300{color:#66768b}
+  .text-indigo-500{color:#4f46e5}
+  .bg-red-50.text-red-600{color:#b91c1c}
+  #sidebar .text-slate-400{color:#94a3b8}
+  #sidebar .text-slate-300{color:#cbd5e1}
+  .bg-amber-500.text-white{background-color:#b45309;border-color:#b45309}
+  ::placeholder{color:#6b7a8f;opacity:1}
+  .bg-slate-300.text-white{color:#334155}
+  button .opacity-80,button .opacity-90{opacity:1}
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -294,6 +305,33 @@ function loadUser(){ return lsGet(USER_KEY, null); }
 window.addEventListener('online', function(){ updateSyncBadge(); flushOutbox(); });
 window.addEventListener('offline', updateSyncBadge);
 setInterval(function(){ if(navigator.onLine && outboxGet().length) flushOutbox(); }, 30000);
+/* Aksesibilitas: setiap isian dan tombol berikon diberi nama yang terbaca pembaca layar, ikon dekoratif disembunyikan.
+   Hanya menambah atribut; dijalankan ulang (ditunda) setiap kali layar berubah. */
+(function(){
+  var ICON = {'chevron-left':'Sebelumnya','chevron-right':'Berikutnya','x':'Tutup','trash-2':'Hapus','trash':'Hapus','pencil':'Ubah','edit':'Ubah','plus':'Tambah','search':'Cari','file-down':'Unduh','download':'Unduh','refresh-cw':'Muat ulang','menu':'Menu','check':'Setuju'};
+  function cellName(el){
+    var td = el.closest('td'); if(!td) return '';
+    var tr = td.parentElement, tbl = td.closest('table'), row = tr && tr.children[0] ? tr.children[0].innerText.trim() : '';
+    var th = tbl && tbl.tHead && tbl.tHead.rows[0] && tbl.tHead.rows[0].children[td.cellIndex];
+    return [row.split('\n')[0], th ? th.innerText.trim().split('\n')[0] : ''].filter(Boolean).join(', ');
+  }
+  function fix(){
+    document.querySelectorAll('input:not([type=hidden]),select,textarea').forEach(function(el){
+      if(el.getAttribute('aria-label') || el.title || el.closest('label') || (el.id && document.querySelector('label[for="'+el.id+'"]'))) return;
+      var n = el.placeholder || cellName(el) || (el.previousElementSibling && el.previousElementSibling.innerText ? el.previousElementSibling.innerText.trim() : '') || el.name || el.id;
+      if(n) el.setAttribute('aria-label', String(n).slice(0, 80));
+    });
+    document.querySelectorAll('button,a[role=button],[role=button]').forEach(function(b){
+      if(b.getAttribute('aria-label') || (b.innerText||'').trim() || b.title) return;
+      var ic = b.querySelector('[data-lucide]'); var k = ic ? ic.getAttribute('data-lucide') : '';
+      b.setAttribute('aria-label', ICON[k] || (b.id ? b.id.replace(/([A-Z])/g,' $1').toLowerCase() : 'Tombol'));
+    });
+    document.querySelectorAll('svg:not([aria-hidden])').forEach(function(s){ s.setAttribute('aria-hidden','true'); });
+  }
+  var timer; new MutationObserver(function(){ clearTimeout(timer); timer = setTimeout(fix, 150); }).observe(document.body, {childList:true, subtree:true});
+  fix();
+})();
+
 if('serviceWorker' in navigator){
   /* A new release took over this phone: reload once so the new screen and styles show right away,
      but only when nothing the user typed can be lost (no unsaved absen, no open window, not typing). */
@@ -698,7 +736,7 @@ function renderNav(){
   var lastGroup = null;
   document.getElementById('navList').innerHTML = navItems.map(function(n){
     var head = '';
-    if(role!=='akuntan' && n.group && n.group!==lastGroup) head = '<div class="mx-6 mt-4 mb-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">'+esc(n.group)+'</div>';
+    if(role!=='akuntan' && n.group && n.group!==lastGroup) head = '<div class="mx-6 mt-4 mb-1 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">'+esc(n.group)+'</div>';
     lastGroup = n.group || lastGroup;
     return head + '<a data-page="'+n.id+'" class="nav-link flex items-center gap-2.5 mx-3 my-0.5 px-3 py-2.5 rounded-xl text-[13.5px] font-medium cursor-pointer transition-colors">'+
       '<i data-lucide="'+n.icon+'" class="w-4 h-4"></i>'+esc(n.label)+'</a>';
