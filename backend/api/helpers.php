@@ -241,9 +241,30 @@ function read_json_body(?array $override = null): array {
 
 /** Returns the logged-in user's session row, or null. Never trusts the
  *  client for identity — always re-derived from the server-side session. */
+/** Penanda singkat kata sandi: bila kata sandi diganti, sesi lama tidak cocok lagi. */
+function password_stamp(string $hash): string { return substr(hash('sha256', $hash), 0, 20); }
+
+/** Pengguna yang sedang masuk. Sesi dicocokkan dengan database di setiap permintaan (satu kueri kunci utama), sehingga akun yang dihapus,
+ *  kata sandi yang diganti, atau peran yang diubah langsung berlaku, bukan baru setelah sesi (setahun) berakhir. */
 function current_user(): ?array {
+    static $checked = false, $result = null;
+    if ($checked) return $result;
     start_session();
-    return $_SESSION['user'] ?? null;
+    $checked = true;
+    $s = $_SESSION['user'] ?? null;
+    if (!$s) return $result = null;
+    $q = db()->prepare('SELECT id, username, nama, role, password_hash FROM users WHERE id = ?');
+    $q->execute([$s['id'] ?? '']);
+    $row = $q->fetch();
+    $stamp = $row ? password_stamp($row['password_hash']) : '';
+    if (!$row || (isset($_SESSION['pw']) && !hash_equals($_SESSION['pw'], $stamp))) { // akun dihapus atau kata sandi diganti
+        $_SESSION = [];
+        session_destroy();
+        return $result = null;
+    }
+    $_SESSION['pw'] = $stamp; // sesi yang dibuat sebelum pembaruan ini ikut diberi penanda
+    $_SESSION['user'] = ['id' => $row['id'], 'username' => $row['username'], 'nama' => $row['nama'], 'role' => $row['role']]; // peran/nama terbaru
+    return $result = $_SESSION['user'];
 }
 
 /** Endpoints an 'akuntan' (accountant) account may call. Everything else —

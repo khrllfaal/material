@@ -46,6 +46,7 @@ db()->prepare('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE i
 start_session();
 session_regenerate_id(true);
 $_SESSION['user'] = ['id' => $user['id'], 'username' => $user['username'], 'nama' => $user['nama'], 'role' => $user['role']];
+$_SESSION['pw'] = password_stamp($user['password_hash']);
 
 $out = $_SESSION['user'];
 if ($user['role'] === 'lapangan') $out['projectIds'] = user_project_ids($_SESSION['user']);

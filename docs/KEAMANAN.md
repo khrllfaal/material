@@ -2,6 +2,7 @@
 
 ## Yang sudah ada di kode
 - Kata sandi disimpan dengan bcrypt. Akun terkunci 15 menit setelah 5 kali salah. Tiap alamat IP dibatasi 20 kali gagal per 10 menit (tabel `login_attempts`, dibuat otomatis).
+- Sesi dicocokkan dengan database di setiap permintaan: akun yang dihapus, kata sandi yang diganti, atau peran yang diubah langsung berlaku, tidak menunggu sesi berakhir.
 - Sesi disimpan di database, cookie `HttpOnly`, `SameSite=Lax`, `Secure` saat HTTPS. ID sesi diganti saat login.
 - Semua kueri memakai parameter (PDO prepared). Permintaan tulis wajib JSON dan berasal dari situs sendiri (permintaan dari situs lain ditolak).
 - Hak akses diperiksa di server, bukan di layar: Lapangan tidak pernah menerima angka gaji, Owner hanya membaca, hanya Akuntan yang menyetujui dan membayar.
@@ -27,3 +28,10 @@ Uji setelah pasang: login, isi absen dari HP, buka Rekap. Jika ada yang gagal, u
 - Pembatas IP bisa menahan satu kantor atau satu jaringan seluler bila banyak orang salah kata sandi bersamaan. Batasnya 20 kali per 10 menit, jadi jarang terjadi.
 - Kunci per akun bisa dipakai orang iseng untuk mengunci akun orang lain selama 15 menit. Aturan rate limit Cloudflare di langkah 5 mengurangi risikonya.
 - Autentikasi dua langkah belum ada. Untuk akun Akuntan dan Admin Pusat, ini peningkatan berikutnya yang paling bernilai.
+
+## Audit
+`node scripts/qa/audit_keamanan.js` (database baru) memeriksa 23 hal dengan data uji, mengikuti daftar periksa `cloudflare/security-audit-skill`: pencabutan sesi, isolasi data antar proyek dan peran, nominal uang tidak sampai ke Lapangan, Owner tidak bisa menulis, XSS lewat data berisi skrip, dan batas beban (rentang tanggal, ukuran badan permintaan, jumlah baris).
+
+Temuan pertama yang diperbaiki: sesi tidak dicocokkan dengan database, jadi akun yang dihapus atau diturunkan perannya tetap bisa bekerja sampai sesinya berakhir (sesi berlaku setahun).
+
+Belum dikerjakan: akun Admin Pusat terakhir bisa menurunkan perannya sendiri, dan antrean data yang belum terkirim di HP tetap ada bila orang lain masuk di HP yang sama (server tetap memeriksa hak akses proyek).
