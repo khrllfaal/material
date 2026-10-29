@@ -304,5 +304,13 @@ t('jurnal: beban borongan = 68jt (70jt - denda 2jt); piutang kasbon berkurang 5j
 t('jurnal: bank = termin transfer (23,5jt + 36jt = 59,5jt), kas = pelepasan retensi 3,5jt', mirip($akun['Bank'], -59500000) && mirip($akun['Kas'], -3500000));
 t('kontrak belum disetujui tidak masuk buku/jurnal', Borongan::buku([['status' => 'draft', 'addenda' => [], 'termin' => []] + $K])['entries'] === [] && Borongan::jurnal([['status' => 'diajukan', 'termin' => $Tfull, 'project_nama' => 'X'] + $K]) === []);
 
+// --- KasbonPlanner: batas saldo sekarang (mencegah potong ganda)
+$rowsK = [['worker_id' => 'w1', 'nama' => 'A', 'tim' => 'T', 'gaji' => 300000.0, 'lembur_rp' => 0.0]];
+t('tanpa batas saldo: perilaku lama (potong 100.000)', mirip(KasbonPlanner::rencana(['w1' => 100000.0], [], [], $rowsK)['total'], 100000));
+t('saldo sekarang 0 (sudah dilunasi lewat jalur lain): tidak dipotong lagi', mirip(KasbonPlanner::rencana(['w1' => 100000.0], [], [], $rowsK, [])['total'], 0));
+t('saldo sekarang 40.000: dipotong sebatas 40.000', mirip(KasbonPlanner::rencana(['w1' => 100000.0], [], [], $rowsK, ['w1' => 40000.0])['total'], 40000));
+t('saldo sekarang lebih besar dari yang boleh dipotong: tetap sebatas kasbon s/d akhir periode', mirip(KasbonPlanner::rencana(['w1' => 100000.0], [], [], $rowsK, ['w1' => 900000.0])['total'], 100000));
+t('batas saldo juga berlaku untuk tim dan grup', mirip(KasbonPlanner::rencana(['t:T' => 50000.0, '' => 20000.0], [], [], $rowsK, ['t:T' => 10000.0])['total'], 10000));
+
 echo "== uji unit: LULUS $ok / GAGAL $bad\n";
 exit($bad ? 1 : 0);

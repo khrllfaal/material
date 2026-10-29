@@ -18,6 +18,8 @@ final class KasbonService {
         $deducted = $this->repo->sudahDipotong($projectId, $p['id']);
         $adj = $this->repo->penyesuaianPeriode($p['id']);
         $calc = $this->payroll->hitung([$projectId], $p['tgl_mulai'], $p['tgl_akhir']);
-        return KasbonPlanner::rencana($given, $deducted, $adj, $calc['rows']);
+        $sekarang = []; // saldo sebenarnya saat ini (semua tanggal): membatasi potongan supaya tidak ganda dengan pelunasan/potongan lewat jalur lain
+        foreach ($this->repo->saldoMap([$projectId]) as $key => $v) $sekarang[substr((string)$key, strlen($projectId) + 1)] = (float)$v;
+        return KasbonPlanner::rencana($given, $deducted, $adj, $calc['rows'], $sekarang);
     }
 }

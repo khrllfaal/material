@@ -121,9 +121,16 @@ final class BoronganRepository {
             ->execute([$id, $projectId, $workerId, '', $tgl, -$jumlah, $ket, $userId, $ref]);
         return $id;
     }
+    /** Semua gerakan kasbon tim: kasbon diberikan, pelunasan/potongan termin (buku kasbon), dan potongan dari gaji mingguan (jalur lama), urut waktu. */
     public function kasbonTim(string $projectId, string $workerId): array {
-        $q = $this->db->prepare('SELECT id, tgl, jumlah, ket, ref FROM kasbon WHERE project_id = ? AND worker_id = ? ORDER BY tgl, created_at, id'); $q->execute([$projectId, $workerId]);
-        return array_map(fn($r) => self::num($r, ['jumlah']), $q->fetchAll());
+        $q = $this->db->prepare('SELECT id, tgl, jumlah, ket, ref, created_at FROM kasbon WHERE project_id = ? AND worker_id = ?'); $q->execute([$projectId, $workerId]);
+        $rows = array_map(fn($r) => self::num($r, ['jumlah']), $q->fetchAll());
+        $a = $this->db->prepare("SELECT x.id, pp.tgl_akhir AS tgl, x.jumlah, pp.tgl_mulai, pp.tgl_akhir, x.created_at FROM payroll_adjustments x JOIN payroll_periods pp ON pp.id = x.period_id
+                                  WHERE pp.project_id = ? AND x.worker_id = ? AND x.kategori = 'kasbon' AND x.jenis = 'potong'");
+        $a->execute([$projectId, $workerId]);
+        foreach ($a->fetchAll() as $r) $rows[] = ['id' => $r['id'], 'tgl' => $r['tgl'], 'jumlah' => -(float)$r['jumlah'], 'ket' => 'Potong dari gaji minggu ' . $r['tgl_mulai'] . ' s/d ' . $r['tgl_akhir'], 'ref' => 'gaji', 'created_at' => $r['created_at']];
+        usort($rows, fn($x, $y) => [$x['tgl'], $x['created_at'], $x['id']] <=> [$y['tgl'], $y['created_at'], $y['id']]);
+        return array_map(function ($r) { unset($r['created_at']); return $r; }, $rows);
     }
     public function namaUser(array $ids): array {
         $ids = array_values(array_filter(array_unique($ids)));
