@@ -1846,6 +1846,7 @@
      "ket": "besar",
      "project_id": "proj_a",
      "project_nama": "Proyek A",
+     "ref": null,
      "tgl": "2026-10-18",
      "tim": "",
      "worker_id": "W3",
@@ -1859,6 +1860,7 @@
      "ket": "kasbon",
      "project_id": "proj_a",
      "project_nama": "Proyek A",
+     "ref": null,
      "tgl": "2026-10-15",
      "tim": "",
      "worker_id": "W2",
@@ -1872,6 +1874,7 @@
      "ket": "kasbon tim",
      "project_id": "proj_a",
      "project_nama": "Proyek A",
+     "ref": null,
      "tgl": "2026-10-16",
      "tim": "",
      "worker_id": "W6",
@@ -2759,7 +2762,7 @@
    "pj_nama": "Arya",
    "project_id": "proj_a",
    "status": "diajukan",
-   "tgl_akhir": "2026-10-29",
+   "tgl_akhir": "2026-10-25",
    "tgl_mulai": "2026-10-23"
   }
  },
@@ -2768,12 +2771,12 @@
   "j": {
    "catatan": "",
    "grup_nama": "",
-   "id": "per_proj_a_2026-10-23",
+   "id": null,
    "pj_nama": "Arya",
    "project_id": "proj_a",
-   "status": "diajukan",
+   "status": "draft",
    "tgl_akhir": "2026-10-29",
-   "tgl_mulai": "2026-10-23"
+   "tgl_mulai": "2026-10-26"
   }
  },
  "038 kasbon_plan minggu 2": {
@@ -2785,7 +2788,7 @@
    "pj_nama": "Arya",
    "project_id": "proj_a",
    "status": "diajukan",
-   "tgl_akhir": "2026-10-29",
+   "tgl_akhir": "2026-10-25",
    "tgl_mulai": "2026-10-23"
   }
  },
@@ -2866,7 +2869,7 @@
      "project_nama": "Proyek A",
      "sisa": 420000,
      "status": "disetujui",
-     "tgl_akhir": "2026-10-29",
+     "tgl_akhir": "2026-10-25",
      "tgl_mulai": "2026-10-23",
      "total_bayar": 420000
     }
@@ -2992,6 +2995,7 @@
      "ket": "besar",
      "project_id": "proj_a",
      "project_nama": "Proyek A",
+     "ref": null,
      "tgl": "2026-10-18",
      "tim": "",
      "worker_id": "W3",
@@ -3005,6 +3009,7 @@
      "ket": "kasbon",
      "project_id": "proj_a",
      "project_nama": "Proyek A",
+     "ref": null,
      "tgl": "2026-10-15",
      "tim": "",
      "worker_id": "W2",
@@ -3018,6 +3023,7 @@
      "ket": "kasbon tim",
      "project_id": "proj_a",
      "project_nama": "Proyek A",
+     "ref": null,
      "tgl": "2026-10-16",
      "tim": "",
      "worker_id": "W6",
@@ -3058,7 +3064,7 @@
     "project_id": "proj_a",
     "project_nama": "Proyek A",
     "status": "disetujui",
-    "tgl_akhir": "2026-10-29",
+    "tgl_akhir": "2026-10-25",
     "tgl_mulai": "2026-10-23"
    },
    {
@@ -3358,7 +3364,7 @@
      "project_nama": "Proyek A",
      "sisa": 420000,
      "status": "disetujui",
-     "tgl_akhir": "2026-10-29",
+     "tgl_akhir": "2026-10-25",
      "tgl_mulai": "2026-10-23",
      "total_bayar": 420000
     }

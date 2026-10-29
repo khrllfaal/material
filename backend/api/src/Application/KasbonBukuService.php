@@ -51,6 +51,7 @@ final class KasbonBukuService {
     public function hapus(string $id): array {
         $k = $this->repo->cari($id);
         if (!$k) throw new DomainError('Data tidak ditemukan.', 404);
+        if (!empty($k['ref'])) throw new DomainError('Catatan ini dibuat otomatis dari pembayaran termin borongan, jadi tidak bisa dihapus. Koreksi lewat menu Borongan.', 409);
         if ((float)$k['jumlah'] > 0) KasbonRules::periksaBisaDihapus((float)$k['jumlah'], $this->kasbon->saldo($k['project_id'], $k['worker_id'], (string)$k['tim']) - (float)$k['jumlah']);
         $this->repo->hapus($id);
         ($this->audit)('delete', 'kasbon', $id, (string)$k['jumlah']);

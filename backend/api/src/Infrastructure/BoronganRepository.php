@@ -44,6 +44,10 @@ final class BoronganRepository {
         $q = $this->db->prepare('SELECT * FROM borongan_termin WHERE id = ?'); $q->execute([$id]);
         return ($r = $q->fetch()) ? self::num($r, ['bruto', 'retensi', 'potong_kasbon', 'denda', 'bersih']) : null;
     }
+    public function cariTerminByBukti(string $buktiNo): ?array {
+        $q = $this->db->prepare('SELECT * FROM borongan_termin WHERE bukti_no = ? LIMIT 1'); $q->execute([$buktiNo]);
+        return ($r = $q->fetch()) ? self::num($r, ['bruto', 'retensi', 'potong_kasbon', 'denda', 'bersih']) : null;
+    }
     public function cariAddendum(string $id): ?array {
         $q = $this->db->prepare('SELECT * FROM borongan_addendum WHERE id = ?'); $q->execute([$id]);
         return ($r = $q->fetch()) ? self::num($r, ['jumlah']) : null;

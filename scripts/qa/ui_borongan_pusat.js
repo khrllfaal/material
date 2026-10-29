@@ -1,4 +1,4 @@
-// Layar Akuntan untuk borongan yang dikelola pusat (tanpa absen): Tambahan -> Ajukan -> Setujui, semua lewat tombol di layar.
+// Jalur lama: nominal borongan sebagai Tambahan pada minggu gaji (tanpa absen) -> Ajukan -> Setujui lewat tombol di layar. Borongan baru memakai menu Borongan (ui_borongan.js).
 const {chromium}=require('/opt/node22/lib/node_modules/playwright');const {C}=require('./lib.js');
 const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String(d).slice(0,160):''));
 (async()=>{const k=new C();await k.login('akun1','AkuntanTest123');
@@ -7,10 +7,7 @@ const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String
  await k.r('payroll_periods.php','POST',{action:'header',project_id:P,tgl:D,pj_nama:'Pak Budi'});
  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});const ctx=await br.newContext({viewport:{width:1280,height:900}});const d=await ctx.newPage();const errs=[];d.on('pageerror',e=>errs.push(e.message));
  await d.goto('http://127.0.0.1:8899/frontend/index.html');await d.fill('#loginEmail','akun1');await d.fill('#loginPassword','AkuntanTest123');await d.click('#loginSubmit');await d.waitForTimeout(2300);
- await d.click('.nav-link[data-page="pekerja"]');await d.waitForSelector('[data-w-nominal]',{timeout:8000});
- ok('Pekerja & Tarif: baris tim borongan punya tombol "Isi nominal borongan"',/Isi nominal borongan/.test(await d.evaluate(()=>document.body.innerText)));
- await d.click('[data-w-nominal]');await d.waitForSelector('#bn_jumlah');await d.fill('#bn_jumlah','5000000');await d.fill('#bn_label','Borongan kaca');await d.fill('#bn_tgl',D);await d.click('#mSave');await d.waitForTimeout(1500);
- let ad=await k.r('payroll.php?project_id='+P+'&tgl_from=2026-10-16&tgl_to=2026-10-22');ok('nominal 5.000.000 tercatat untuk tim lewat layar Pekerja & Tarif',ad.j.rows.some(r=>r.worker_id===tim&&r.net===5000000),JSON.stringify(ad.j.rows.map(r=>r.net)));
+ await k.r('payroll_adjustments.php','POST',{project_id:P,tgl:D,jenis:'tambah',kategori:'tambahan',label:'Borongan kaca (catatan lama per minggu)',worker_id:tim,jumlah:5000000});
  await d.click('.nav-link[data-page="pengajuan"]');await d.waitForSelector('[data-pj-ajukan]',{timeout:8000}).catch(()=>{});
  const txt=(await d.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ');
  ok('minggu borongan tanpa absen: tombol "Ajukan minggu borongan" tampil',/Ajukan minggu borongan/.test(txt));

@@ -37,7 +37,7 @@ const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String
  ok('lapangan proyek B tidak menerima data proyek A dari endpoint mana pun',!bocorProyek.length,bocorProyek.join(' '));
  ok('lapangan tidak menerima nominal uang/tarif/rekening dari endpoint mana pun',!bocorUang.length,bocorUang.join(' '));
  ok('Owner (hanya-baca) tidak bisa menulis lewat endpoint mana pun',!ownerTulis.length,ownerTulis.join(' '));
- let akLuar=[];for(const e of endpoints){const x=await k.r(e);if(x.s===200&&!['projects.php','workers.php','labor_rates.php','attendance.php','payroll.php','payroll_periods.php','payroll_adjustments.php','kasbon.php','kasbon_requests.php'].includes(e))akLuar.push(e)}
+ let akLuar=[];for(const e of endpoints){const x=await k.r(e);if(x.s===200&&!['projects.php','workers.php','labor_rates.php','attendance.php','payroll.php','payroll_periods.php','payroll_adjustments.php','kasbon.php','kasbon_requests.php','borongan.php'].includes(e))akLuar.push(e)}
  ok('Akuntan tidak bisa membuka endpoint di luar daftar tugasnya',!akLuar.length,akLuar.join(' '));
  for(const e of ['users.php','audit_log.php']){for(const [n,c] of [['lapangan',l1],['akuntan',k],['owner',o]]){const x=await c.r(e);if(e==='users.php'||(e==='audit_log.php'&&n==='lapangan'))ok(e+' tertutup bagi '+n,x.s===403,x.s)}}
  // ---- C. DOM XSS: isi nama/keterangan dengan payload lalu buka layar
@@ -47,17 +47,23 @@ const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String
  await k.r('kasbon.php','POST',{project_id:'proj_a',tgl:'2026-10-20',worker_id:wP.id,jumlah:5000,ket:P});
  await l1.r('kasbon_requests.php','POST',{project_id:'proj_a',worker_id:wP.id,jumlah:1000,ket:P});
  await a.r('projects.php','POST',{id:'proj_x',nama:P,lokasi:P}).catch(()=>{});
+ const bt=(await k.r('workers.php','POST',{project_id:'proj_a',nama:P,borongan:true,no_rek:P})).j.id;
+ const kx=(await a.r('borongan.php','POST',{action:'buat',worker_id:bt,nama_pekerjaan:P,tgl_mulai:'2026-10-20',nilai:1000000,retensi_persen:5,catatan:P})).j.id;
+ await a.r('borongan.php','POST',{action:'ajukan',id:kx});await k.r('borongan.php','POST',{action:'setujui',id:kx});
+ await a.r('borongan.php','POST',{action:'termin_buat',kontrak_id:kx,bruto:100000,tgl:'2026-10-21',ket:P,denda:1000,denda_ket:P});
+ await a.r('borongan.php','POST',{action:'addendum_buat',kontrak_id:kx,jumlah:5000,alasan:P});
  await a.r('attendance.php','POST',{project_id:'proj_a',tgl:'2026-10-22',entries:[{worker_id:wP.id,hari:1,lembur_jam:0,ket:P}]});
  const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
  const visit=async(user,pw,mobile,pages)=>{const ctx=await br.newContext(mobile?{viewport:{width:390,height:800},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:900}});const p=await ctx.newPage();let dlg=0;p.on('dialog',d=>{dlg++;d.dismiss()});
   await p.goto('http://127.0.0.1:8899/frontend/index.html');await p.fill('#loginEmail',user);await p.fill('#loginPassword',pw);await p.click('#loginSubmit');await p.waitForTimeout(2300);
   for(const pg of pages){const sel=pg[0]==='#'||pg[0]==='['?pg:'.nav-link[data-page="'+pg+'"]';await p.click(sel,{timeout:2500}).catch(()=>{});await p.waitForTimeout(1300);
+   if(pg==='borongan'){await p.click('[data-bf=""]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(300);await p.click('[data-bt]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(700);await p.click('[data-ko]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(500);for(const t of ['buku','kasbon'])await p.click('[data-tab="'+t+'"]',{timeout:2000}).catch(()=>{});await p.waitForTimeout(400)}
    if(pg==='pengajuan'){if(!(await p.$('[data-pj-adj]'))){await p.click('[data-pj-open]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(500)}await p.click('[data-pj-adj]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(500);await p.keyboard.press('Escape')}}
   const x=await p.evaluate(()=>window.__xss||0);await ctx.close();return x+dlg};
- const xa=await visit('akun1','AkuntanTest123',false,['pengajuan','rekap','pekerja']);
+ const xa=await visit('akun1','AkuntanTest123',false,['pengajuan','rekap','pekerja','borongan']);
  const xp=await visit('adminp','AdminTest123',false,['dashboard','pekerja','proyek','pengguna','log','audit']);
  const xl=await visit('lap1','LapanganTest123',true,['#mNav [data-sec="absen"]','#mNav [data-sec="bahan"]','#mNav [data-sec="stok"]']);
- ok('XSS: Akuntan membuka Pengajuan/Rekap/Pekerja dengan payload di data: tidak ada skrip berjalan',xa===0,xa);
+ ok('XSS: Akuntan membuka Pengajuan/Rekap/Pekerja/Borongan dengan payload di data: tidak ada skrip berjalan',xa===0,xa);
  ok('XSS: Admin Pusat membuka halaman utama dan master: tidak ada skrip berjalan',xp===0,xp);
  ok('XSS: Lapangan (HP) membuka Absen/Bahan/Stok: tidak ada skrip berjalan',xl===0,xl);
  await br.close();

@@ -3,6 +3,9 @@
 0. Tanpa database: `php scripts/qa/unit.php` (uji unit murni aturan gaji/kasbon/periode).
 1. `./scripts/qa/up_env.sh` membuat database uji + akun uji + server `php -S` di port 8899.
 2. Jalankan (Playwright + Chromium harus ada; `NODE_PATH` ke modul playwright):
+   - `node scripts/qa/borongan_modul.js` — menu Borongan lewat API (72 pemeriksaan: alur, peran, retensi, kasbon, addendum, bersamaan). Jalankan di bawah jam terkunci: `scripts/qa/waktu_uji.sh mulai`, lalu `scripts/qa/waktu_uji.sh node borongan_modul.js`.
+   - `node scripts/qa/bukti.js` — nomor Bukti Pembayaran berurut, isi bukti, akses (jam terkunci).
+   - `node scripts/qa/ui_borongan.js`, `ui_bukti.js`, `ui_pengajuan.js` — layar Borongan, cetak bukti PDF, layar Pengajuan (jam nyata; `waktu_uji.sh berhenti` dulu bila server sedang dikunci).
    - `node scripts/qa/audit_keamanan.js` — 23 pemeriksaan keamanan (sesi, isolasi data, XSS, batas beban); database baru.
    - `node scripts/qa/ui_kasbon_riwayat.js` — HP lapangan: kotak pengajuan kasbon ringkas + tombol riwayat.
    - `node scripts/qa/ui_kasbon_riwayat.js` — HP lapangan: kotak pengajuan kasbon ringkas + tombol riwayat.

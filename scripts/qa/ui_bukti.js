@@ -13,7 +13,7 @@ const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String
  const exp={0:'nol',1:'satu',11:'sebelas',12:'dua belas',19:'sembilan belas',20:'dua puluh',21:'dua puluh satu',99:'sembilan puluh sembilan',100:'seratus',101:'seratus satu',111:'seratus sebelas',200:'dua ratus',999:'sembilan ratus sembilan puluh sembilan',1000:'seribu',1001:'seribu satu',1999:'seribu sembilan ratus sembilan puluh sembilan',2000:'dua ribu',10000:'sepuluh ribu',11000:'sebelas ribu',100000:'seratus ribu',150000:'seratus lima puluh ribu',1234567:'satu juta dua ratus tiga puluh empat ribu lima ratus enam puluh tujuh',2500000:'dua juta lima ratus ribu',10000000:'sepuluh juta',1000000000:'satu miliar',1500000000:'satu miliar lima ratus juta'};
  const salah=tb.filter(([n,t])=>exp[n]!==t);ok('terbilang benar untuk 26 angka (0, belasan, ratusan, ribuan, juta, miliar)',!salah.length,JSON.stringify(salah));
  await d.click('.nav-link[data-page="pengajuan"]');await d.waitForSelector('[data-pj-bayar]',{timeout:8000});
- await d.click('[data-pj-bayar]');await d.waitForSelector('#py_tgl');await d.fill('#py_tgl','2026-10-29');await d.click('#mSave');
+ await d.click('[data-pj-bayar]');await d.waitForSelector('#py_tgl');await d.fill('#py_tgl','2026-10-27');await d.click('#mSave');
  await d.waitForSelector('text=Pembayaran tercatat',{timeout:8000});
  const m=await d.evaluate(()=>document.getElementById('modalBody').innerText);ok('setelah bayar muncul tawaran cetak dengan nomor BP/2026/10/0001',/BP\/2026\/10\/0001/.test(m),m.replace(/\s+/g,' '));
  const [dl]=await Promise.all([d.waitForEvent('download',{timeout:15000}),d.click('#mSave')]);
@@ -21,7 +21,7 @@ const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String
  ok('PDF terunduh dengan nama Bukti_Pembayaran_BP-2026-10-0001.pdf',dl.suggestedFilename()==='Bukti_Pembayaran_BP-2026-10-0001.pdf',dl.suggestedFilename());
  const buf=fs.readFileSync(f);ok('berkas adalah PDF valid',buf.slice(0,5).toString()==='%PDF-'&&buf.length>2000,buf.length);
  const txt=execSync('pdftotext -layout '+f+' -').toString().replace(/[ \t]+/g,' ');
- ok('isi: judul, nomor, proyek, periode, PJ, tanggal & metode',/BUKTI PEMBAYARAN UPAH/.test(txt)&&/BP\/2026\/10\/0001/.test(txt)&&/Bina Marga Kodim Bangun Jalan Cibalong/.test(txt)&&/16 Okt – 22 Okt 2026/.test(txt)&&/Pak Budi/.test(txt)&&/29 Oktober 2026/.test(txt)&&/Tunai/.test(txt),txt.slice(0,400).replace(/\n/g,' | '));
+ ok('isi: judul, nomor, proyek, periode, PJ, tanggal & metode',/BUKTI PEMBAYARAN UPAH/.test(txt)&&/BP\/2026\/10\/0001/.test(txt)&&/Bina Marga Kodim Bangun Jalan Cibalong/.test(txt)&&/16 Okt – 22 Okt 2026/.test(txt)&&/Pak Budi/.test(txt)&&/27 Oktober 2026/.test(txt)&&/Tunai/.test(txt),txt.slice(0,400).replace(/\n/g,' | '));
  ok('isi: kedua penerima dengan rekening, diterima 215.000 dan 175.000, total 390.000',/Asep Sunandar/.test(txt)&&/Budi Hartono/.test(txt)&&/BCA 1234567/.test(txt)&&/215\.000/.test(txt)&&/175\.000/.test(txt)&&/390\.000/.test(txt));
  ok('isi: terbilang "tiga ratus sembilan puluh ribu rupiah" dan kolom tanda tangan',/tiga ratus sembilan puluh ribu rupiah/.test(txt)&&/Penerima/.test(txt)&&/Dibayar oleh/.test(txt)&&/Mengetahui/.test(txt));
  // tombol bukti pada periode lunas

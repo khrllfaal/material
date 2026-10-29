@@ -272,7 +272,7 @@ function current_user(): ?array {
  *  once so no individual endpoint can forget it. */
 const AKUNTAN_ENDPOINTS = [
     'auth_me.php', 'auth_logout.php', 'projects.php', 'workers.php', 'labor_rates.php',
-    'attendance.php', 'payroll.php', 'payroll_periods.php', 'payroll_adjustments.php', 'kasbon.php', 'kasbon_requests.php',
+    'attendance.php', 'payroll.php', 'payroll_periods.php', 'payroll_adjustments.php', 'kasbon.php', 'kasbon_requests.php', 'borongan.php',
 ];
 
 function require_login(): array {
@@ -461,7 +461,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
  *  fails quietly otherwise. */
 function ensure_payroll_controls(): void {
     start_session();
-    if ((int)($_SESSION['controls_ok'] ?? 0) >= 7) return; // bump the number whenever a new migration is added
+    if ((int)($_SESSION['controls_ok'] ?? 0) >= 8) return; // bump the number whenever a new migration is added
     try {
         $db = db();
         $has = function (string $table, string $col) use ($db): bool {
@@ -508,7 +508,10 @@ function ensure_payroll_controls(): void {
         $db->exec("CREATE TABLE IF NOT EXISTS doc_counters (kode VARCHAR(8) NOT NULL, periode CHAR(7) NOT NULL, terakhir INT UNSIGNED NOT NULL DEFAULT 0,
                     PRIMARY KEY (kode, periode)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         if (!$has('payroll_payments', 'bukti_no')) $db->exec("ALTER TABLE payroll_payments ADD COLUMN bukti_no VARCHAR(30) NULL, ADD INDEX idx_pay_bukti (bukti_no)");
-        $_SESSION['controls_ok'] = 7;
+        // v8: modul Borongan (kontrak, addendum, termin) dan penghubung kasbon -> termin.
+        if (!$has('kasbon', 'ref')) $db->exec("ALTER TABLE kasbon ADD COLUMN ref VARCHAR(40) NULL");
+        foreach (\App\Infrastructure\SkemaBorongan::DDL as $stmt) $db->exec($stmt);
+        $_SESSION['controls_ok'] = 8;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
     }

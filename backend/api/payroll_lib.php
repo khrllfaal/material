@@ -63,3 +63,9 @@ function bukti_service(): \App\Application\BuktiService {
     if ($s === null) $s = new \App\Application\BuktiService(new \App\Infrastructure\PeriodRepository(db()), payroll_services()['payroll']);
     return $s;
 }
+
+function borongan_service(): \App\Application\BoronganService {
+    static $s = null;
+    if ($s === null) { $pdo = db(); $s = new \App\Application\BoronganService($pdo, new \App\Infrastructure\BoronganRepository($pdo), payroll_services()['kasbon'], 'audit', 'require_project_access'); }
+    return $s;
+}

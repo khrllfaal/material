@@ -71,6 +71,10 @@ final class WorkerRepository {
         $c = $this->db->prepare('SELECT COUNT(*) FROM attendance WHERE worker_id = ?'); $c->execute([$id]);
         return (int)$c->fetchColumn() > 0;
     }
+    public function punyaKontrakBorongan(string $id): bool {
+        try { $c = $this->db->prepare('SELECT COUNT(*) FROM borongan_kontrak WHERE worker_id = ?'); $c->execute([$id]); return (int)$c->fetchColumn() > 0; }
+        catch (\PDOException) { return false; } // tabel belum ada (belum bermigrasi): tidak ada kontrak
+    }
     public function hapus(string $id): void { $this->db->prepare('DELETE FROM workers WHERE id = ?')->execute([$id]); }
 
     /** Ganti nama tim di semua tempat (pekerja, tarif tim, kasbon, penyesuaian, absen yang belum dibayar). Mengembalikan jumlah pekerja. */

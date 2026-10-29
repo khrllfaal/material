@@ -2,7 +2,7 @@
 // Uji unit murni (tanpa database, tanpa server): php scripts/qa/unit.php
 declare(strict_types=1);
 spl_autoload_register(function ($c) { $f = __DIR__ . '/../../backend/api/src/' . str_replace('\\', '/', substr($c, 4)) . '.php'; if (is_file($f)) require $f; });
-use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError, AttendanceRules, WorkerRules, KasbonRules, ClientIp, NomorBukti, BuktiPembayaran};
+use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError, AttendanceRules, WorkerRules, KasbonRules, ClientIp, NomorBukti, BuktiPembayaran, Borongan};
 
 $ok = 0; $bad = 0;
 function t(string $nama, bool $kondisi, string $info = ''): void { global $ok, $bad; if ($kondisi) $ok++; else { $bad++; echo "GAGAL: $nama $info\n"; } }
@@ -223,6 +223,86 @@ t('bukti 0002: baris grup -10.000 dan total = 200.000 + 150.000 - 10.000', mirip
 $b1 = BuktiPembayaran::susun('BP/2026/10/0001', [$semua[0]], $semua, $rowsW);
 t('bukti 0001: hanya pembayaran lebih awal yang dihitung (data lama 5.000 sebelumnya; 0002 belum ada)', mirip($b1['lines'][0]['sebelumnya'], 5000) && mirip($b1['lines'][0]['sisa_setelah'], 300000 - 5000 - 100000) && $b1['grup'] === []);
 t('total bukti = jumlah baris dibayar ini', mirip($b1['total'], 100000));
+
+// --- Borongan
+$K = ['id' => 'k1', 'no_kontrak' => 'BK/2026/10/0001', 'nama_pekerjaan' => 'Pasang kaca', 'tgl_mulai' => '2026-10-01', 'nilai' => 100000000.0, 'retensi_persen' => 5.0, 'status' => 'disetujui'];
+$tm = fn($no, $jenis, $st, $bruto, $ret, $kas, $den, $bers, $tgl = '2026-10-10', $tb = null, $bk = null, $met = 'transfer') => ['id' => "t$no$jenis", 'no_termin' => $no, 'jenis' => $jenis, 'status' => $st, 'bruto' => (float)$bruto, 'retensi' => (float)$ret,
+    'potong_kasbon' => (float)$kas, 'denda' => (float)$den, 'bersih' => (float)$bers, 'tgl' => $tgl, 'tgl_bayar' => $tb, 'bukti_no' => $bk, 'metode' => $met];
+// hitungTermin
+$h = Borongan::hitungTermin('termin', 30000000, 5.0, 0, 5000000, true);
+t('termin 30jt, retensi 5%, kasbon 5jt: retensi 1,5jt, kasbon 5jt, bersih 23,5jt', mirip($h['retensi'], 1500000) && mirip($h['potong_kasbon'], 5000000) && mirip($h['bersih'], 23500000));
+$h = Borongan::hitungTermin('termin', 40000000, 5.0, 2000000, 0, true);
+t('termin 40jt, denda 2jt: retensi 2jt, bersih 36jt', mirip($h['retensi'], 2000000) && mirip($h['potong_kasbon'], 0) && mirip($h['bersih'], 36000000));
+$h = Borongan::hitungTermin('termin', 10000000, 0, 0, 25000000, true);
+t('kasbon lebih besar dari termin: dipotong sebatas termin, bersih 0, saldo sisa dibawa', mirip($h['potong_kasbon'], 10000000) && mirip($h['bersih'], 0));
+$h = Borongan::hitungTermin('termin', 10000000, 5.0, 0, 25000000, false);
+t('potong kasbon dimatikan: tidak dipotong', mirip($h['potong_kasbon'], 0) && mirip($h['bersih'], 9500000));
+$h = Borongan::hitungTermin('lepas_retensi', 3500000, 5.0, 0, 0, true);
+t('pelepasan retensi tidak menahan retensi lagi', mirip($h['retensi'], 0) && mirip($h['bersih'], 3500000));
+foreach ([[33333333.33, 7.5, 123456.78, 9999999.99], [1.0, 30.0, 0.0, 0.0], [999999999.99, 2.5, 1000.01, 1.0]] as [$br, $pr, $dn, $sk]) {
+    $h = Borongan::hitungTermin('termin', $br, $pr, $dn, $sk, true);
+    t("bruto = retensi + denda + kasbon + bersih (bruto $br)", mirip($br, $h['retensi'] + $dn + $h['potong_kasbon'] + $h['bersih']));
+}
+tolak('retensi+denda melebihi termin', fn() => Borongan::hitungTermin('termin', 100.0, 5.0, 200.0, 0, true), 422);
+tolak('termin 0', fn() => Borongan::hitungTermin('termin', 0, 5.0, 0, 0, true), 422);
+// ringkas & aturan
+$T = [$tm(1, 'termin', 'dibayar', 30000000, 1500000, 5000000, 0, 23500000, '2026-10-10', '2026-10-12', 'BP/2026/10/0001'),
+      $tm(2, 'termin', 'dibayar', 40000000, 2000000, 0, 2000000, 36000000, '2026-10-20', '2026-10-22', 'BP/2026/10/0002')];
+$r = Borongan::ringkas($K, [], $T);
+t('ringkas: nilai 100jt, ditagih 70jt, belum ditagih 30jt', mirip($r['nilai_kini'], 100000000) && mirip($r['ditagih'], 70000000) && mirip($r['belum_ditagih'], 30000000));
+t('ringkas: retensi ditahan 3,5jt; dibayar bersih 59,5jt; kasbon 5jt; denda 2jt', mirip($r['retensi_ditahan'], 3500000) && mirip($r['dibayar_bersih'], 59500000) && mirip($r['kasbon_dipotong'], 5000000) && mirip($r['denda'], 2000000));
+t('ringkas: hutang saldo = 100jt - (59,5 + 5 + 2) = 33,5jt', mirip($r['hutang_saldo'], 33500000) && $r['termin_berjalan'] === 0);
+tolak('termin 31jt melebihi sisa 30jt', fn() => Borongan::periksaBisaTermin($K, $r, 'termin', 31000000), 422);
+lolos('termin 30jt tepat sisa', fn() => Borongan::periksaBisaTermin($K, $r, 'termin', 30000000));
+tolak('pelepasan retensi 3,6jt melebihi 3,5jt', fn() => Borongan::periksaBisaTermin($K, $r, 'lepas_retensi', 3600000), 422);
+lolos('pelepasan retensi 3,5jt', fn() => Borongan::periksaBisaTermin($K, $r, 'lepas_retensi', 3500000));
+tolak('termin pada kontrak belum disetujui', fn() => Borongan::periksaBisaTermin(['status' => 'diajukan'] + $K, $r, 'termin', 1000), 409);
+tolak('termin pada kontrak selesai', fn() => Borongan::periksaBisaTermin(['status' => 'selesai'] + $K, $r, 'termin', 1000), 409);
+lolos('pelepasan retensi pada kontrak selesai', fn() => Borongan::periksaBisaTermin(['status' => 'selesai'] + $K, $r, 'lepas_retensi', 1000));
+// termin pending ikut memakai jatah
+$Tp = array_merge($T, [$tm(3, 'termin', 'diajukan', 20000000, 1000000, 0, 0, 19000000)]);
+$rp2 = Borongan::ringkas($K, [], $Tp);
+t('termin diajukan 20jt memakai jatah (belum ditagih 10jt) tapi belum menahan retensi', mirip($rp2['belum_ditagih'], 10000000) && mirip($rp2['retensi_ditahan'], 3500000) && $rp2['termin_berjalan'] === 1);
+tolak('termin baru 11jt ditolak karena sisa jatah 10jt', fn() => Borongan::periksaBisaTermin($K, $rp2, 'termin', 11000000), 422);
+$Tr = array_merge($T, [$tm(3, 'termin', 'ditolak', 20000000, 1000000, 0, 0, 19000000)]);
+t('termin ditolak tidak dihitung sama sekali', mirip(Borongan::ringkas($K, [], $Tr)['belum_ditagih'], 30000000));
+// addendum
+$Ad = [['jumlah' => 10000000.0, 'status' => 'disetujui'], ['jumlah' => 5000000.0, 'status' => 'diajukan'], ['jumlah' => 9999.0, 'status' => 'ditolak']];
+t('addendum: hanya yang disetujui menambah nilai (110jt)', mirip(Borongan::ringkas($K, $Ad, $T)['nilai_kini'], 110000000));
+$r0 = Borongan::ringkas($K, [], $T);
+tolak('addendum nol', fn() => Borongan::periksaBisaAddendum($K, $r0, 0.0), 422);
+tolak('addendum -30,01jt melebihi sisa belum ditagih', fn() => Borongan::periksaBisaAddendum($K, $r0, -30010000), 422);
+lolos('addendum -30jt tepat sisa belum ditagih', fn() => Borongan::periksaBisaAddendum($K, $r0, -30000000));
+lolos('addendum +5jt', fn() => Borongan::periksaBisaAddendum($K, $r0, 5000000));
+tolak('addendum pada kontrak selesai', fn() => Borongan::periksaBisaAddendum(['status' => 'selesai'] + $K, $r0, 1000), 409);
+// selesai & batal
+tolak('selesai dengan sisa 30jt tanpa kurangi nilai', fn() => Borongan::periksaBisaSelesai($K, $r0, false), 409);
+t('selesai dengan kurangi nilai: pengurangan 30jt', mirip(Borongan::periksaBisaSelesai($K, $r0, true), 30000000));
+tolak('selesai dengan termin berjalan', fn() => Borongan::periksaBisaSelesai($K, $rp2, true), 409);
+$Tlunas = [$tm(1, 'termin', 'dibayar', 100000000, 5000000, 0, 0, 95000000, '2026-10-10', '2026-10-12', 'BP/2026/10/0001')];
+t('selesai tanpa sisa: pengurangan 0', mirip(Borongan::periksaBisaSelesai($K, Borongan::ringkas($K, [], $Tlunas), false), 0.0));
+tolak('batal setelah ada pembayaran', fn() => Borongan::periksaBisaBatal($K, $T), 409);
+lolos('batal saat termin belum dibayar', fn() => Borongan::periksaBisaBatal($K, [$tm(1, 'termin', 'diajukan', 1000, 0, 0, 0, 1000), $tm(2, 'termin', 'disetujui', 1000, 0, 0, 0, 1000)]));
+tolak('batal dua kali', fn() => Borongan::periksaBisaBatal(['status' => 'batal'] + $K, []), 409);
+// skenario lengkap: kontrak 100jt -> 2 termin -> kurangi nilai 30jt -> lepas retensi: hutang nol, jurnal seimbang
+$Tfull = array_merge($T, [$tm(0, 'lepas_retensi', 'dibayar', 3500000, 0, 0, 0, 3500000, '2026-10-30', '2026-10-30', 'BP/2026/10/0003', 'tunai')]);
+$Afull = [['jumlah' => -30000000.0, 'status' => 'disetujui', 'tgl' => '2026-10-25', 'alasan' => 'Penutupan kontrak']];
+$rf = Borongan::ringkas($K, $Afull, $Tfull);
+t('skenario lengkap: nilai kini 70jt, belum ditagih 0, retensi ditahan 0, hutang saldo 0', mirip($rf['nilai_kini'], 70000000) && mirip($rf['belum_ditagih'], 0) && mirip($rf['retensi_ditahan'], 0) && mirip($rf['hutang_saldo'], 0));
+$kl = ['status' => 'disetujui', 'addenda' => $Afull, 'termin' => $Tfull, 'project_nama' => 'Proyek A'] + $K;
+$bk = Borongan::buku([$kl]);
+t('buku besar: saldo akhir 0 dan kejadian berurut waktu', mirip($bk['saldo'], 0) && $bk['entries'] === array_values($bk['entries']) && $bk['entries'][0]['jenis'] === 'kontrak' && mirip($bk['entries'][0]['saldo'], 100000000));
+$tg = array_column($bk['entries'], 'tgl'); $so = $tg; sort($so);
+t('buku besar urut tanggal', $tg === $so);
+$jr = Borongan::jurnal([$kl]);
+$seimbang = true; $akun = [];
+foreach ($jr as $e) { $d = $c = 0.0; foreach ($e['lines'] as [$a, $dd, $cc]) { $d += $dd; $c += $cc; $akun[$a] = ($akun[$a] ?? 0.0) + $dd - $cc; } if (abs($d - $c) > 0.005) $seimbang = false; }
+t('jurnal: setiap peristiwa seimbang (debit = kredit)', $seimbang);
+t('jurnal: 3 termin x (persetujuan + pembayaran) = 6 peristiwa', count($jr) === 6, (string)count($jr));
+t('jurnal: hutang borongan dan hutang retensi nol setelah semua dibayar', mirip($akun['Hutang Borongan'] ?? 0, 0) && mirip($akun['Hutang Retensi'] ?? 0, 0));
+t('jurnal: beban borongan = 68jt (70jt - denda 2jt); piutang kasbon berkurang 5jt; kas+bank keluar 63jt', mirip($akun['Beban Borongan – Proyek A'], 68000000) && mirip($akun['Piutang Kasbon'], -5000000) && mirip(($akun['Kas'] ?? 0) + ($akun['Bank'] ?? 0), -63000000), json_encode($akun));
+t('jurnal: bank = termin transfer (23,5jt + 36jt = 59,5jt), kas = pelepasan retensi 3,5jt', mirip($akun['Bank'], -59500000) && mirip($akun['Kas'], -3500000));
+t('kontrak belum disetujui tidak masuk buku/jurnal', Borongan::buku([['status' => 'draft', 'addenda' => [], 'termin' => []] + $K])['entries'] === [] && Borongan::jurnal([['status' => 'diajukan', 'termin' => $Tfull, 'project_nama' => 'X'] + $K]) === []);
 
 echo "== uji unit: LULUS $ok / GAGAL $bad\n";
 exit($bad ? 1 : 0);

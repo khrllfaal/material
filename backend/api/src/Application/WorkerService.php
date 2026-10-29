@@ -136,6 +136,7 @@ final class WorkerService {
         if ($user['role'] !== 'admin') throw new DomainError('Hanya Admin Pusat yang bisa menghapus pekerja. Nonaktifkan bila sudah pernah absen.', 403);
         if ($id === '') throw new DomainError('id wajib diisi', 422);
         if ($this->repo->punyaAbsen($id)) throw new DomainError('Pekerja ini sudah punya riwayat absen, jadi tidak dihapus. Ubah menjadi Nonaktif.', 409);
+        if ($this->repo->punyaKontrakBorongan($id)) throw new DomainError('Tim ini punya kontrak borongan, jadi tidak dihapus. Ubah menjadi Nonaktif.', 409);
         $this->repo->hapus($id);
         $this->catat('delete', 'workers', $id);
         return ['ok' => true];

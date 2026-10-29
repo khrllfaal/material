@@ -35,7 +35,7 @@ const AUDIT=()=>{
   for(const pg of pages){const sel=pg.startsWith('#')||pg.startsWith('.')||pg.startsWith('[')?pg:'.nav-link[data-page="'+pg+'"]';await p.click(sel).catch(()=>{});await p.waitForTimeout(1200);const o=await p.evaluate(AUDIT);
    for(const k of Object.keys(tot)){tot[k]+=o[k].length;for(const e of o[k]){const key=typeof e==='string'?e:JSON.stringify(e);ex[k][key]=(ex[k][key]||0)+1}}}
   await ctx.close()};
- await run('akuntan',{viewport:{width:1280,height:900}},'akun1','AkuntanTest123',['pengajuan','rekap','pekerja']);
+ await run('akuntan',{viewport:{width:1280,height:900}},'akun1','AkuntanTest123',['pengajuan','rekap','pekerja','borongan']);
  await run('admin',{viewport:{width:1280,height:900}},'adminp','AdminTest123',['dashboard','pekerja','proyek'].filter(Boolean));
  await run('lapangan HP',{...devices['Pixel 7']},'lap2','LapanganTest123',['#mNav [data-sec="absen"]','#mNav [data-sec="bahan"]','#mNav [data-sec="stok"]']);
  console.log('TOTAL temuan:',JSON.stringify(tot));

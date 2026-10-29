@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#0ea5e9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'">
-<link rel="stylesheet" href="vendor/tailwind.css?v=20261029">
-<script src="vendor/icons.js?v=20261029"></script>
+<link rel="stylesheet" href="vendor/tailwind.css?v=20261030">
+<script src="vendor/icons.js?v=20261030"></script>
 <style>
   /* Platform-native font stack, not a self-hosted webfont: Inter was
      referenced here but never actually loaded (no @font-face), so the
@@ -724,12 +724,13 @@ var NAV=[
   {id:'rap_report', label:'Analisis RAP per Pekerjaan (detail)', icon:'trending-up', group:'Laporan Material'},
   {id:'pengajuan', label:'Pengajuan & Approval', icon:'send', group:'Tenaga Kerja'},
   {id:'rekap_gaji', label:'Rekap & Pembukuan', icon:'wallet', group:'Tenaga Kerja'},
+  {id:'borongan', label:'Borongan', icon:'building-2', group:'Tenaga Kerja'},
   {id:'pekerja', label:'Pekerja & Tarif', icon:'hard-hat', group:'Tenaga Kerja'},
   {id:'users', label:'Kelola User', icon:'users', group:'Pengaturan'},
   {id:'log', label:'Log Aktivitas', icon:'history', group:'Pengaturan'},
 ];
 /* Akuntan keeps it simple: only the pay menus, no group headings. */
-var NAV_AKUNTAN = ['pengajuan','rekap_gaji','pekerja'];
+var NAV_AKUNTAN = ['pengajuan','rekap_gaji','borongan','pekerja'];
 function renderNav(){
   var role = STATE.user && STATE.user.role;
   var navItems = role==='akuntan' ? NAV.filter(function(n){ return NAV_AKUNTAN.indexOf(n.id)>-1; }) : NAV.filter(function(n){ return role==='admin' || n.id!=='users'; });
@@ -864,7 +865,7 @@ function loadExcelJS(){
   if(_exceljsLoading) return _exceljsLoading;
   _exceljsLoading=new Promise(function(resolve,reject){
     var s=document.createElement('script');
-    s.src='vendor/exceljs.min.js?v=20261029';
+    s.src='vendor/exceljs.min.js?v=20261030';
     s.onload=function(){ resolve(); };
     s.onerror=function(){ _exceljsLoading=null; reject(new Error('Gagal memuat modul Excel.')); };
     document.head.appendChild(s);
@@ -970,10 +971,10 @@ function loadJsPdf(){
   if(_jspdfLoading) return _jspdfLoading;
   _jspdfLoading=new Promise(function(resolve,reject){
     var s1=document.createElement('script');
-    s1.src='vendor/jspdf.umd.min.js?v=20261029';
+    s1.src='vendor/jspdf.umd.min.js?v=20261030';
     s1.onload=function(){
       var s2=document.createElement('script');
-      s2.src='vendor/jspdf.autotable.min.js?v=20261029';
+      s2.src='vendor/jspdf.autotable.min.js?v=20261030';
       s2.onload=function(){ resolve(); };
       s2.onerror=function(){ _jspdfLoading=null; reject(new Error('Gagal memuat modul PDF.')); };
       document.head.appendChild(s2);
@@ -2437,6 +2438,52 @@ function pilihBukti(payments){
   document.querySelectorAll('[data-bk]').forEach(function(b){ b.onclick = function(){ closeModal(); cetakBukti(b.getAttribute('data-bk')); }; });
 }
 
+/* ---- Bukti Pembayaran Borongan (PDF) ---- */
+async function cetakBuktiBorongan(buktiNo){
+  var d;
+  try{ d = await apiFetch('/borongan.php?action=bukti&bukti_no='+encodeURIComponent(buktiNo)); await loadJsPdf(); }
+  catch(e){ toast(e.message || 'Gagal memuat bukti pembayaran.', true); return; }
+  var doc = new window.jspdf.jsPDF({unit:'pt', format:'a4'}), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(30,58,138); doc.text('BUKTI PEMBAYARAN BORONGAN', M, 44);
+  doc.setFontSize(11); doc.setTextColor(15,23,42); doc.text('No. '+d.bukti_no, W-M, 44, {align:'right'});
+  doc.setDrawColor(30,58,138); doc.setLineWidth(1.2); doc.line(M, 54, W-M, 54);
+  var lab = function(t, x, y){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139); doc.text(t, x, y); };
+  var val = function(t, x, y, w){ doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(15,23,42); doc.text(t, x, y, w ? {maxWidth:w} : undefined); };
+  var pn = doc.splitTextToSize(String(d.project_nama), W-2*M-95), kn = doc.splitTextToSize(d.no_kontrak+' · '+d.nama_pekerjaan, W-2*M-95), y0 = 74;
+  lab('Proyek', M, y0); val(pn, M+95, y0); y0 += 15*pn.length;
+  lab('Penerima (tim)', M, y0); val(String(d.tim_nama), M+95, y0, W/2-M-100); lab('Rekening', W/2+10, y0); val(String(d.no_rek || '-'), W/2+95, y0, W/2-M-100); y0 += 15;
+  lab('Kontrak', M, y0); val(kn, M+95, y0); y0 += 15*kn.length;
+  lab('Pembayaran', M, y0); val(d.jenis==='lepas_retensi' ? 'Pelepasan retensi' : 'Termin ke-'+d.no_termin, M+95, y0); lab('Tanggal bayar', W/2+10, y0); val(fmtTglPanjang(d.tgl_bayar), W/2+95, y0, W/2-M-100); y0 += 15;
+  lab('Tanggal termin', M, y0); val(fmtTglPanjang(d.tgl_termin), M+95, y0, W/2-M-100); lab('Metode', W/2+10, y0); val(d.metode==='transfer' ? 'Transfer' : 'Tunai', W/2+95, y0); y0 += 15;
+  lab('Dicatat oleh', M, y0); val(String(d.dibuat_oleh || '-'), M+95, y0, W/2-M-100); y0 += 15;
+  var body = [];
+  body.push(['Nilai kontrak saat ini', num0(d.nilai_kini)]);
+  if(d.jenis==='termin') body.push(['Jumlah termin ini (bruto)', num0(d.bruto)], ['Total ditagih sampai termin ini', num0(d.ditagih_sampai_ini)], ['Dikurangi: retensi ditahan ('+num0(d.retensi_persen)+'%)', '('+num0(d.retensi)+')']);
+  else body.push(['Pelepasan retensi (bruto)', num0(d.bruto)]);
+  if(d.denda>0) body.push(['Dikurangi: denda / potongan'+(d.denda_ket ? ' ('+d.denda_ket+')' : ''), '('+num0(d.denda)+')']);
+  if(d.potong_kasbon>0) body.push(['Dikurangi: potong kasbon tim', '('+num0(d.potong_kasbon)+')']);
+  doc.autoTable({
+    head: [['Rincian','Rp']], body: body, foot: [['JUMLAH DIBAYAR', num0(d.bersih)]], startY: y0 + 10, margin: {left:M, right:M},
+    styles: {font:'helvetica', fontSize:9, cellPadding:5, textColor:[15,23,42], lineColor:[210,216,226], lineWidth:0.5},
+    headStyles: {fillColor:[30,58,138], textColor:255, fontStyle:'bold', fontSize:8}, footStyles: {fillColor:[238,242,255], textColor:[30,58,138], fontStyle:'bold', fontSize:10},
+    columnStyles: {1:{halign:'right', cellWidth:130}}, didParseCell: function(x){ if(x.column.index===1 && (x.section==='head' || x.section==='foot')) x.cell.styles.halign = 'right'; }
+  });
+  var y = doc.lastAutoTable.finalY + 14;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,116,139);
+  doc.text('Retensi masih ditahan untuk kontrak ini: Rp '+num0(d.retensi_ditahan), M, y); y += 16;
+  var words = doc.splitTextToSize('Terbilang: '+terbilang(d.bersih)+' rupiah', W-2*M);
+  if(y + words.length*12 + 130 > H-40){ doc.addPage(); y = 50; }
+  doc.setFont('helvetica','italic'); doc.setFontSize(9.5); doc.setTextColor(15,23,42); doc.text(words, M, y); y += words.length*12 + 22;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139);
+  var cols = ['Penerima', 'Dibayar oleh', 'Mengetahui'], cw = (W-2*M)/3;
+  cols.forEach(function(c, i){ doc.text(c, M+cw*i+cw/2, y, {align:'center'}); doc.setDrawColor(148,163,184); doc.setLineWidth(0.6); doc.line(M+cw*i+14, y+62, M+cw*(i+1)-14, y+62); });
+  doc.setTextColor(15,23,42); doc.setFont('helvetica','bold'); doc.text(String(d.tim_nama), M+cw/2, y+74, {align:'center', maxWidth:cw-20}); doc.text(d.dibuat_oleh || '', M+cw*1.5, y+74, {align:'center'});
+  if(d.ket){ doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,116,139); doc.text('Catatan: '+d.ket, M, y+96, {maxWidth:W-2*M}); }
+  var pages = doc.internal.getNumberOfPages();
+  for(var pg=1; pg<=pages; pg++){ doc.setPage(pg); doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(148,163,184);
+    doc.text('Dokumen dibuat oleh sistem Material & Stok · '+d.bukti_no+' · dicetak '+new Date().toLocaleString('id-ID'), M, H-24); doc.text('Halaman '+pg+'/'+pages, W-M, H-24, {align:'right'}); }
+  doc.save('Bukti_Borongan_'+String(d.bukti_no).replace(/\//g,'-')+'.pdf');
+}
 function periodStatusBadge(st){ var m = PERIOD_STATUS[st]||PERIOD_STATUS.draft; return badge(m[0], m[1]); }
 
 /* One engine, two screens for the people who handle pay:
@@ -2500,7 +2547,8 @@ function payrollView(c, mode){
   function load(){
     var qs = 'tgl_from='+G.from+'&tgl_to='+G.to+(fv('fProj')?'&project_id='+encodeURIComponent(fv('fProj')):'');
     $('gjRangeNote').textContent = G.from===G.to ? fmtTglPanjang(G.from) : fmtTglPendek(G.from)+' – '+fmtTglPendek(G.to)+' '+G.to.slice(0,4);
-    var extra = REKAP ? apiFetch('/kasbon.php').then(function(l){ G.shared.ledger = l; }).catch(function(){ G.shared.ledger = {kasbon:[], saldo:[]}; })
+    var bj = REKAP ? apiFetch('/borongan.php?action=jurnal&from='+G.from+'&to='+(G.to>today()?today():G.to)+(fv('fProj')?'&project_id='+encodeURIComponent(fv('fProj')):'')).then(function(x){ G.shared.borJ = x; }).catch(function(){ G.shared.borJ = []; }) : null;
+    var extra = REKAP ? Promise.all([apiFetch('/kasbon.php').then(function(l){ G.shared.ledger = l; }).catch(function(){ G.shared.ledger = {kasbon:[], saldo:[]}; }), bj])
                       : apiFetch('/kasbon_requests.php').then(function(l){ G.shared.req = l; }).catch(function(){ G.shared.req = []; });
     return Promise.all([apiFetch('/payroll.php?'+qs), extra]).then(function(rs){
         var d = rs[0];
@@ -2717,10 +2765,12 @@ function payrollView(c, mode){
     });
     ((G.shared.ledger && G.shared.ledger.kasbon) || []).forEach(function(k){
       if((proj && k.project_id!==proj) || k.tgl<G.from || k.tgl>G.to) return;
+      if(k.ref) return; // potongan kasbon dari termin borongan: sudah ada di jurnal borongan
       var nm = k.worker_nama || (k.tim ? timLabel(k.tim) : 'Grup / penanggung jawab');
       if(k.jumlah < 0) ev.push({tgl:k.tgl, ket:'Pelunasan kasbon · '+nm+' · '+k.project_nama, lines:[['Kas', -k.jumlah, 0],['Piutang Kasbon', 0, -k.jumlah]]});
       else ev.push({tgl:k.tgl, ket:'Kasbon diberikan · '+nm+' · '+k.project_nama, lines:[['Piutang Kasbon', k.jumlah, 0],['Kas', 0, k.jumlah]]});
     });
+    (G.shared.borJ || []).forEach(function(e){ ev.push({tgl:e.tgl, ket:e.ket, lines:e.lines}); }); // borongan: beban, hutang, retensi, kas/bank, kasbon
     ev.sort(function(a,b){ return a.tgl<b.tgl ? -1 : (a.tgl>b.tgl ? 1 : 0); });
     var rows = [], n = 0, D = 0, K = 0;
     ev.forEach(function(e){ n++; var no = 'JU-'+String(n).padStart(3,'0');
@@ -3034,7 +3084,7 @@ function payrollView(c, mode){
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis</label><select id="ad_kat" class="'+fieldCls+'">'+
           '<option value="tambahan|tambah">Tambahan (mis. air galon, uang makan)</option><option value="bonus|tambah">Bonus</option>'+
           '<option value="potongan|potong">Potongan (denda, alat hilang)</option><option value="kasbon|potong">Potong kasbon</option></select></div>'+
-        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Untuk</label><select id="ad_w" class="'+fieldCls+'">'+optsW+'</select><div id="ad_saldo" class="text-xs text-slate-500 mt-1.5"></div>'+(borongHere.length||ws.some(function(r){ return r.borongan; }) ? '<div class="text-xs text-amber-700 mt-1.5">Tim borongan: pilih timnya, jenis <b>Tambahan</b>, isi nama pekerjaan di Keterangan dan nominal borongan di Jumlah.</div>' : '')+'</div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Untuk</label><select id="ad_w" class="'+fieldCls+'">'+optsW+'</select><div id="ad_saldo" class="text-xs text-slate-500 mt-1.5"></div>'+(borongHere.length||ws.some(function(r){ return r.borongan; }) ? '<div class="text-xs text-amber-700 mt-1.5">Tim borongan: kontrak baru dicatat di menu <b>Borongan</b> (nilai, termin, retensi, kasbon). Pilihan tim di sini hanya untuk catatan lama per minggu.</div>' : '')+'</div>'+
         '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan *</label><input id="ad_label" type="text" class="'+fieldCls+'" placeholder="mis. air galon, kasbon minggu lalu"></div>'+
         '<div class="grid grid-cols-3 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Qty</label>'+numInputHtml('ad_qty','',fieldCls)+'</div>'+
           '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Harga satuan</label>'+numInputHtml('ad_harga','',fieldCls,' data-money')+'</div>'+
@@ -3391,34 +3441,17 @@ PAGES.pekerja = function(c){
         return '<tr class="border-b border-slate-100 hover:bg-indigo-50/40 '+(w.aktif?'':'opacity-50')+'"><td class="py-3 pr-4"><b>'+esc(w.nama)+'</b>'+(w.borongan?' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">BORONGAN</span>':'')+(w.aktif?'':' <span class="text-xs text-slate-400">nonaktif</span>')+'</td>'+
           '<td class="py-3 pr-4"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full '+(GRADE_CLS[w.grade]||GRADE_CLS.LAIN)+'">'+esc(w.borongan ? 'Tim borongan' : (GRADE_NAMA[w.grade]||w.grade))+'</span></td>'+
           '<td class="py-3 pr-4 text-slate-600">'+esc(w.tim||'–')+'</td><td class="py-3 pr-4 text-slate-600">'+esc(pn(w.project_id))+'</td>'+
-          '<td class="py-3 pr-4 tabular-nums">'+(w.borongan?(write&&w.aktif?'<button class="'+btnGhostSm+' !text-amber-800 !bg-amber-50 !border-amber-200" data-w-nominal="'+esc(w.id)+'">Isi nominal borongan</button>':'<span class="text-xs text-amber-700 font-semibold">per tim</span>'):(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>'))+(w.borongan?'':(e[2]?' <span class="text-[10px] font-bold text-indigo-500">pribadi</span>':(e[3]?' <span class="text-[10px] font-bold text-emerald-600">tarif tim</span>':'')))+'</td>'+
+          '<td class="py-3 pr-4 tabular-nums">'+(w.borongan?(write&&w.aktif?'<button class="'+btnGhostSm+' !text-amber-800 !bg-amber-50 !border-amber-200" data-w-kontrak="'+esc(w.id)+'">Kontrak &amp; pembayaran</button>':'<span class="text-xs text-amber-700 font-semibold">per tim</span>'):(e[0]?rp(e[0]):'<span class="text-red-500 text-xs font-semibold">belum diisi</span>'))+(w.borongan?'':(e[2]?' <span class="text-[10px] font-bold text-indigo-500">pribadi</span>':(e[3]?' <span class="text-[10px] font-bold text-emerald-600">tarif tim</span>':'')))+'</td>'+
           '<td class="py-3 pr-4 tabular-nums">'+(!w.borongan&&e[1]?rp(e[1]):'–')+'</td><td class="py-3 pr-4 text-xs text-slate-500">'+esc(w.no_rek||'–')+'</td>'+
           (write?'<td class="py-3 whitespace-nowrap"><button class="'+btnGhostSm+'" data-w-edit="'+esc(w.id)+'">Edit</button></td>':'')+'</tr>';
       }).join('') : '<tr><td colspan="'+cols.length+'" class="text-center text-slate-400 text-sm py-10">Belum ada pekerja. Admin Lapangan bisa menambahkannya dari HP, atau tambahkan di sini.</td></tr>')+'</tbody>';
     renderPager(list.length, D.PG, drawWorkers);
     document.querySelectorAll('[data-w-edit]').forEach(function(b){ b.onclick = function(){ openWorker(b.getAttribute('data-w-edit')); }; });
-    document.querySelectorAll('[data-w-nominal]').forEach(function(b){ b.onclick = function(){ openNominalBorongan(b.getAttribute('data-w-nominal')); }; });
+    document.querySelectorAll('[data-w-kontrak]').forEach(function(b){ b.onclick = function(){ STATE.boronganTim = b.getAttribute('data-w-kontrak'); go('borongan'); }; });
     var pnm = function(id){ return pn(id); };
     var headers = ['Nama','Status','Tim','Proyek','Tarif harian','Lembur per jam','Rekening / e-wallet','Aktif'];
     bindExportBtns('Pekerja_dan_Tarif', 'Pekerja & Tarif', 'Daftar pekerja beserta tarif berlaku', headers,
       function(){ return list.map(function(w){ var e = eff(w); return [w.nama, GRADE_NAMA[w.grade]||w.grade, w.tim||'', pnm(w.project_id), Math.round(e[0]||0), Math.round(e[1]||0), w.no_rek||'', w.aktif?'Ya':'Tidak']; }); }, null, null);
-  }
-  /* Nominal borongan: satu angka untuk tim itu pada minggu pekerjaannya (disimpan sebagai Tambahan; dibayar Akuntan lewat Pengajuan). */
-  function openNominalBorongan(id){
-    var w = D.workers.find(function(x){ return x.id===id; }); if(!w) return;
-    openModal('Nominal borongan — '+w.nama,
-      '<div class="space-y-4">'+
-        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nominal borongan (Rp) *</label>'+numInputHtml('bn_jumlah','',fieldCls,' data-money')+'</div>'+
-        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Pekerjaan</label><input id="bn_label" type="text" class="'+fieldCls+'" value="Borongan" placeholder="mis. Borongan cat lantai 2"></div>'+
-        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal pekerjaan</label><input id="bn_tgl" type="date" class="'+fieldCls+'" value="'+today()+'"><div class="text-xs text-slate-400 mt-1">Masuk ke minggu gaji (Jumat–Kamis) pada tanggal ini. Setelah itu: menu Pengajuan → Ajukan → Setujui → Bayar. Bisa diisi lagi untuk pekerjaan berikutnya.</div></div>'+
-      '</div>',
-      function(){
-        var j = parseIdNum(fv('bn_jumlah'));
-        if(Number.isNaN(j) || j<=0){ toast('Isi nominal borongan.', true); return; }
-        if(!fv('bn_tgl')){ toast('Isi tanggal pekerjaan.', true); return; }
-        apiFetch('/payroll_adjustments.php', {method:'POST', body:JSON.stringify({project_id:w.project_id, tgl:fv('bn_tgl'), jenis:'tambah', kategori:'tambahan', label:fv('bn_label')||'Borongan', worker_id:w.id, jumlah:j})})
-          .then(function(){ closeModal(); toast('Nominal '+rp(j)+' dicatat untuk '+w.nama+'. Lanjut di menu Pengajuan.'); }).catch(function(e){ toast(e.message, true); });
-      });
   }
   function openWorker(id, preset){
     var w = id ? D.workers.find(function(x){ return x.id===id; }) : null;
@@ -3635,6 +3668,272 @@ function kasbonView(c, part, opts){
   return {reload: load, redraw: draw};
 }
 /* Old address kept working. */
+/* ============================================================
+   BORONGAN — kontrak per tim: nilai, termin, retensi, kasbon tim, buku besar.
+   Admin Pusat membuat dan mengajukan; Akuntan menyetujui, membayar, menyelesaikan; Owner hanya melihat.
+   ============================================================ */
+PAGES.borongan = function(c){
+  var role = STATE.user.role, isAk = role==='akuntan', write = role==='admin' || role==='akuntan';
+  var B = {data:null, projects:[], proj:'', filter: isAk ? '_aksi' : '', tim:(STATE.boronganTim||null), detail:null, tab:'kontrak', open:{}};
+  STATE.boronganTim = null;
+  var $ = function(id){ return document.getElementById(id); };
+  var KSTAT = {draft:['neutral','Draft'], diajukan:['warn','Menunggu persetujuan'], disetujui:['info','Berjalan'], selesai:['aman','Selesai'], batal:['danger','Batal']};
+  var TSTAT = {diajukan:['warn','Menunggu persetujuan'], disetujui:['info','Siap dibayar'], dibayar:['aman','Dibayar'], ditolak:['danger','Ditolak']};
+  var FILTERS = [['_aksi','Perlu tindakan'],['berjalan','Berjalan'],['selesai','Selesai'],['','Semua']];
+  c.innerHTML = pageHead('Borongan', 'Kontrak per tim: nilai, termin pembayaran, retensi, potong kasbon, dan buku besar. Satu tim bisa punya beberapa kontrak dari waktu ke waktu.',
+      write ? '<div class="flex gap-2 flex-wrap"><button class="'+btnGhostSm+' flex items-center gap-1" id="bgTimBaru"><i data-lucide="users" class="w-3.5 h-3.5"></i>Tim borongan baru</button><button class="'+btnPrimary+'" id="bgKontrakBaru"><i data-lucide="plus" class="w-4 h-4"></i>Kontrak baru</button></div>' : '')+
+    '<div id="bgBody"></div>';
+  icons();
+
+  // ---------- data
+  function load(){
+    return Promise.all([apiFetch('/borongan.php'+(B.proj?'?project_id='+encodeURIComponent(B.proj):'')), B.projects.length ? null : apiFetch('/projects.php').catch(function(){ return []; }), B.tim ? apiFetch('/borongan.php?tim='+encodeURIComponent(B.tim)) : null])
+      .then(function(r){ B.data = r[0]; if(r[1]) B.projects = r[1]; B.detail = r[2]; draw(); })
+      .catch(function(e){ $('bgBody').innerHTML = '<div class="text-center py-10">'+loadErrorHtml(e.message)+'</div>'; var rb = $('btnRetry'); if(rb) rb.onclick = load; });
+  }
+  function act(body, okMsg){
+    return apiFetch('/borongan.php', {method:'POST', body:JSON.stringify(body)}).then(function(r){ closeModal(); if(okMsg) toast(okMsg); return load().then(function(){ return r; }); })
+      .catch(function(e){ toast(e.message, true); });
+  }
+  function timOf(id){ return (B.data.tim||[]).find(function(t){ return t.worker_id===id; }); }
+  function stat(kind, st, map){ var m = map[st]||['neutral', st]; return badge(m[0], m[1]); }
+  var card = function(label, val, sub, tone){ return '<div class="rounded-2xl border p-4 shadow-sm '+(tone==='amber'?'bg-amber-50/70 border-amber-200':(tone==='red'?'bg-red-50/70 border-red-200':'bg-white border-slate-200'))+'"><div class="text-sm font-semibold text-slate-600">'+esc(label)+'</div><div class="text-2xl font-extrabold text-slate-900 mt-2 tabular-nums leading-none">'+val+'</div><div class="text-xs text-slate-500 mt-2">'+sub+'</div></div>'; };
+
+  // ---------- daftar tim
+  function timMatches(t){
+    if(B.filter==='_aksi') return t.perlu_tindakan>0;
+    if(B.filter==='berjalan') return t.kontrak_berjalan>0;
+    if(B.filter==='selesai') return t.kontrak_berjalan===0 && t.nilai_kini>0;
+    return true;
+  }
+  function drawList(){
+    var d = B.data, tims = d.tim, aksi = tims.reduce(function(a,t){ return a+t.perlu_tindakan; },0);
+    var hut = tims.reduce(function(a,t){ return a+t.hutang_saldo; },0), ret = tims.reduce(function(a,t){ return a+t.retensi_ditahan; },0), kas = tims.reduce(function(a,t){ return a+t.kasbon_saldo; },0);
+    var shown = tims.filter(timMatches);
+    $('bgBody').innerHTML =
+      '<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">'+
+        card('Perlu tindakan', aksi ? aksi+' item' : 'Tidak ada', aksi ? 'Kontrak, termin, atau addendum menunggu' : 'Semua sudah diproses', aksi ? 'amber' : '')+
+        card('Kewajiban ke tim', rp(hut), 'Nilai kontrak yang belum dibayar (termasuk retensi)')+
+        card('Retensi ditahan', rp(ret), 'Kasbon tim belum lunas: '+rp(kas))+
+      '</div>'+
+      panel('<div class="flex items-center gap-2 flex-wrap">'+projectFilterSelectHtml(B.projects)+
+        FILTERS.map(function(f){ var on = B.filter===f[0]; return '<button type="button" data-bf="'+f[0]+'" aria-pressed="'+(on?'true':'false')+'" class="px-3.5 py-2 rounded-xl text-sm font-semibold border transition '+(on?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50')+'">'+f[1]+'</button>'; }).join('')+'</div>')+
+      '<div class="mt-4">'+(shown.length ? shown.map(function(t){
+        return '<div class="bg-white rounded-2xl border '+(t.perlu_tindakan?'border-indigo-200':'border-slate-200')+' shadow-sm p-4 mb-3">'+
+          '<div class="flex items-start gap-3 flex-wrap"><div class="min-w-0 flex-1 basis-56"><div class="font-extrabold text-slate-800 leading-tight">'+esc(t.nama)+(t.aktif?'':' <span class="text-xs text-slate-500 font-semibold">(tidak aktif)</span>')+'</div>'+
+            '<div class="text-xs text-slate-500 mt-0.5">'+esc(t.project_nama)+(t.no_rek?' · '+esc(t.no_rek):'')+'</div>'+
+            (t.perlu_tindakan ? '<div class="mt-1.5"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">'+t.perlu_tindakan+' perlu tindakan</span></div>' : '')+'</div>'+
+          '<div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-right">'+
+            [['Nilai kontrak', rp(t.nilai_kini)],['Sudah dibayar', rp(t.dibayar_bersih)],['Sisa kewajiban', rp(t.hutang_saldo)],['Kasbon tim', rp(t.kasbon_saldo)]].map(function(x){ return '<div><div class="text-[11px] font-semibold text-slate-500">'+x[0]+'</div><div class="text-sm font-extrabold tabular-nums '+(x[0]==='Kasbon tim'&&t.kasbon_saldo>0?'text-red-600':'text-slate-800')+'">'+x[1]+'</div></div>'; }).join('')+'</div>'+
+          '<button type="button" data-bt="'+esc(t.worker_id)+'" class="'+btnPrimary+' w-full sm:w-auto justify-center">Buka</button></div></div>';
+      }).join('') : '<div class="text-sm text-slate-500 bg-white rounded-2xl border border-slate-200 px-5 py-8 text-center">'+(!tims.length ? 'Belum ada tim borongan. Buat tim dulu dengan tombol "Tim borongan baru".' : (B.filter==='_aksi' ? 'Tidak ada yang perlu tindakan.<div class="mt-2"><button type="button" class="font-bold text-indigo-600 underline" data-bf="">Lihat semua tim</button></div>' : 'Tidak ada tim pada pilihan ini.'))+'</div>')+'</div>';
+    var fp = $('fProj'); if(fp){ fp.value = B.proj; enhanceSelect(fp); fp.onchange = function(){ B.proj = fp.value; load(); }; }
+    document.querySelectorAll('[data-bf]').forEach(function(b){ b.onclick = function(){ B.filter = b.getAttribute('data-bf'); drawList(); }; });
+    document.querySelectorAll('[data-bt]').forEach(function(b){ b.onclick = function(){ B.tim = b.getAttribute('data-bt'); B.tab = 'kontrak'; load(); }; });
+    icons();
+  }
+
+  // ---------- detail tim
+  function kontrakCard(k){
+    var r = k.ringkas, open = !!B.open[k.id], pct = r.nilai_kini>0 ? Math.min(100, Math.round(r.ditagih/r.nilai_kini*100)) : 0;
+    var btn = function(attr, label, primary){ return '<button type="button" '+attr+' class="'+(primary?btnPrimary:btnGhostSm)+'">'+label+'</button>'; };
+    var a = '';
+    if(write && k.status==='draft') a += btn('data-ka="ajukan" data-id="'+esc(k.id)+'"','Ajukan', true)+btn('data-ka="ubah" data-id="'+esc(k.id)+'"','Ubah')+btn('data-ka="batal" data-id="'+esc(k.id)+'"','Batalkan');
+    if(isAk && k.status==='diajukan') a += btn('data-ka="setujui" data-id="'+esc(k.id)+'"','Setujui Kontrak', true)+btn('data-ka="kembalikan" data-id="'+esc(k.id)+'"','Kembalikan')+btn('data-ka="batal" data-id="'+esc(k.id)+'"','Batalkan');
+    if(write && k.status==='diajukan' && !isAk) a += '<span class="text-xs text-slate-500 self-center">Menunggu Akuntan.</span>';
+    if(write && k.status==='disetujui') a += btn('data-ka="termin" data-id="'+esc(k.id)+'"','+ Termin', r.belum_ditagih>0.5)+btn('data-ka="addendum" data-id="'+esc(k.id)+'"','+ Addendum')+(isAk ? btn('data-ka="selesai" data-id="'+esc(k.id)+'"','Selesaikan')+btn('data-ka="batal" data-id="'+esc(k.id)+'"','Batalkan') : '');
+    if(write && (k.status==='disetujui'||k.status==='selesai') && r.retensi_ditahan>0.5 && r.pelepasan_diajukan+0.5<r.retensi_ditahan) a += btn('data-ka="lepas" data-id="'+esc(k.id)+'"','Lepas retensi');
+    var ter = k.termin.filter(function(t){ return t.status!=='ditolak' || open; });
+    var tbl = !open ? '' : '<div class="mt-3 border-t border-slate-100 pt-3">'+
+      (k.termin.length ? '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-slate-500"><th class="py-1.5 pr-3 font-semibold">Pembayaran</th><th class="py-1.5 pr-3 font-semibold">Tanggal</th><th class="py-1.5 pr-3 font-semibold text-right">Bruto</th><th class="py-1.5 pr-3 font-semibold text-right">Retensi</th><th class="py-1.5 pr-3 font-semibold text-right">Denda</th><th class="py-1.5 pr-3 font-semibold text-right">Kasbon</th><th class="py-1.5 pr-3 font-semibold text-right">Diterima</th><th class="py-1.5 pr-3 font-semibold">Status</th><th></th></tr></thead><tbody>'+
+        ter.map(function(t){
+          var ta = '';
+          if(isAk && t.status==='diajukan') ta += btn('data-ta="setujui" data-id="'+esc(t.id)+'"','Setujui', true)+btn('data-ta="tolak" data-id="'+esc(t.id)+'"','Tolak');
+          if(isAk && t.status==='disetujui') ta += btn('data-ta="bayar" data-id="'+esc(t.id)+'"','Catat Bayar', true)+btn('data-ta="tolak" data-id="'+esc(t.id)+'"','Tolak');
+          if(t.status==='dibayar' && t.bukti_no) ta += btn('data-ta="bukti" data-no="'+esc(t.bukti_no)+'"','Bukti');
+          return '<tr class="border-t border-slate-100"><td class="py-2 pr-3 font-semibold">'+(t.jenis==='lepas_retensi'?'Pelepasan retensi':'Termin '+t.no_termin)+(t.ket?'<div class="text-[11px] font-normal text-slate-500">'+esc(t.ket)+'</div>':'')+(t.denda_ket?'<div class="text-[11px] font-normal text-slate-500">Denda: '+esc(t.denda_ket)+'</div>':'')+'</td>'+
+            '<td class="py-2 pr-3 text-slate-600 whitespace-nowrap">'+esc(fmtTglPendek(t.tgl))+(t.tgl_bayar?'<div class="text-[11px] text-slate-500">bayar '+esc(fmtTglPendek(t.tgl_bayar))+'</div>':'')+'</td>'+
+            '<td class="py-2 pr-3 text-right tabular-nums">'+rp(t.bruto)+'</td><td class="py-2 pr-3 text-right tabular-nums text-slate-600">'+(t.retensi>0?rp(t.retensi):'–')+'</td><td class="py-2 pr-3 text-right tabular-nums text-slate-600">'+(t.denda>0?rp(t.denda):'–')+'</td>'+
+            '<td class="py-2 pr-3 text-right tabular-nums text-slate-600">'+(t.potong_kasbon>0?rp(t.potong_kasbon):'–')+'</td><td class="py-2 pr-3 text-right tabular-nums font-extrabold">'+rp(t.bersih)+'</td><td class="py-2 pr-3">'+stat('t', t.status, TSTAT)+'</td><td class="py-2"><div class="flex gap-1.5 justify-end">'+ta+'</div></td></tr>';
+        }).join('')+'</tbody></table></div>' : '<div class="text-xs text-slate-500">Belum ada termin.</div>')+
+      (k.addenda.length ? '<div class="mt-3 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Addendum</div>'+k.addenda.map(function(x){
+        return '<div class="flex items-center gap-2 py-1.5 border-t border-slate-100 text-sm flex-wrap"><span class="font-bold tabular-nums '+(x.jumlah>=0?'text-emerald-600':'text-red-600')+'">'+(x.jumlah>=0?'+':'−')+rp(Math.abs(x.jumlah))+'</span><span class="text-slate-600 flex-1 min-w-[120px]">'+esc(x.alasan)+' <span class="text-xs text-slate-500">· '+esc(fmtTglPendek(x.tgl))+'</span></span>'+
+          badge(x.status==='disetujui'?'aman':(x.status==='ditolak'?'danger':'warn'), x.status==='diajukan'?'Menunggu':(x.status==='disetujui'?'Disetujui':'Ditolak'))+
+          (isAk && x.status==='diajukan' ? btn('data-aa="setujui" data-id="'+esc(x.id)+'"','Setujui', true)+btn('data-aa="tolak" data-id="'+esc(x.id)+'"','Tolak') : '')+'</div>'; }).join('') : '')+'</div>';
+    return '<div class="bg-white rounded-2xl border '+((k.status==='diajukan'||k.termin.some(function(t){ return t.status==='diajukan'||t.status==='disetujui'; }))?'border-indigo-200':'border-slate-200')+' shadow-sm p-4 mb-3">'+
+      '<div class="flex items-start gap-3 flex-wrap"><div class="min-w-0 flex-1 basis-56"><div class="font-extrabold text-slate-800 leading-tight">'+esc(k.nama_pekerjaan)+'</div><div class="text-xs text-slate-500 mt-0.5">'+esc(k.no_kontrak)+' · mulai '+esc(fmtTglPendek(k.tgl_mulai))+' '+k.tgl_mulai.slice(0,4)+(k.retensi_persen>0?' · retensi '+num0(k.retensi_persen)+'%':'')+'</div>'+
+        (k.catatan_kembali && k.status==='draft' ? '<div class="text-xs text-red-700 mt-1">Dikembalikan: '+esc(k.catatan_kembali)+'</div>' : '')+'</div>'+
+      '<div class="text-right"><div class="text-lg font-extrabold tabular-nums text-slate-900">'+rp(r.nilai_kini)+'</div><div class="mt-1">'+stat('k', k.status, KSTAT)+'</div></div></div>'+
+      (k.status==='disetujui'||k.status==='selesai' ? '<div class="mt-3"><div class="flex justify-between text-[11px] text-slate-500 mb-1"><span>Ditagih '+rp(r.ditagih)+' ('+pct+'%)</span><span>Belum ditagih '+rp(r.belum_ditagih)+'</span></div><div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full bg-indigo-500" style="width:'+pct+'%"></div></div>'+
+        '<div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 mt-3">'+[['Sudah dibayar (bersih)', rp(r.dibayar_bersih)],['Retensi ditahan', rp(r.retensi_ditahan)],['Potong kasbon', rp(r.kasbon_dipotong)],['Sisa kewajiban', rp(r.hutang_saldo)]].map(function(x){ return '<div><div class="text-[11px] font-semibold text-slate-500">'+x[0]+'</div><div class="text-sm font-extrabold tabular-nums">'+x[1]+'</div></div>'; }).join('')+'</div></div>' : '')+
+      '<div class="flex flex-wrap gap-2 mt-3 items-center">'+a+'<button type="button" data-ko="'+esc(k.id)+'" aria-expanded="'+(open?'true':'false')+'" class="'+btnGhostSm+' ml-auto flex items-center gap-1">Rincian <i data-lucide="chevron-down" class="w-4 h-4 transition-transform '+(open?'rotate-180':'')+'"></i></button></div>'+tbl+'</div>';
+  }
+  function bukuTable(D){
+    var rows = D.buku;
+    return panel('<div class="flex items-center justify-between gap-2 flex-wrap mb-3"><div class="font-extrabold text-slate-800">Buku besar — kewajiban kepada tim</div><div class="flex gap-2"><button class="'+btnGhostSm+'" id="bgXls">Excel</button><button class="'+btnGhostSm+'" id="bgPdf">PDF</button></div></div>'+
+      '<div class="text-xs text-slate-500 mb-3">Hanya kejadian yang sudah berlaku: kontrak disetujui, addendum disetujui, termin yang sudah dibayar. Saldo = nilai kontrak - yang dibayar - potong kasbon - denda; retensi yang ditahan masih termasuk kewajiban.</div>'+
+      (rows.length ? '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-slate-500"><th class="py-1.5 pr-3 font-semibold">Tanggal</th><th class="py-1.5 pr-3 font-semibold">Keterangan</th><th class="py-1.5 pr-3 font-semibold text-right">Bertambah</th><th class="py-1.5 pr-3 font-semibold text-right">Berkurang</th><th class="py-1.5 font-semibold text-right">Saldo</th></tr></thead><tbody>'+
+        rows.map(function(e){ return '<tr class="border-t border-slate-100"><td class="py-2 pr-3 whitespace-nowrap text-slate-600">'+esc(e.tgl)+'</td><td class="py-2 pr-3">'+esc(e.ket)+'</td><td class="py-2 pr-3 text-right tabular-nums text-emerald-700">'+(e.tambah>0?rp(e.tambah):'')+'</td><td class="py-2 pr-3 text-right tabular-nums text-red-600">'+(e.kurang>0?rp(e.kurang):'')+'</td><td class="py-2 text-right tabular-nums font-extrabold">'+rp(e.saldo)+'</td></tr>'; }).join('')+
+        '<tr class="border-t-2 border-slate-200 bg-slate-50"><td colspan="4" class="py-2.5 pr-3 font-extrabold">SALDO AKHIR</td><td class="py-2.5 text-right tabular-nums font-extrabold">'+rp(D.hutang_saldo)+'</td></tr></tbody></table></div>' : '<div class="text-sm text-slate-500 py-6 text-center">Belum ada kejadian. Kontrak muncul di sini setelah disetujui.</div>'));
+  }
+  function kasbonTable(D){
+    return panel('<div class="font-extrabold text-slate-800 mb-1">Kasbon tim</div><div class="text-xs text-slate-500 mb-3">Kasbon diberikan menambah saldo; pelunasan dan potongan dari termin mengurangi. Potongan termin dicatat otomatis saat termin dibayar.</div>'+
+      (write ? '<div class="mb-3"><button class="'+btnGhostSm+'" id="bgKasbonBaru">+ Catat kasbon tim</button></div>' : '')+
+      (D.kasbon.length ? '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-slate-500"><th class="py-1.5 pr-3 font-semibold">Tanggal</th><th class="py-1.5 pr-3 font-semibold">Keterangan</th><th class="py-1.5 pr-3 font-semibold text-right">Jumlah</th><th class="py-1.5 font-semibold text-right">Saldo</th></tr></thead><tbody>'+
+        D.kasbon.map(function(k){ return '<tr class="border-t border-slate-100"><td class="py-2 pr-3 whitespace-nowrap text-slate-600">'+esc(k.tgl)+'</td><td class="py-2 pr-3">'+esc(k.ket||'Kasbon')+'</td><td class="py-2 pr-3 text-right tabular-nums '+(k.jumlah<0?'text-emerald-700':'text-red-600')+'">'+(k.jumlah<0?'−':'')+rp(Math.abs(k.jumlah))+'</td><td class="py-2 text-right tabular-nums font-bold">'+rp(k.saldo)+'</td></tr>'; }).join('')+'</tbody></table></div>' : '<div class="text-sm text-slate-500 py-4 text-center">Belum ada kasbon.</div>'));
+  }
+  function drawDetail(){
+    var D = B.detail, t = D.tim, kas = D.kasbon_saldo;
+    var ret = D.kontrak.reduce(function(a,k){ return a+((k.status==='disetujui'||k.status==='selesai')?k.ringkas.retensi_ditahan:0); },0), dib = D.kontrak.reduce(function(a,k){ return a+k.ringkas.dibayar_bersih; },0);
+    var tabs = [['kontrak','Kontrak'],['buku','Buku Besar'],['kasbon','Kasbon']];
+    $('bgBody').innerHTML =
+      '<button type="button" id="bgBack" class="text-sm font-bold text-indigo-600 mb-3 flex items-center gap-1"><i data-lucide="chevron-left" class="w-4 h-4"></i>Semua tim</button>'+
+      '<div class="mb-4"><div class="text-lg font-extrabold text-slate-900">'+esc(t.nama)+'</div><div class="text-xs text-slate-500">'+esc((B.data.tim.find(function(x){ return x.worker_id===t.id; })||{}).project_nama||'')+(t.no_rek?' · '+esc(t.no_rek):'')+'</div></div>'+
+      '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">'+card('Sisa kewajiban', rp(D.hutang_saldo), 'dari semua kontrak')+card('Retensi ditahan', rp(ret), 'dibayar saat serah terima')+card('Sudah dibayar', rp(dib), 'bersih, setelah potongan')+card('Kasbon tim', rp(kas), kas>0 ? 'dipotong otomatis dari termin' : 'tidak ada saldo', kas>0 ? 'amber' : '')+'</div>'+
+      '<div class="flex gap-2 flex-wrap mb-4">'+tabs.map(function(x){ var on = B.tab===x[0]; return '<button type="button" data-tab="'+x[0]+'" class="px-4 py-2 rounded-xl text-sm font-bold border transition '+(on?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50')+'">'+x[1]+'</button>'; }).join('')+
+        (write && B.tab==='kontrak' ? '<button type="button" id="bgKontrakTim" class="'+btnGhostSm+' ml-auto self-center">+ Kontrak baru untuk tim ini</button>' : '')+'</div>'+
+      '<div id="bgTab">'+(B.tab==='kontrak' ? (D.kontrak.length ? D.kontrak.map(kontrakCard).join('') : '<div class="text-sm text-slate-500 bg-white rounded-2xl border border-slate-200 px-5 py-8 text-center">Belum ada kontrak untuk tim ini.</div>') : (B.tab==='buku' ? bukuTable(D) : kasbonTable(D)))+'</div>';
+    $('bgBack').onclick = function(){ B.tim = null; B.detail = null; load(); };
+    document.querySelectorAll('[data-tab]').forEach(function(b){ b.onclick = function(){ B.tab = b.getAttribute('data-tab'); drawDetail(); }; });
+    var kt = $('bgKontrakTim'); if(kt) kt.onclick = function(){ openKontrak(null, t.id); };
+    document.querySelectorAll('[data-ko]').forEach(function(b){ b.onclick = function(){ var id = b.getAttribute('data-ko'); B.open[id] = !B.open[id]; drawDetail(); }; });
+    var K = function(id){ return D.kontrak.find(function(x){ return x.id===id; }); }, T = function(id){ var r = null; D.kontrak.forEach(function(k){ k.termin.forEach(function(x){ if(x.id===id) r = {t:x, k:k}; }); }); return r; };
+    document.querySelectorAll('[data-ka]').forEach(function(b){ b.onclick = function(){ kontrakAksi(b.getAttribute('data-ka'), K(b.getAttribute('data-id'))); }; });
+    document.querySelectorAll('[data-ta]').forEach(function(b){ b.onclick = function(){ var a = b.getAttribute('data-ta'); if(a==='bukti'){ cetakBuktiBorongan(b.getAttribute('data-no')); return; } terminAksi(a, T(b.getAttribute('data-id'))); }; });
+    document.querySelectorAll('[data-aa]').forEach(function(b){ b.onclick = function(){ act({action:b.getAttribute('data-aa')==='setujui'?'addendum_setujui':'addendum_tolak', id:b.getAttribute('data-id')}, b.getAttribute('data-aa')==='setujui'?'Addendum disetujui.':'Addendum ditolak.'); }; });
+    var kb = $('bgKasbonBaru'); if(kb) kb.onclick = function(){ openKasbonTim(); };
+    var xl = $('bgXls'); if(xl) xl.onclick = function(){ exportExcel('Buku_Besar_Borongan_'+filenameFromTitle(t.nama), 'Buku Besar Borongan — '+t.nama, ['Tanggal','Keterangan','Bertambah (Rp)','Berkurang (Rp)','Saldo (Rp)'], bukuRows(D), {sheetName:'Buku Besar'}); };
+    var pf = $('bgPdf'); if(pf) pf.onclick = function(){ exportPdf('Buku Besar Borongan — '+t.nama, 'Saldo akhir kewajiban: '+rp(D.hutang_saldo), ['Tanggal','Keterangan','Bertambah (Rp)','Berkurang (Rp)','Saldo (Rp)'], bukuRows(D), {}); };
+    icons();
+  }
+  function bukuRows(D){ return D.buku.map(function(e){ return [e.tgl, e.ket, Math.round(e.tambah), Math.round(e.kurang), Math.round(e.saldo)]; }).concat([['', 'SALDO AKHIR', '', '', Math.round(D.hutang_saldo)]]); }
+  function draw(){ if(B.tim && B.detail) drawDetail(); else drawList(); }
+
+  // ---------- aksi
+  function kontrakAksi(a, k){
+    if(a==='ajukan') confirmModal('Ajukan Kontrak','Ajukan kontrak <b>'+esc(k.nama_pekerjaan)+'</b> ('+rp(k.nilai)+') ke Akuntan?', function(){ act({action:'ajukan', id:k.id}, 'Kontrak diajukan.'); });
+    else if(a==='setujui') confirmModal('Setujui Kontrak','Setujui kontrak <b>'+esc(k.nama_pekerjaan)+'</b> senilai <b>'+rp(k.nilai)+'</b>'+(k.retensi_persen>0?' dengan retensi '+num0(k.retensi_persen)+'%':'')+'? Setelah itu termin bisa dibuat.', function(){ act({action:'setujui', id:k.id}, 'Kontrak disetujui.'); });
+    else if(a==='ubah') openKontrak(k);
+    else if(a==='kembalikan') openAlasan('Kembalikan ke Draft', 'Alasan *', 'mis. nilai belum sesuai', function(v){ act({action:'kembalikan', id:k.id, alasan:v}, 'Dikembalikan ke draft.'); });
+    else if(a==='batal') openAlasan('Batalkan Kontrak', k.status==='draft' ? 'Alasan (opsional)' : 'Alasan *', 'mis. pekerjaan dibatalkan', function(v){ act({action:'batal', id:k.id, alasan:v}, 'Kontrak dibatalkan.'); }, k.status==='draft');
+    else if(a==='termin') openTermin(k, 'termin');
+    else if(a==='lepas') openTermin(k, 'lepas_retensi');
+    else if(a==='addendum') openAddendum(k);
+    else if(a==='selesai') openSelesai(k);
+  }
+  function terminAksi(a, x){
+    if(!x) return;
+    if(a==='setujui') confirmModal('Setujui Termin', 'Setujui '+(x.t.jenis==='lepas_retensi'?'pelepasan retensi':'termin '+x.t.no_termin)+' sebesar <b>'+rp(x.t.bruto)+'</b>? Potong kasbon dihitung ulang dari saldo kasbon saat ini.', function(){ act({action:'termin_setujui', id:x.t.id}, 'Termin disetujui.'); });
+    else if(a==='tolak') openAlasan('Tolak Termin', 'Alasan *', 'mis. progres belum sesuai', function(v){ act({action:'termin_tolak', id:x.t.id, alasan:v}, 'Termin ditolak.'); });
+    else if(a==='bayar') openBayar(x.t, x.k);
+  }
+  function openAlasan(title, label, ph, cb, opsional){
+    openModal(title, '<label class="block text-xs font-semibold text-slate-500 mb-1.5">'+label+'</label><input id="al_v" type="text" maxlength="200" class="'+fieldCls+'" placeholder="'+esc(ph)+'">', function(){
+      var v = fv('al_v'); if(!v && !opsional){ toast('Alasan wajib diisi.', true); return; } cb(v); });
+  }
+  function openTimBaru(){
+    var opts = B.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===B.proj?' selected':'')+'>'+esc(p.nama)+'</option>'; }).join('');
+    openModal('Tim Borongan Baru', '<div class="space-y-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Proyek *</label><select id="tb_p" class="'+fieldCls+'">'+opts+'</select></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama tim *</label><input id="tb_n" type="text" class="'+fieldCls+'" placeholder="mis. Tim Kaca Pak Ujang"></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Rekening / e-wallet (opsional)</label><input id="tb_r" type="text" class="'+fieldCls+'" placeholder="mis. BCA 1234567890"></div></div>', function(){
+        if(!fv('tb_n')){ toast('Nama tim wajib diisi.', true); return; }
+        apiFetch('/workers.php', {method:'POST', body:JSON.stringify({project_id:fv('tb_p'), nama:fv('tb_n'), no_rek:fv('tb_r'), borongan:true, grade:'LAIN'})})
+          .then(function(r){ closeModal(); toast('Tim dibuat. Lanjut buat kontraknya.'); B.tim = r.id; B.tab = 'kontrak'; return load(); }).catch(function(e){ toast(e.message, true); });
+      });
+  }
+  function openKontrak(k, timId){
+    var tims = (B.data.tim||[]).filter(function(t){ return t.aktif; });
+    if(!k && !tims.length){ toast('Buat tim borongan dulu.', true); openTimBaru(); return; }
+    var sel = k ? k.worker_id : (timId || B.tim || '');
+    openModal(k ? 'Ubah Kontrak' : 'Kontrak Borongan Baru',
+      '<div class="space-y-4"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tim *</label><select id="kk_t" class="'+fieldCls+'"'+(k?' disabled':'')+'>'+(k ? '<option>'+esc(k.tim_nama)+'</option>' : '<option value="">Pilih tim…</option>'+tims.map(function(t){ return '<option value="'+esc(t.worker_id)+'"'+(t.worker_id===sel?' selected':'')+'>'+esc(t.nama)+' — '+esc(t.project_nama)+'</option>'; }).join(''))+'</select></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama pekerjaan *</label><input id="kk_n" type="text" maxlength="160" value="'+esc(k?k.nama_pekerjaan:'')+'" class="'+fieldCls+'" placeholder="mis. Pasang kaca lantai 1"></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal mulai *</label><input id="kk_d" type="date" value="'+(k?k.tgl_mulai:today())+'" class="'+fieldCls+'"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Retensi (%)</label><input id="kk_r" type="number" min="0" max="30" step="0.5" value="'+(k?k.retensi_persen:0)+'" class="'+fieldCls+'"></div></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nilai kontrak (Rp) *</label>'+numInputHtml('kk_v', k?fmtIdNum(k.nilai):'', fieldCls, ' data-money')+'<div class="text-xs text-slate-500 mt-1">Retensi = bagian dari tiap termin yang ditahan sampai serah terima. Isi 0 bila tidak ada.</div></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Catatan</label><input id="kk_c" type="text" maxlength="255" value="'+esc(k?k.catatan:'')+'" class="'+fieldCls+'"></div></div>',
+      function(){
+        var v = parseIdNum(fv('kk_v')), tid = k ? k.worker_id : fv('kk_t');
+        if(!tid){ toast('Pilih tim.', true); return; } if(!fv('kk_n')){ toast('Nama pekerjaan wajib diisi.', true); return; } if(Number.isNaN(v) || v<=0){ toast('Isi nilai kontrak.', true); return; }
+        var body = {action:k?'ubah':'buat', worker_id:tid, id:k?k.id:undefined, nama_pekerjaan:fv('kk_n'), tgl_mulai:fv('kk_d'), nilai:v, retensi_persen:Number(fv('kk_r')||0), catatan:fv('kk_c')};
+        act(body, k ? 'Kontrak diubah.' : 'Kontrak dibuat sebagai draft. Ajukan ke Akuntan bila sudah benar.').then(function(r){ if(r && r.id && !k){ B.tim = tid; B.tab = 'kontrak'; B.open[r.id] = true; load(); } });
+      });
+    var sv = $('mSave'); if(sv) sv.textContent = k ? 'Simpan' : 'Buat Kontrak';
+  }
+  function openTermin(k, jenis){
+    var r = k.ringkas, lepas = jenis==='lepas_retensi', kas = B.detail ? B.detail.kasbon_saldo : 0;
+    var maks = lepas ? Math.max(0, r.retensi_ditahan - r.pelepasan_diajukan) : r.belum_ditagih;
+    openModal(lepas ? 'Lepas Retensi — '+k.nama_pekerjaan : 'Termin Baru — '+k.nama_pekerjaan,
+      '<div class="space-y-4"><div class="text-xs text-slate-500">'+(lepas ? 'Retensi masih ditahan: <b class="text-slate-800">'+rp(r.retensi_ditahan)+'</b>' : 'Nilai kontrak '+rp(r.nilai_kini)+' · belum ditagih <b class="text-slate-800">'+rp(r.belum_ditagih)+'</b>'+(k.retensi_persen>0?' · retensi '+num0(k.retensi_persen)+'%':''))+'</div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal *</label><input id="tm_d" type="date" value="'+today()+'" class="'+fieldCls+'"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">'+(lepas?'Jumlah dilepas':'Jumlah termin')+' (Rp) *</label>'+numInputHtml('tm_b', fmtIdNum(Math.round(maks)), fieldCls, ' data-money')+'</div></div>'+
+      '<label class="flex items-center gap-2 text-sm"><input type="checkbox" id="tm_kas" class="w-4 h-4" '+(kas>0?'checked':'')+'> Potong kasbon tim'+(kas>0 ? ' <span class="text-slate-500">(saldo '+rp(kas)+')</span>' : ' <span class="text-slate-500">(tidak ada saldo)</span>')+'</label>'+
+      '<label class="flex items-center gap-2 text-sm"><input type="checkbox" id="tm_den" class="w-4 h-4"> Ada denda / potongan lain</label>'+
+      '<div id="tm_denbox" class="hidden grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Denda (Rp)</label>'+numInputHtml('tm_dn','',fieldCls,' data-money')+'</div><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Alasan *</label><input id="tm_dk" type="text" maxlength="160" class="'+fieldCls+'" placeholder="mis. terlambat 3 hari"></div></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="tm_k" type="text" maxlength="255" class="'+fieldCls+'" placeholder="'+(lepas?'mis. serah terima 1 Nov':'mis. progres 40%')+'"></div>'+
+      '<div id="tm_prev" class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm"></div></div>',
+      function(){
+        var b = parseIdNum(fv('tm_b')); if(Number.isNaN(b) || b<=0){ toast('Isi jumlah.', true); return; }
+        var den = $('tm_den').checked ? parseIdNum(fv('tm_dn')) : 0;
+        act({action:'termin_buat', kontrak_id:k.id, jenis:jenis, tgl:fv('tm_d'), bruto:b, denda:Number.isNaN(den)?0:den, denda_ket:fv('tm_dk'), potong_kasbon:$('tm_kas').checked, ket:fv('tm_k')}, 'Diajukan ke Akuntan.');
+      });
+    var sv = $('mSave'); if(sv) sv.textContent = 'Ajukan';
+    var prev = function(){
+      var b = parseIdNum(fv('tm_b')) || 0, den = $('tm_den').checked ? (parseIdNum(fv('tm_dn')) || 0) : 0;
+      $('tm_denbox').classList.toggle('hidden', !$('tm_den').checked);
+      var ret = lepas ? 0 : Math.round(b*k.retensi_persen)/100*1, base = b - ret - den, pot = $('tm_kas').checked ? Math.min(kas, Math.max(0, base)) : 0;
+      $('tm_prev').innerHTML = '<div class="flex justify-between"><span>Jumlah</span><b class="tabular-nums">'+rp(b)+'</b></div>'+(lepas ? '' : '<div class="flex justify-between text-slate-600"><span>− Retensi '+num0(k.retensi_persen)+'%</span><span class="tabular-nums">'+rp(ret)+'</span></div>')+
+        (den>0 ? '<div class="flex justify-between text-slate-600"><span>− Denda</span><span class="tabular-nums">'+rp(den)+'</span></div>' : '')+(pot>0 ? '<div class="flex justify-between text-slate-600"><span>− Potong kasbon</span><span class="tabular-nums">'+rp(pot)+'</span></div>' : '')+
+        '<div class="flex justify-between border-t border-slate-200 mt-1.5 pt-1.5 font-extrabold"><span>Diterima tim</span><span class="tabular-nums">'+rp(base-pot)+'</span></div>'+
+        (b>maks+0.5 ? '<div class="text-xs text-red-600 mt-1.5">Melebihi '+(lepas?'retensi yang ditahan':'sisa nilai yang belum ditagih')+' ('+rp(maks)+').</div>' : '')+'<div class="text-[11px] text-slate-500 mt-1.5">Perkiraan. Angka pasti dihitung server saat disetujui (saldo kasbon bisa berubah).</div>';
+    };
+    ['tm_b','tm_dn','tm_kas','tm_den'].forEach(function(id){ var e = $(id); if(e){ e.addEventListener('input', prev); e.addEventListener('change', prev); } }); prev();
+  }
+  function openBayar(t, k){
+    openModal('Catat Pembayaran — '+(t.jenis==='lepas_retensi'?'Pelepasan retensi':'Termin '+t.no_termin),
+      '<div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm mb-4"><div class="flex justify-between"><span>Jumlah</span><b class="tabular-nums">'+rp(t.bruto)+'</b></div>'+(t.retensi>0?'<div class="flex justify-between text-slate-600"><span>− Retensi</span><span class="tabular-nums">'+rp(t.retensi)+'</span></div>':'')+(t.denda>0?'<div class="flex justify-between text-slate-600"><span>− Denda</span><span class="tabular-nums">'+rp(t.denda)+'</span></div>':'')+(t.potong_kasbon>0?'<div class="flex justify-between text-slate-600"><span>− Potong kasbon</span><span class="tabular-nums">'+rp(t.potong_kasbon)+'</span></div>':'')+'<div class="flex justify-between border-t border-slate-200 mt-1.5 pt-1.5 font-extrabold"><span>Dibayarkan ke '+esc(k.tim_nama)+'</span><span class="tabular-nums">'+rp(t.bersih)+'</span></div></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal bayar</label><input id="by_d" type="date" value="'+today()+'" min="'+t.tgl+'" class="'+fieldCls+'"></div>'+
+        '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Metode</label><select id="by_m" class="'+fieldCls+'"><option value="transfer">Transfer</option><option value="tunai">Tunai</option></select></div></div>',
+      function(){ act({action:'termin_bayar', id:t.id, tgl_bayar:fv('by_d'), metode:fv('by_m')}, 'Pembayaran tercatat ✓').then(function(r){ if(r && r.bukti_no) tawarkanBuktiBorongan(r.bukti_no, r.dibayar); }); });
+    var sv = $('mSave'); if(sv) sv.textContent = 'Catat Dibayar';
+  }
+  function tawarkanBuktiBorongan(no, total){
+    openModal('Pembayaran tercatat', '<div class="text-sm text-slate-600">Nomor bukti: <b class="text-slate-900">'+esc(no)+'</b><br>Dibayarkan: <b class="text-slate-900">'+rp(total)+'</b></div><div class="text-xs text-slate-500 mt-3">Cetak buktinya untuk ditandatangani tim. Bisa dicetak lagi dari tombol "Bukti" pada termin.</div>', function(){ closeModal(); cetakBuktiBorongan(no); });
+    var sv = $('mSave'); if(sv) sv.textContent = 'Cetak Bukti (PDF)'; var cn = $('mCancel'); if(cn) cn.textContent = 'Nanti saja';
+  }
+  function openAddendum(k){
+    openModal('Addendum — '+k.nama_pekerjaan, '<div class="space-y-4"><div class="text-xs text-slate-500">Nilai kontrak sekarang '+rp(k.ringkas.nilai_kini)+'. Isi angka positif untuk menambah nilai, atau negatif (mis. -5.000.000) untuk mengurangi. Berlaku setelah disetujui Akuntan.</div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Perubahan nilai (Rp) *</label><input id="ad2_j" type="text" inputmode="decimal" class="'+fieldCls+'" placeholder="mis. 10000000 atau -5000000"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal</label><input id="ad2_d" type="date" value="'+today()+'" class="'+fieldCls+'"></div></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Alasan *</label><input id="ad2_a" type="text" maxlength="200" class="'+fieldCls+'" placeholder="mis. tambah kerja jendela lantai 2"></div></div>', function(){
+        var j = Number(String(fv('ad2_j')).replace(/\./g,'').replace(',','.')); if(!fv('ad2_j') || Number.isNaN(j) || j===0){ toast('Isi perubahan nilai (bukan nol).', true); return; } if(!fv('ad2_a')){ toast('Alasan wajib diisi.', true); return; }
+        act({action:'addendum_buat', kontrak_id:k.id, jumlah:j, alasan:fv('ad2_a'), tgl:fv('ad2_d')}, 'Addendum diajukan.');
+      });
+  }
+  function openSelesai(k){
+    var r = k.ringkas, sisa = r.belum_ditagih;
+    openModal('Selesaikan Kontrak — '+k.nama_pekerjaan, '<div class="space-y-3 text-sm text-slate-600"><div>Nilai kontrak <b>'+rp(r.nilai_kini)+'</b>, ditagih <b>'+rp(r.ditagih)+'</b>.</div>'+
+      (r.termin_berjalan>0 ? '<div class="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700">Masih ada '+r.termin_berjalan+' termin yang belum dibayar atau ditolak. Selesaikan dulu.</div>' : '')+
+      (sisa>0.5 ? '<label class="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900"><input type="checkbox" id="sl_k" class="w-4 h-4 mt-0.5"><span>Sisa <b>'+rp(sisa)+'</b> tidak akan ditagih. Kurangi nilai kontrak sebesar itu (dicatat sebagai addendum minus).</span></label>' : '<div class="text-xs text-emerald-700">Seluruh nilai sudah ditagih.</div>')+
+      (r.retensi_ditahan>0.5 ? '<div class="text-xs text-slate-500">Retensi ditahan '+rp(r.retensi_ditahan)+' tetap bisa dilepas sesudah kontrak selesai.</div>' : '')+
+      (B.detail && B.detail.kasbon_saldo>0.5 ? '<div class="text-xs text-red-700">Kasbon tim belum lunas: '+rp(B.detail.kasbon_saldo)+'.</div>' : '')+'</div>', function(){
+        if(sisa>0.5 && !$('sl_k').checked){ toast('Centang pengurangan nilai, atau tagih sisanya dulu.', true); return; }
+        act({action:'selesai', id:k.id, kurangi_nilai: sisa>0.5}, 'Kontrak diselesaikan.');
+      });
+    var sv = $('mSave'); if(sv) sv.textContent = 'Selesaikan';
+  }
+  function openKasbonTim(){
+    var t = B.detail.tim;
+    openModal('Catat Kasbon Tim — '+t.nama, '<div class="space-y-4"><div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tanggal *</label><input id="kb_d" type="date" value="'+today()+'" class="'+fieldCls+'"></div><div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jumlah (Rp) *</label>'+numInputHtml('kb_j','',fieldCls,' data-money')+'</div></div>'+
+      '<div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Keterangan</label><input id="kb_k" type="text" maxlength="240" class="'+fieldCls+'" placeholder="mis. beli material"></div></div>', function(){
+        var j = parseIdNum(fv('kb_j')); if(Number.isNaN(j) || j<=0){ toast('Isi jumlah.', true); return; }
+        apiFetch('/kasbon.php', {method:'POST', body:JSON.stringify({project_id:t.project_id, worker_id:t.id, tgl:fv('kb_d'), jumlah:j, ket:fv('kb_k')})}).then(function(){ closeModal(); toast('Kasbon dicatat.'); return load(); }).catch(function(e){ toast(e.message, true); });
+      });
+  }
+  var b1 = $('bgKontrakBaru'); if(b1) b1.onclick = function(){ if(!B.data){ return; } openKontrak(null, B.tim); };
+  var b2 = $('bgTimBaru'); if(b2) b2.onclick = function(){ if(B.projects.length) openTimBaru(); };
+  load();
+};
+
 PAGES.kasbon = function(c){
   c.innerHTML = pageHead('Kasbon', 'Pengajuan dari lapangan dan buku kasbon.')+'<div id="kbA" class="mb-5"></div><div id="kbB"></div>';
   kasbonView(document.getElementById('kbA'), 'requests'); kasbonView(document.getElementById('kbB'), 'ledger');

@@ -11,18 +11,22 @@ backend/api/
 └── src/                                               (dimuat otomatis, namespace App\…; tidak pernah dilayani web)
     ├── Domain/            aturan murni — TANPA database, TANPA HTTP
     │   ├── PayrollCalculator, KasbonPlanner, PeriodRules      gaji, potong kasbon otomatis, minggu Jumat–Kamis & alur status
+    │   ├── Borongan            kontrak, termin, retensi, kasbon tim, buku besar, jurnal borongan
+    │   ├── NomorBukti, BuktiPembayaran   nomor dokumen berurut dan isi bukti pembayaran
     │   ├── AttendanceRules     jendela waktu lapangan, nilai hari/lembur, bentrok versi, ringkasan audit
     │   ├── WorkerRules         nama/tim, validasi isian, deteksi pekerja ganda
     │   ├── KasbonRules         validasi pengajuan, batas terbuka, syarat pelunasan & hapus
     │   └── DomainError         pelanggaran aturan (pesan + kode status + data tambahan)
     ├── Infrastructure/    semua SQL
     │   ├── PayrollRepository, KasbonRepository, PeriodRepository, AttendanceRepository,
-    │   │   WorkerRepository, KasbonBukuRepository, KasbonRequestRepository
+    │   │   WorkerRepository, KasbonBukuRepository, KasbonRequestRepository, BoronganRepository
+    │   ├── DocCounter, SkemaBorongan   penghitung nomor dokumen, skema tabel untuk migrasi otomatis
     │   └── Tx             transaksi (batal bila gagal; opsional diulang saat deadlock)
     └── Application/       use case: ambil data → panggil aturan → simpan → audit
         ├── PayrollService, KasbonService, PeriodService (ajukan/setujui/kembalikan/bayar)
         ├── AttendanceService, WorkerService
-        └── KasbonBukuService, KasbonRequestService
+        ├── KasbonBukuService, KasbonRequestService
+        └── BuktiService, BoronganService (lihat docs/BORONGAN.md)
 ```
 
 Arah ketergantungan: HTTP → Application → Domain ← Infrastructure. Domain tidak mengenal yang lain.
@@ -36,8 +40,9 @@ Arah ketergantungan: HTTP → Application → Domain ← Infrastructure. Domain 
 ## Pengaman refaktor
 | Alat | Fungsi |
 |---|---|
-| `php scripts/qa/unit.php` | 109 uji unit murni (hitungan gaji, kasbon, minggu/status, absen, pekerja, pengajuan kasbon) — tanpa database, hitungan detik |
+| `php scripts/qa/unit.php` | 174 uji unit murni (hitungan gaji, kasbon, minggu/status, absen, pekerja, pengajuan kasbon) — tanpa database, hitungan detik |
 | `node scripts/qa/golden.js` | 46 respons API gaji (rekap, periode, kasbon, bayar, susulan, ganda, borongan) dibandingkan dengan rekaman sebelum refaktor — harus identik |
+| `scripts/qa/waktu_uji.sh` | menjalankan database dan server dengan jam dikunci 27 Okt 2026 (perlu paket `faketime`), supaya uji bertanggal tetap stabil kapan pun dijalankan |
 | `node scripts/qa/golden2.js` | 134 respons API pekerja, absen (bentrok versi, jendela 7 hari, terkunci), buku kasbon, pengajuan kasbon — harus identik (tanggal mengikuti minggu 23–29 Okt 2026) |
 | `balapan.js`, `core.js`, `borongan_*.js`, `ui.js`, `crawl.js` | uji tersambung (lihat `scripts/qa/README.md`) |
 
