@@ -20,6 +20,10 @@ $role = $user['role'];
 
 if ($method === 'GET') {
     $projectId = (string)($_GET['project_id'] ?? '');
+    if (($_GET['action'] ?? '') === 'bukti') { // data Bukti Pembayaran (uang: hanya peran pusat)
+        if (!in_array($role, ['admin', 'akuntan', 'owner'], true)) json_error('Anda tidak punya akses untuk aksi ini.', 403);
+        json_response(bukti_service()->data((string)($_GET['bukti_no'] ?? '')));
+    }
     if ($projectId === '' && in_array($role, ['admin', 'akuntan', 'owner'], true)) {
         // Pusat view: which weeks are waiting (e.g. status=diajukan -> ready to be paid). No money here.
         $status = (string)($_GET['status'] ?? '');

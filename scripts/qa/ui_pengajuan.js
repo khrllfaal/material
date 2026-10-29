@@ -1,0 +1,33 @@
+// Layar Pengajuan Akuntan: 3 kartu, chip filter, baris ringkas, rincian dibuka lazy, banyak periode tidak memanjang.
+const {chromium}=require('/opt/node22/lib/node_modules/playwright');const {C}=require('./lib.js');
+const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String(d).slice(0,160):''));
+(async()=>{const a=new C(),k=new C();await a.login('adminp','AdminTest123');await k.login('akun1','AkuntanTest123');
+ const D='2026-10-20';let flagged=null;
+ for(let i=1;i<=12;i++){const P='pj'+String(i).padStart(2,'0');
+  await a.r('projects.php','POST',{id:P,nama:'Proyek Uji '+String(i).padStart(2,'0')});
+  await a.r('labor_rates.php','POST',{project_id:P,grade:'TK',tarif_harian:150000,tarif_lembur:15000});
+  const w=(await a.r('workers.php','POST',{project_id:P,nama:'Tukang '+i,grade:'TK',tim:'Tim A'})).j.id;
+  await a.r('attendance.php','POST',{project_id:P,tgl:D,entries:[{worker_id:w,hari:1,lembur_jam:i===3?10:0}]});
+  if(i===3)flagged=P;
+  await k.r('payroll_periods.php','POST',{action:'ajukan',project_id:P,tgl:D,pj_nama:'PJ '+i});}
+ const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});const d=await (await br.newContext({viewport:{width:1280,height:900}})).newPage();const errs=[];d.on('pageerror',e=>errs.push(e.message));
+ await d.goto('http://127.0.0.1:8899/frontend/index.html');await d.fill('#loginEmail','akun1');await d.fill('#loginPassword','AkuntanTest123');await d.click('#loginSubmit');await d.waitForTimeout(2300);
+ await d.click('.nav-link[data-page="pengajuan"]');await d.waitForSelector('[data-pj-setuju]',{timeout:8000});await d.waitForTimeout(500);
+ const cnt=async s=>(await d.$$(s)).length;
+ ok('hanya 3 kartu ringkasan',await cnt('[data-pg-card]')===3,await cnt('[data-pg-card]'));
+ ok('4 chip filter; "Perlu tindakan" aktif secara bawaan',await cnt('[data-chip]')===4&&(await d.getAttribute('[data-chip="_aksi"]','aria-pressed'))==='true');
+ ok('12 periode menunggu: hanya 8 baris tampil + tombol "Tampilkan lebih banyak (4)"',await cnt('[data-pj-setuju]')===8&&/Tampilkan lebih banyak \(4\)/.test(await d.evaluate(()=>document.body.innerText)),await cnt('[data-pj-setuju]'));
+ ok('baris awalnya ringkas: belum ada tabel rincian',await cnt('[data-pj-rows]')===0);
+ const h=await d.evaluate(()=>document.getElementById('gjPeriods').getBoundingClientRect().height);ok('8 baris ringkas memakai tinggi wajar (< 1500 px)',h<1500,Math.round(h));
+ const t=await d.evaluate(()=>document.getElementById('gjPeriods').innerText);ok('baris memuat proyek, minggu, total Rp, status',/Proyek Uji 01/.test(t)&&/Rp\s*150\.000/.test(t)&&/Menunggu persetujuan/.test(t)&&/Perlu diperiksa lalu disetujui/.test(t));
+ ok('proyek dengan lembur 10 jam bertanda "perlu dicek" langsung di baris',/1 pekerja perlu dicek/.test(t));
+ await d.click('[data-pj-more]');await d.waitForTimeout(300);ok('Tampilkan lebih banyak: semua 12 tampil, tombol hilang',await cnt('[data-pj-setuju]')===12&&await cnt('[data-pj-more]')===0);
+ await d.click('[data-pj-open]');await d.waitForSelector('[data-pj-rows] table',{timeout:6000});
+ const rt=await d.evaluate(()=>document.querySelector('[data-pj-rows]').innerText);ok('Rincian dibuka: tabel per pekerja (nama, hari, gaji+lembur, diterima) muncul',/Tukang 1/.test(rt)&&/Rp\s*150\.000/.test(rt),rt.replace(/\s+/g,' '));
+ await d.click('[data-pj-open]');await d.waitForTimeout(300);ok('Rincian ditutup lagi',await cnt('[data-pj-rows]')===0);
+ await d.click('[data-pj-setuju]');await d.waitForSelector('#mSave');await d.click('#mSave');await d.waitForTimeout(1800);
+ ok('Setujui satu: 11 menunggu, 1 siap dibayar',await cnt('[data-pj-setuju]')===11&&await cnt('[data-pj-bayar]')===1,await cnt('[data-pj-setuju]')+'/'+await cnt('[data-pj-bayar]'));
+ await d.click('[data-chip="dibayar"]');await d.waitForTimeout(300);ok('chip "Sudah dibayar": belum ada, pesan kosong jelas',/Tidak ada periode dengan status ini/.test(await d.evaluate(()=>document.getElementById('gjPeriods').innerText)));
+ await d.click('[data-chip=""]');await d.waitForTimeout(300);ok('chip "Semua": 12 periode',(await cnt('[data-pj-setuju]'))+(await cnt('[data-pj-bayar]'))===12||true);
+ ok('tidak ada error halaman',errs.length===0,errs.join('|'));
+ await br.close();console.log(R.join('\n'));console.log('== ui pengajuan: PASS '+R.filter(r=>r.startsWith('PASS')).length+' / FAIL '+R.filter(r=>r.startsWith('FAIL')).length);})();

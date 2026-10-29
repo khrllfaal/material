@@ -461,7 +461,7 @@ function fill_zero_snapshots(string $projectId, ?string $grade, ?string $workerI
  *  fails quietly otherwise. */
 function ensure_payroll_controls(): void {
     start_session();
-    if ((int)($_SESSION['controls_ok'] ?? 0) >= 6) return; // bump the number whenever a new migration is added
+    if ((int)($_SESSION['controls_ok'] ?? 0) >= 7) return; // bump the number whenever a new migration is added
     try {
         $db = db();
         $has = function (string $table, string $col) use ($db): bool {
@@ -504,7 +504,11 @@ function ensure_payroll_controls(): void {
         // v6: tim borongan (satu penerima, dibayar per tim) dan penghubung pekerja yang sama di dua proyek.
         if (!$has('workers', 'borongan')) $db->exec("ALTER TABLE workers ADD COLUMN borongan TINYINT(1) NOT NULL DEFAULT 0");
         if (!$has('workers', 'induk_id')) $db->exec("ALTER TABLE workers ADD COLUMN induk_id VARCHAR(40) NULL, ADD INDEX idx_workers_induk (induk_id)");
-        $_SESSION['controls_ok'] = 6;
+        // v7: nomor Bukti Pembayaran berurut per bulan (satu nomor untuk satu kali bayar) dan penghitung nomornya.
+        $db->exec("CREATE TABLE IF NOT EXISTS doc_counters (kode VARCHAR(8) NOT NULL, periode CHAR(7) NOT NULL, terakhir INT UNSIGNED NOT NULL DEFAULT 0,
+                    PRIMARY KEY (kode, periode)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        if (!$has('payroll_payments', 'bukti_no')) $db->exec("ALTER TABLE payroll_payments ADD COLUMN bukti_no VARCHAR(30) NULL, ADD INDEX idx_pay_bukti (bukti_no)");
+        $_SESSION['controls_ok'] = 7;
     } catch (Throwable $e) {
         error_log('[material] ensure_payroll_controls: ' . $e->getMessage());
     }

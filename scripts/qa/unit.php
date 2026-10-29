@@ -2,7 +2,7 @@
 // Uji unit murni (tanpa database, tanpa server): php scripts/qa/unit.php
 declare(strict_types=1);
 spl_autoload_register(function ($c) { $f = __DIR__ . '/../../backend/api/src/' . str_replace('\\', '/', substr($c, 4)) . '.php'; if (is_file($f)) require $f; });
-use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError, AttendanceRules, WorkerRules, KasbonRules, ClientIp};
+use App\Domain\{PayrollCalculator, KasbonPlanner, PeriodRules, DomainError, AttendanceRules, WorkerRules, KasbonRules, ClientIp, NomorBukti, BuktiPembayaran};
 
 $ok = 0; $bad = 0;
 function t(string $nama, bool $kondisi, string $info = ''): void { global $ok, $bad; if ($kondisi) $ok++; else { $bad++; echo "GAGAL: $nama $info\n"; } }
@@ -200,6 +200,29 @@ t('lewat Cloudflare: pakai CF-Connecting-IP', ClientIp::resolve(['REMOTE_ADDR' =
 t('langsung ke server: header CF palsu diabaikan', ClientIp::resolve(['REMOTE_ADDR' => '36.70.9.9', 'HTTP_CF_CONNECTING_IP' => '1.2.3.4']) === '36.70.9.9');
 t('header CF berisi sampah diabaikan', ClientIp::resolve(['REMOTE_ADDR' => '172.67.10.20', 'HTTP_CF_CONNECTING_IP' => 'bukan-ip']) === '172.67.10.20');
 t('tanpa header: REMOTE_ADDR', ClientIp::resolve(['REMOTE_ADDR' => '36.70.9.9']) === '36.70.9.9' && ClientIp::resolve([]) === '');
+
+// --- NomorBukti
+t('format nomor bukti', NomorBukti::format('BP', '2026-10-29', 7) === 'BP/2026/10/0007' && NomorBukti::format('BR', '2027-01-02', 12345) === 'BR/2027/01/12345');
+tolak('nomor urut 0 ditolak', fn() => NomorBukti::format('BP', '2026-10-29', 0), 500);
+t('urai nomor', NomorBukti::urai('BP/2026/10/0007') === ['kode' => 'BP', 'tahun' => '2026', 'bulan' => '10', 'urut' => 7] && NomorBukti::urai('abc') === null);
+t('urutan: 0009 sebelum 0010 (bukan urut abjad kasar)', NomorBukti::lebihAwal('BP/2026/10/0009', 'BP/2026/10/0010') && !NomorBukti::lebihAwal('BP/2026/10/0010', 'BP/2026/10/0009'));
+t('urutan lintas bulan dan tahun', NomorBukti::lebihAwal('BP/2026/09/0099', 'BP/2026/10/0001') && NomorBukti::lebihAwal('BP/2026/12/0001', 'BP/2027/01/0001'));
+t('data lama tanpa nomor dianggap paling awal', NomorBukti::lebihAwal(null, 'BP/2026/10/0001') && !NomorBukti::lebihAwal('BP/2026/10/0001', null) && !NomorBukti::lebihAwal(null, null));
+t('nomor sama bukan lebih awal', !NomorBukti::lebihAwal('BP/2026/10/0001', 'BP/2026/10/0001'));
+
+// --- BuktiPembayaran
+$rowsW = ['w1' => ['nama' => 'Asep', 'no_rek' => 'BCA 1', 'grade_nama' => 'Tukang', 'tim' => 'A', 'borongan' => 0, 'hari' => 2, 'gaji' => 300000.0, 'lembur_rp' => 20000.0, 'tambah' => 0.0, 'potong' => 20000.0, 'net' => 300000.0],
+          'w2' => ['nama' => 'Budi', 'no_rek' => '', 'grade_nama' => 'Tukang', 'tim' => 'A', 'borongan' => 0, 'hari' => 1, 'gaji' => 150000.0, 'lembur_rp' => 0.0, 'tambah' => 0.0, 'potong' => 0.0, 'net' => 150000.0]];
+$semua = [['worker_id' => 'w1', 'jumlah' => 100000, 'bukti_no' => 'BP/2026/10/0001'], ['worker_id' => 'w1', 'jumlah' => 200000, 'bukti_no' => 'BP/2026/10/0002'], ['worker_id' => 'w2', 'jumlah' => 150000, 'bukti_no' => 'BP/2026/10/0002'],
+          ['worker_id' => 'w1', 'jumlah' => 5000, 'bukti_no' => null], ['worker_id' => null, 'jumlah' => -10000, 'bukti_no' => 'BP/2026/10/0002']];
+$b2 = BuktiPembayaran::susun('BP/2026/10/0002', array_values(array_filter($semua, fn($p) => $p['bukti_no'] === 'BP/2026/10/0002')), $semua, $rowsW);
+$l = array_column($b2['lines'], null, 'worker_id');
+t('bukti 0002: Asep dibayar 200.000, sebelumnya 105.000 (100.000 + data lama 5.000), sisa -5.000 dibulatkan', mirip($l['w1']['dibayar_ini'], 200000) && mirip($l['w1']['sebelumnya'], 105000) && mirip($l['w1']['sisa_setelah'], 300000 - 105000 - 200000));
+t('bukti 0002: Budi dibayar penuh, sisa 0', mirip($l['w2']['dibayar_ini'], 150000) && mirip($l['w2']['sisa_setelah'], 0));
+t('bukti 0002: baris grup -10.000 dan total = 200.000 + 150.000 - 10.000', mirip($b2['grup']['dibayar_ini'], -10000) && mirip($b2['total'], 340000));
+$b1 = BuktiPembayaran::susun('BP/2026/10/0001', [$semua[0]], $semua, $rowsW);
+t('bukti 0001: hanya pembayaran lebih awal yang dihitung (data lama 5.000 sebelumnya; 0002 belum ada)', mirip($b1['lines'][0]['sebelumnya'], 5000) && mirip($b1['lines'][0]['sisa_setelah'], 300000 - 5000 - 100000) && $b1['grup'] === []);
+t('total bukti = jumlah baris dibayar ini', mirip($b1['total'], 100000));
 
 echo "== uji unit: LULUS $ok / GAGAL $bad\n";
 exit($bad ? 1 : 0);

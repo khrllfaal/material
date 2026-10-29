@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#0ea5e9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'">
-<link rel="stylesheet" href="vendor/tailwind.css?v=20261027">
-<script src="vendor/icons.js?v=20261027"></script>
+<link rel="stylesheet" href="vendor/tailwind.css?v=20261029">
+<script src="vendor/icons.js?v=20261029"></script>
 <style>
   /* Platform-native font stack, not a self-hosted webfont: Inter was
      referenced here but never actually loaded (no @font-face), so the
@@ -864,7 +864,7 @@ function loadExcelJS(){
   if(_exceljsLoading) return _exceljsLoading;
   _exceljsLoading=new Promise(function(resolve,reject){
     var s=document.createElement('script');
-    s.src='vendor/exceljs.min.js?v=20261027';
+    s.src='vendor/exceljs.min.js?v=20261029';
     s.onload=function(){ resolve(); };
     s.onerror=function(){ _exceljsLoading=null; reject(new Error('Gagal memuat modul Excel.')); };
     document.head.appendChild(s);
@@ -970,10 +970,10 @@ function loadJsPdf(){
   if(_jspdfLoading) return _jspdfLoading;
   _jspdfLoading=new Promise(function(resolve,reject){
     var s1=document.createElement('script');
-    s1.src='vendor/jspdf.umd.min.js?v=20261027';
+    s1.src='vendor/jspdf.umd.min.js?v=20261029';
     s1.onload=function(){
       var s2=document.createElement('script');
-      s2.src='vendor/jspdf.autotable.min.js?v=20261027';
+      s2.src='vendor/jspdf.autotable.min.js?v=20261029';
       s2.onload=function(){ resolve(); };
       s2.onerror=function(){ _jspdfLoading=null; reject(new Error('Gagal memuat modul PDF.')); };
       document.head.appendChild(s2);
@@ -2357,6 +2357,86 @@ var PAY_BADGE = {lunas:['aman','Lunas'], sebagian:['warn','Sebagian'], belum:['d
 var FLAG_LABEL = {net_minus:'Gaji minus: potongan lebih besar dari gaji', tarif_kosong:'Tarif belum diisi', lembur_tinggi:'Lembur lebih dari 8 jam/hari', ganda:'Tercatat hadir di 2 proyek pada hari yang sama', belum_diisi:'Ada hari yang belum diisi lapangan', borongan_kosong:'Tim borongan: nominal belum diisi (Tambahan / Potongan)'};
 function fmtHariVal(v){ return v===1 ? '1' : (v===0.5 ? '½' : (v>0 ? String(v).replace('.',',') : '–')); }
 function datesBetween(from, to, max){ var out=[], d=from; while(d<=to && out.length<(max||62)){ out.push(d); d=addDays(d,1); } return out; }
+/* ---- Bukti Pembayaran (PDF) ---- */
+function terbilang(n){
+  n = Math.floor(Math.abs(Number(n)||0));
+  var sat = ['','satu','dua','tiga','empat','lima','enam','tujuh','delapan','sembilan','sepuluh','sebelas'];
+  function f(x){
+    if(x<12) return sat[x];
+    if(x<20) return f(x-10)+' belas';
+    if(x<100) return f(Math.floor(x/10))+' puluh'+(x%10 ? ' '+f(x%10) : '');
+    if(x<200) return 'seratus'+(x-100 ? ' '+f(x-100) : '');
+    if(x<1000) return f(Math.floor(x/100))+' ratus'+(x%100 ? ' '+f(x%100) : '');
+    if(x<2000) return 'seribu'+(x-1000 ? ' '+f(x-1000) : '');
+    if(x<1e6) return f(Math.floor(x/1e3))+' ribu'+(x%1e3 ? ' '+f(x%1e3) : '');
+    if(x<1e9) return f(Math.floor(x/1e6))+' juta'+(x%1e6 ? ' '+f(x%1e6) : '');
+    if(x<1e12) return f(Math.floor(x/1e9))+' miliar'+(x%1e9 ? ' '+f(x%1e9) : '');
+    return f(Math.floor(x/1e12))+' triliun'+(x%1e12 ? ' '+f(x%1e12) : '');
+  }
+  return n===0 ? 'nol' : f(n);
+}
+async function cetakBukti(buktiNo){
+  var d;
+  try{ d = await apiFetch('/payroll_periods.php?action=bukti&bukti_no='+encodeURIComponent(buktiNo)); await loadJsPdf(); }
+  catch(e){ toast(e.message || 'Gagal memuat bukti pembayaran.', true); return; }
+  var doc = new window.jspdf.jsPDF({unit:'pt', format:'a4'}), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(30,58,138); doc.text('BUKTI PEMBAYARAN UPAH', M, 44);
+  doc.setFontSize(11); doc.setTextColor(15,23,42); doc.text('No. '+d.bukti_no, W-M, 44, {align:'right'});
+  doc.setDrawColor(30,58,138); doc.setLineWidth(1.2); doc.line(M, 54, W-M, 54);
+  var lab = function(t, x, y){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139); doc.text(t, x, y); };
+  var val = function(t, x, y, w){ doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(15,23,42); doc.text(t, x, y, w ? {maxWidth:w} : undefined); };
+  var pn = doc.splitTextToSize(String(d.project_nama), W-2*M-95), y0 = 74;
+  lab('Proyek', M, y0); val(pn, M+95, y0); y0 += 15*pn.length;
+  lab('Periode', M, y0); val(fmtTglPendek(d.tgl_mulai)+' – '+fmtTglPendek(d.tgl_akhir)+' '+d.tgl_akhir.slice(0,4), M+95, y0);
+  lab('Tanggal bayar', W/2+10, y0); val(fmtTglPanjang(d.tgl_bayar), W/2+95, y0, W/2-M-95); y0 += 15;
+  lab('Penanggung jawab', M, y0); val(String(d.pj_nama || '-'), M+95, y0, W/2-M-105);
+  lab('Metode', W/2+10, y0); val(d.metode==='transfer' ? 'Transfer' : 'Tunai', W/2+95, y0); y0 += 15;
+  lab('Dicatat oleh', M, y0); val(String(d.dibuat_oleh || '-'), M+95, y0, W/2-M-105);
+  var body = d.lines.map(function(l, i){
+    return [i+1, l.nama+(l.borongan ? ' (borongan)' : '')+(l.tim && !l.borongan ? '\n'+l.tim : ''), l.no_rek || '-', num0(l.diterima), num0(l.sebelumnya), num0(l.dibayar_ini), num0(l.sisa_setelah)];
+  });
+  if(d.grup && d.grup.dibayar_ini!==undefined) body.push(['', 'Penyesuaian grup', '-', '', num0(d.grup.sebelumnya), num0(d.grup.dibayar_ini), '']);
+  doc.autoTable({
+    head: [['No','Penerima','Rekening / e-wallet','Diterima periode (Rp)','Dibayar sebelumnya','Dibayar sekarang','Sisa']],
+    body: body, foot: [['', 'TOTAL DIBAYAR', '', '', '', num0(d.total), '']], startY: y0 + 14, margin: {left:M, right:M},
+    styles: {font:'helvetica', fontSize:8.5, cellPadding:5, textColor:[15,23,42], lineColor:[210,216,226], lineWidth:0.5},
+    headStyles: {fillColor:[30,58,138], textColor:255, fontStyle:'bold', fontSize:8}, footStyles: {fillColor:[238,242,255], textColor:[30,58,138], fontStyle:'bold'},
+    columnStyles: {0:{cellWidth:24}, 3:{halign:'right'}, 4:{halign:'right'}, 5:{halign:'right', fontStyle:'bold'}, 6:{halign:'right'}},
+    didParseCell: function(x){ if(x.section==='head' && x.column.index>=3) x.cell.styles.halign = 'right'; if(x.section==='foot' && x.column.index>=3) x.cell.styles.halign = 'right'; }
+  });
+  var y = doc.lastAutoTable.finalY + 18;
+  var words = doc.splitTextToSize('Terbilang: '+terbilang(d.total)+' rupiah', W-2*M);
+  if(y + words.length*12 + 130 > H-40){ doc.addPage(); y = 50; }
+  doc.setFont('helvetica','italic'); doc.setFontSize(9.5); doc.setTextColor(15,23,42); doc.text(words, M, y); y += words.length*12 + 22;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,116,139);
+  var cols = ['Penerima', 'Dibayar oleh', 'Mengetahui'], cw = (W-2*M)/3;
+  cols.forEach(function(c, i){ doc.text(c, M+cw*i+cw/2, y, {align:'center'}); doc.setDrawColor(148,163,184); doc.setLineWidth(0.6); doc.line(M+cw*i+14, y+62, M+cw*(i+1)-14, y+62); });
+  doc.setTextColor(15,23,42); doc.setFont('helvetica','bold'); doc.text(d.dibuat_oleh || '', M+cw*1+cw/2, y+74, {align:'center'});
+  if(d.ket){ doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,116,139); doc.text('Catatan: '+d.ket, M, y+96, {maxWidth:W-2*M}); }
+  var pages = doc.internal.getNumberOfPages();
+  for(var pg=1; pg<=pages; pg++){ doc.setPage(pg); doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(148,163,184);
+    doc.text('Dokumen dibuat oleh sistem Material & Stok · '+d.bukti_no+' · dicetak '+new Date().toLocaleString('id-ID'), M, H-24); doc.text('Halaman '+pg+'/'+pages, W-M, H-24, {align:'right'}); }
+  doc.save('Bukti_Pembayaran_'+String(d.bukti_no).replace(/\//g,'-')+'.pdf');
+}
+function tawarkanBukti(buktiNo, total){
+  openModal('Pembayaran tercatat',
+    '<div class="text-sm text-slate-600">Nomor bukti: <b class="text-slate-900">'+esc(buktiNo)+'</b><br>Total dibayar: <b class="text-slate-900">'+rp(total)+'</b></div>'+
+    '<div class="text-xs text-slate-500 mt-3">Cetak buktinya sekarang untuk ditandatangani penerima. Bukti juga bisa dicetak lagi kapan saja dari tombol "Bukti Pembayaran" pada periode ini.</div>',
+    function(){ closeModal(); cetakBukti(buktiNo); });
+  var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Cetak Bukti (PDF)';
+  var cn = document.getElementById('mCancel'); if(cn) cn.textContent = 'Nanti saja';
+}
+function pilihBukti(payments){
+  var nos = Array.from(new Set((payments||[]).map(function(x){ return x.bukti_no; }).filter(Boolean))).sort();
+  if(!nos.length){ toast('Pembayaran ini dicatat sebelum fitur bukti ada, jadi belum punya nomor bukti.', true); return; }
+  if(nos.length===1){ cetakBukti(nos[0]); return; }
+  openModal('Pilih Bukti Pembayaran',
+    '<div class="text-sm text-slate-600 mb-3">Periode ini dibayar beberapa kali. Pilih bukti yang akan dicetak.</div><div class="space-y-2">'+
+    nos.map(function(n){ var tot = payments.filter(function(x){ return x.bukti_no===n; }).reduce(function(a,x){ return a+Number(x.jumlah||0); },0), tg = (payments.find(function(x){ return x.bukti_no===n; })||{}).tgl_bayar;
+      return '<button type="button" data-bk="'+esc(n)+'" class="w-full flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left hover:bg-slate-50"><span><b class="text-sm">'+esc(n)+'</b><span class="block text-xs text-slate-500">'+esc(tg ? fmtTglPendek(tg) : '')+'</span></span><span class="text-sm font-extrabold tabular-nums">'+rp(tot)+'</span></button>'; }).join('')+'</div>');
+  document.querySelectorAll('[data-bk]').forEach(function(b){ b.onclick = function(){ closeModal(); cetakBukti(b.getAttribute('data-bk')); }; });
+}
+
 function periodStatusBadge(st){ var m = PERIOD_STATUS[st]||PERIOD_STATUS.draft; return badge(m[0], m[1]); }
 
 /* One engine, two screens for the people who handle pay:
@@ -2366,7 +2446,7 @@ function payrollView(c, mode){
   var REKAP = mode==='rekap';
   var write = canWritePay(), isAk = STATE.user.role==='akuntan';
   var wk = weekOf(today());
-  var G = {from:wk.from, to:wk.to, data:null, bayar:'', flagOnly:false, open:{}, PG:{page:1}, preset:'minggu', tab: REKAP?'rincian':'gaji', st:'', shared:{}, kv:null, evSort:'hadir'};
+  var G = {from:wk.from, to:wk.to, data:null, bayar:'', flagOnly:false, open:{}, PG:{page:1}, preset:'minggu', tab: REKAP?'rincian':'gaji', st: (!REKAP && isAk) ? '_aksi' : '', pOpen:{}, pMax:8, pd:{}, shared:{}, kv:null, evSort:'hadir'};
   var projects = [];
   var $ = function(id){ return document.getElementById(id); };
   var selCls = 'px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100';
@@ -2374,15 +2454,15 @@ function payrollView(c, mode){
                    : [['gaji','Gaji Mingguan','wallet'],['kasbon','Kasbon','banknote']];
   c.innerHTML = pageHead(REKAP ? 'Rekap & Pembukuan' : 'Pengajuan Gaji & Kasbon',
       REKAP ? 'Lihat hasil: rincian per pekerja, pembukuan & jurnal upah, buku kasbon, dan evaluasi kehadiran.'
-            : (isAk ? 'Periksa, setujui, lalu bayar pengajuan dari lapangan. Yang perlu tindakan Anda ada di kartu merah dan kuning.' : 'Pantau pengajuan gaji dan kasbon dari lapangan. Persetujuan dan pembayaran dilakukan Akuntan.'),
+            : (isAk ? 'Periksa dan setujui pengajuan dari lapangan, lalu catat pembayarannya. Yang perlu tindakan Anda tampil paling atas.' : 'Pantau pengajuan gaji dan kasbon dari lapangan. Persetujuan dan pembayaran dilakukan Akuntan.'),
       '<div class="flex items-center gap-2 flex-wrap justify-end">'+
       '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportExcel"><i data-lucide="file-down" class="w-3.5 h-3.5"></i>Excel</button>'+
       '<button class="'+btnGhostSm+' flex items-center gap-1" id="btnExportPdf"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>PDF</button></div>')+
-    '<div id="gjCards" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5"></div>'+
+    '<div id="gjCards" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5"></div>'+
     panel(
       '<div class="flex items-center gap-3 flex-wrap">'+
         '<select id="fProj" class="'+selCls+' min-w-[180px]"><option value="">Semua Proyek</option></select>'+
-        (REKAP ? '' : '<select id="gjSt" class="'+selCls+' min-w-[170px]"><option value="">Semua status</option><option value="draft">Belum diajukan</option><option value="diajukan">Menunggu persetujuan</option><option value="disetujui">Siap dibayar</option><option value="dibayar">Sudah dibayar</option></select>')+
+        (REKAP ? '' : '<div id="gjChips" class="flex gap-1.5 flex-wrap"></div>')+
         '<select id="gjPreset" class="'+selCls+' font-semibold"><option value="minggu">Minggu ini (Jum–Kam)</option><option value="lalu">Minggu lalu</option><option value="bulan">Bulan ini</option><option value="30hari">30 hari terakhir</option><option value="kustom">Rentang manual</option></select>'+
         '<span class="text-xs text-slate-400">Dari</span><input type="date" id="gjFrom" class="'+selCls+'">'+
         '<span class="text-xs text-slate-400">Sampai</span><input type="date" id="gjTo" class="'+selCls+'">'+
@@ -2405,10 +2485,9 @@ function payrollView(c, mode){
   enhanceSelect($('gjPreset'));
   if($('gjBayar')) enhanceSelect($('gjBayar'));
   if($('gjTim')) enhanceSelect($('gjTim'));
-  if($('gjSt')) enhanceSelect($('gjSt'));
   $('gjFrom').value = G.from; $('gjTo').value = G.to;
   // The accountant pays the week that just closed, so start there.
-  if(isAk){ G.preset = 'lalu'; var w0 = weekOf(addDays(today(), -7)); G.from = w0.from; G.to = w0.to; $('gjFrom').value = G.from; $('gjTo').value = G.to; $('gjPreset').value = 'lalu'; }
+  if(isAk){ G.preset = 'lalu'; var w0 = weekOf(addDays(today(), -7)); G.from = w0.from; G.to = w0.to; $('gjFrom').value = G.from; $('gjTo').value = G.to; $('gjPreset').value = 'lalu'; $('gjPreset').dispatchEvent(new Event('ss-refresh')); }
 
   function setPreset(v){
     var t = today();
@@ -2486,30 +2565,45 @@ function payrollView(c, mode){
     icons();
   }
   /* Pengajuan cards: what needs the Akuntan's attention right now. */
-  function periodsShown(){ return G.data.periods.filter(function(p){ return (p.hari>0 || p.adjustments.length || p.payments.length) && (!G.st || p.status===G.st); }); }
+  /* Yang perlu tindakan Akuntan: periode diajukan (disetujui dulu), disetujui (dibayar), dan minggu borongan tanpa absen yang belum diajukan. */
+  function soloBor(p){ return p.status==='draft' && !(p.hari>0) && p.adjustments.length>0; }
+  function butuhTindakan(p){ return p.status==='diajukan' || p.status==='disetujui' || soloBor(p); }
+  function periodsShown(){
+    return G.data.periods.filter(function(p){
+      if(!(p.hari>0 || p.adjustments.length || p.payments.length)) return false;
+      if(!G.st) return true;
+      return G.st==='_aksi' ? butuhTindakan(p) : p.status===G.st;
+    });
+  }
+  var CHIPS = [['_aksi','Perlu tindakan'],['draft','Belum diajukan'],['dibayar','Sudah dibayar'],['','Semua']];
+  function drawChips(){
+    var host = $('gjChips'); if(!host) return;
+    host.innerHTML = CHIPS.map(function(c){
+      var on = G.st===c[0] || (c[0]==='_aksi' && (G.st==='diajukan'||G.st==='disetujui'));
+      return '<button type="button" data-chip="'+c[0]+'" aria-pressed="'+(on?'true':'false')+'" class="px-3.5 py-2 rounded-xl text-sm font-semibold border transition '+(on?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50')+'">'+c[1]+'</button>';
+    }).join('');
+    host.querySelectorAll('[data-chip]').forEach(function(b){ b.onclick = function(){ G.st = b.getAttribute('data-chip'); G.pMax = 8; if(G.tab!=='gaji') setTab('gaji'); else { drawCards(); drawPeriods(); bindExports(); } }; });
+  }
   function drawCardsPengajuan(){
     var all = G.data.periods.filter(function(p){ return p.hari>0 || p.adjustments.length || p.payments.length; });
     var by = function(st){ return all.filter(function(p){ return p.status===st; }); };
     var sumK = function(l, k, pos){ return l.reduce(function(a,p){ var v = p[k]||0; return a + (pos ? Math.max(0, v) : v); },0); };
     var proj = fv('fProj');
     var kp = (G.shared.req||[]).filter(function(r){ return r.status==='diajukan' && (!proj || r.project_id===proj); });
-    var wait = by('diajukan'), ready = by('disetujui'), draft = by('draft'), paid = by('dibayar');
-    var n = function(l, word){ return l.length+' '+word; };
+    var wait = by('diajukan'), ready = by('disetujui');
     $('gjCards').innerHTML =
-      cardHtml('send','text-red-500','HARUS DIBAYAR SEKARANG', rp(sumK(ready,'sisa',true)), ready.length ? n(ready,'periode siap dibayar · klik untuk menyaring') : 'Belum ada periode yang siap dibayar', 'data-pg-card="disetujui"', G.st==='disetujui', ready.length ? 'red' : '')+
-      cardHtml('clock','text-amber-500','Menunggu persetujuan', rp(sumK(wait,'total_bayar')), wait.length ? n(wait,'periode perlu diperiksa · klik untuk menyaring') : 'Tidak ada yang menunggu', 'data-pg-card="diajukan"', G.st==='diajukan', wait.length ? 'amber' : '')+
-      cardHtml('banknote','text-sky-500','Kasbon menunggu', rp(kp.reduce(function(a,r){ return a+r.jumlah; },0)), kp.length ? kp.length+' pengajuan perlu dicek · klik untuk membuka' : 'Tidak ada pengajuan kasbon', 'data-pg-card="kasbon"', G.tab==='kasbon', kp.length ? 'amber' : '')+
-      cardHtml('edit','text-slate-500','Belum diajukan lapangan', rp(sumK(draft,'total_bayar')), n(draft,'periode masih draft'), 'data-pg-card="draft"', G.st==='draft')+
-      cardHtml('check-circle-2','text-emerald-500','Sudah dibayar', rp(sumK(paid,'dibayar')), n(paid,'periode selesai'), 'data-pg-card="dibayar"', G.st==='dibayar')+
-      cardHtml('wallet','text-indigo-500','Semua periode', rp(sumK(all,'total_bayar')), n(all,'periode pada rentang ini'), 'data-pg-card=""', !G.st && G.tab==='gaji');
+      cardHtml('clock','text-amber-500','Perlu Anda setujui', wait.length ? wait.length+' periode' : 'Tidak ada', wait.length ? 'Total '+rp(sumK(wait,'total_bayar'))+' · ketuk untuk melihat' : 'Semua pengajuan sudah diperiksa', 'data-pg-card="diajukan"', G.st==='diajukan', wait.length ? 'amber' : '')+
+      cardHtml('send','text-red-500','Siap dibayar', ready.length ? rp(sumK(ready,'sisa',true)) : 'Tidak ada', ready.length ? ready.length+' periode sudah disetujui · ketuk untuk melihat' : 'Belum ada yang siap dibayar', 'data-pg-card="disetujui"', G.st==='disetujui', ready.length ? 'red' : '')+
+      cardHtml('banknote','text-sky-500','Kasbon menunggu', kp.length ? kp.length+' pengajuan' : 'Tidak ada', kp.length ? 'Total '+rp(kp.reduce(function(a,r){ return a+r.jumlah; },0))+' · ketuk untuk membuka' : 'Tidak ada pengajuan kasbon', 'data-pg-card="kasbon"', G.tab==='kasbon', kp.length ? 'amber' : '');
     document.querySelectorAll('[data-pg-card]').forEach(function(b){
       b.onclick = function(){
         var k = b.getAttribute('data-pg-card');
         if(k==='kasbon'){ setTab('kasbon'); return; }
-        G.st = (G.st===k ? '' : k); if($('gjSt')){ $('gjSt').value = G.st; $('gjSt').dispatchEvent(new Event('ss-refresh')); }
+        G.st = (G.st===k ? (isAk ? '_aksi' : '') : k); G.pMax = 8;
         if(G.tab!=='gaji') setTab('gaji'); else { drawCards(); drawPeriods(); bindExports(); }
       };
     });
+    drawChips();
     icons();
   }
   function dayChips(r){
@@ -2759,51 +2853,101 @@ function payrollView(c, mode){
     }
   }
   /* ---- periods ---- */
+  /* ---- periods: satu baris ringkas per periode (apa, berapa, tombol utama); rincian dibuka dengan tombol panah ---- */
+  var NEXT_NOTE = {draft:'Menunggu lapangan mengajukan absen.', diajukan:'Perlu diperiksa lalu disetujui.', disetujui:'Sudah disetujui, siap dibayar.', dibayar:'Sudah dibayar dan terkunci.'};
+  function periodFlagNote(p){
+    // Jumlah pekerja yang perlu dicek hanya pasti bila rentang layar memuat satu periode saja untuk proyek ini.
+    var same = G.data.periods.filter(function(x){ return x.project_id===p.project_id; });
+    if(same.length!==1) return '';
+    var n = G.data.rows.filter(function(r){ return r.project_id===p.project_id && r.flags.length; }).length;
+    return n ? '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700">⚠ '+n+' pekerja perlu dicek</span>' : '';
+  }
+  function periodRowsTable(p, d){
+    var rows = d.rows.filter(function(r){ return r.net!==0 || r.hari>0 || r.flags.length; });
+    rows.sort(function(a,b){ return (b.flags.length>0)-(a.flags.length>0) || String(a.nama).localeCompare(String(b.nama)); });
+    var more = rows.length>30;
+    return '<div class="overflow-x-auto mt-3"><table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-slate-500"><th class="py-1.5 pr-3 font-semibold">Pekerja</th><th class="py-1.5 pr-3 font-semibold text-right">Hari</th><th class="py-1.5 pr-3 font-semibold text-right">Gaji + lembur</th><th class="py-1.5 pr-3 font-semibold text-right">± Penyesuaian</th><th class="py-1.5 font-semibold text-right">Diterima</th></tr></thead><tbody>'+
+      rows.slice(0,30).map(function(r){
+        var adj = r.tambah - r.potong;
+        return '<tr class="border-t border-slate-100"><td class="py-2 pr-3"><div class="font-semibold text-slate-800 leading-tight">'+esc(r.nama)+(r.borongan?' <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">BORONGAN</span>':'')+'</div>'+
+          '<div class="text-[11px] text-slate-500">'+esc(r.grade_nama)+(r.tim && !r.borongan?' · '+esc(r.tim):'')+'</div>'+
+          (r.flags.length ? '<div class="mt-0.5 flex flex-wrap gap-1">'+r.flags.map(function(f){ return '<span class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700">⚠ '+esc(FLAG_LABEL[f]||f)+(f==='belum_diisi'&&r.kosong?' ('+r.kosong+' hari)':'')+'</span>'; }).join('')+'</div>' : '')+'</td>'+
+          '<td class="py-2 pr-3 text-right tabular-nums">'+num0(r.hari)+'</td><td class="py-2 pr-3 text-right tabular-nums">'+rp(r.gaji+r.lembur_rp)+'</td>'+
+          '<td class="py-2 pr-3 text-right tabular-nums '+(adj<0?'text-red-600':(adj>0?'text-emerald-600':'text-slate-400'))+'">'+(adj===0?'–':(adj>0?'+':'−')+rp(Math.abs(adj)))+'</td>'+
+          '<td class="py-2 text-right tabular-nums font-extrabold">'+rp(r.net)+'</td></tr>';
+      }).join('')+'</tbody></table></div>'+(more ? '<div class="text-xs text-slate-500 mt-2">Menampilkan 30 teratas dari '+rows.length+'. Unduh Excel untuk semuanya.</div>' : '');
+  }
   function drawPeriods(){
     var host = document.getElementById('gjPeriods'), pj = periodsShown();
-    if(!pj.length){ host.innerHTML = '<div class="text-sm text-slate-400 bg-white rounded-2xl border border-slate-200 px-5 py-8 text-center">'+(G.st ? 'Tidak ada periode dengan status ini pada rentang ini.' : 'Belum ada periode dengan absen pada rentang ini.')+'</div>'; return; }
-    host.innerHTML = pj.map(function(p){
-      var locked = p.status==='dibayar';
-      var mini = function(l, v, cls){ return '<div><div class="text-[11px] font-semibold text-slate-400">'+l+'</div><div class="text-[15px] font-extrabold tabular-nums '+(cls||'text-slate-800')+'">'+v+'</div></div>'; };
+    if(!pj.length){
+      host.innerHTML = '<div class="text-sm text-slate-500 bg-white rounded-2xl border border-slate-200 px-5 py-8 text-center">'+
+        (G.st==='_aksi' ? 'Tidak ada yang perlu Anda setujui atau bayar pada rentang ini.<div class="mt-2"><button type="button" class="font-bold text-indigo-600 underline" data-chip-all>Lihat semua periode</button></div>'
+          : (G.st ? 'Tidak ada periode dengan status ini pada rentang ini.' : 'Belum ada periode dengan absen pada rentang ini.'))+'</div>';
+      var all = host.querySelector('[data-chip-all]'); if(all) all.onclick = function(){ G.st = ''; drawCards(); drawPeriods(); bindExports(); };
+      return;
+    }
+    var shown = pj.slice(0, G.pMax);
+    host.innerHTML = shown.map(function(p){
+      var locked = p.status==='dibayar', isAk = STATE.user.role==='akuntan', solo = soloBor(p);
+      var open = (p.id in G.pOpen) ? G.pOpen[p.id] : (pj.length<=1 || solo);
+      var btn = function(attr, icon, label, primary){ return '<button type="button" '+attr+' class="'+(primary?btnPrimary:btnGhostSm)+' flex items-center justify-center gap-1.5">'+(icon?'<i data-lucide="'+icon+'" class="w-3.5 h-3.5"></i>':'')+label+'</button>'; };
+      var primary = '';
+      if(isAk && p.status==='diajukan') primary = btn('data-pj-setuju="'+esc(p.id)+'"','check','Periksa & Setujui', true);
+      else if(isAk && p.status==='disetujui') primary = btn('data-pj-bayar="'+esc(p.id)+'"','banknote','Catat Pembayaran', true);
+      else if(p.status==='dibayar' && p.payments.length) primary = btn('data-pj-bukti="'+esc(p.id)+'"','file-text','Bukti Pembayaran');
+      else if(isAk && p.status==='draft') primary = btn('data-pj-ajukan="'+esc(p.id)+'"','send', solo ? 'Ajukan minggu borongan' : 'Ajukan (atas nama lapangan)', solo);
+      var sec = '';
+      if(write && !locked) sec += btn('data-pj-adj="'+esc(p.id)+'"','plus','Tambahan / Potongan');
+      if(write && !locked) sec += btn('data-pj-head="'+esc(p.id)+'"','','Ubah PJ');
+      if(isAk && (p.status==='diajukan' || p.status==='disetujui') && !p.payments.length) sec += btn('data-pj-kembali="'+esc(p.id)+'"','','Kembalikan ke lapangan');
+      if(p.payments.length && p.status!=='dibayar') sec += btn('data-pj-bukti="'+esc(p.id)+'"','file-text','Bukti Pembayaran');
+      sec += btn('data-pj-xls="'+esc(p.id)+'"','file-down','Absen Upah (Excel)');
+      sec += btn('data-pj-pdf="'+esc(p.id)+'"','file-text','Daftar Bayar (PDF)');
+      if(p.status==='disetujui' || p.status==='dibayar') sec += btn('data-pj-trf="'+esc(p.id)+'"','banknote','Daftar Transfer (Excel)');
+      var note = solo ? 'Minggu ini hanya berisi nominal (mis. borongan), tanpa absen harian. Isi PJ lewat Ubah PJ di rincian, lalu ajukan.' : (NEXT_NOTE[p.status]||'');
       var adjRows = p.adjustments.map(function(x){
         return '<tr class="border-t border-slate-100"><td class="py-2 pr-3 text-sm">'+esc(x.label)+(x.kategori==='kasbon'?' <span class="text-[11px] font-bold text-red-500">kasbon</span>':'')+'</td>'+
           '<td class="py-2 pr-3 text-xs text-slate-500">'+(x.worker_nama?esc(x.worker_nama):(x.tim?esc(timLabel(x.tim)):'Seluruh grup'))+'</td>'+
-          '<td class="py-2 pr-3 text-right tabular-nums font-bold '+(x.jenis==='tambah'?'text-emerald-600':'text-red-600')+'">'+(x.jenis==='tambah'?'+':'−')+rp(x.jumlah).replace('Rp ','Rp ')+'</td>'+
-          '<td class="py-2 text-right">'+(write && !locked?'<button class="text-xs text-slate-300 hover:text-red-600 font-bold" data-adj-del="'+esc(x.id)+'" title="Hapus">✕</button>':'')+'</td></tr>';
+          '<td class="py-2 pr-3 text-right tabular-nums font-bold '+(x.jenis==='tambah'?'text-emerald-600':'text-red-600')+'">'+(x.jenis==='tambah'?'+':'−')+rp(x.jumlah)+'</td>'+
+          '<td class="py-2 text-right">'+(write && !locked?'<button class="text-xs text-slate-400 hover:text-red-600 font-bold" data-adj-del="'+esc(x.id)+'" aria-label="Hapus baris">✕</button>':'')+'</td></tr>';
       }).join('');
-      var btn = function(attr, icon, label, primary){ return '<button type="button" '+attr+' class="'+(primary?btnPrimary:btnGhostSm+' flex items-center gap-1')+'">'+(icon?'<i data-lucide="'+icon+'" class="w-3.5 h-3.5"></i>':'')+label+'</button>'; };
-      var acts = '', isAk = STATE.user.role==='akuntan';
-      var soloBor = p.status==='draft' && !(p.hari>0) && p.adjustments.length>0; // minggu yang hanya berisi nominal (mis. borongan): tidak ada absen harian
-      var stepNote = {draft: soloBor ? 'Minggu ini hanya berisi nominal (mis. borongan), tanpa absen harian — diisi pusat. Isi PJ lewat "Ubah PJ", lalu ajukan langsung di sini.' : 'Menunggu lapangan mengajukan absen minggu ini.', diajukan:'Menunggu pemeriksaan dan persetujuan Akuntan.', disetujui:'Sudah disetujui — siap dibayar.', dibayar:'Sudah dibayar dan terkunci.'}[p.status]||'';
-      if(isAk && p.status==='diajukan') acts += btn('data-pj-setuju="'+esc(p.id)+'"','check','Periksa & Setujui', true);
-      if(isAk && p.status==='disetujui') acts += btn('data-pj-bayar="'+esc(p.id)+'"','banknote','Catat Pembayaran', true);
-      if(write && !locked) acts += btn('data-pj-adj="'+esc(p.id)+'"','plus','Tambahan / Potongan');
-      if(isAk && p.status==='draft') acts += btn('data-pj-ajukan="'+esc(p.id)+'"','send', soloBor ? 'Ajukan minggu borongan' : 'Ajukan (atas nama lapangan)');
-      if(isAk && (p.status==='diajukan' || p.status==='disetujui') && !p.payments.length) acts += btn('data-pj-kembali="'+esc(p.id)+'"','','Kembalikan ke lapangan');
-      if(write && !locked) acts += btn('data-pj-head="'+esc(p.id)+'"','','Ubah PJ');
-      acts += btn('data-pj-xls="'+esc(p.id)+'"','file-down','Absen Upah (Excel)');
-      acts += btn('data-pj-pdf="'+esc(p.id)+'"','file-text','Daftar Bayar (PDF)');
-      if(p.status==='disetujui' || p.status==='dibayar') acts += btn('data-pj-trf="'+esc(p.id)+'"','banknote','Daftar Transfer (Excel)');
-      return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-4">'+
-        '<div class="flex items-start justify-between gap-3 flex-wrap mb-4"><div><div class="font-extrabold text-slate-800">'+esc(p.project_nama)+'</div>'+
-          '<div class="text-xs text-slate-500 mt-0.5">'+esc(fmtTglPendek(p.tgl_mulai))+' – '+esc(fmtTglPendek(p.tgl_akhir))+' '+p.tgl_akhir.slice(0,4)+
-          (p.pj_nama?' · PJ <b class="text-slate-700">'+esc(p.pj_nama)+'</b>':'')+(p.grup_nama?' · '+esc(p.grup_nama):'')+'</div>'+
-          '<div class="text-xs text-slate-400 mt-1">'+esc(stepNote)+'</div>'+
-          (p.catatan && !/^Dikembalikan:/.test(p.catatan) ? '<div class="text-xs text-slate-600 mt-1.5"><span class="font-semibold text-slate-500">Keterangan lapangan:</span> '+esc(p.catatan)+'</div>' : '')+'</div>'+periodStatusBadge(p.status)+'</div>'+
-        '<div class="grid grid-cols-2 md:grid-cols-6 gap-4 pb-4 border-b border-slate-100">'+
-          mini('Pekerja', p.pekerja)+mini('Hari kerja', num0(p.hari))+mini('Gaji + lembur', rp(p.gaji+p.lembur_rp))+
-          mini('Tambahan / potongan', (p.adj_tambah-p.adj_potong===0?'–':(p.adj_tambah-p.adj_potong>0?'+':'')+rp(p.adj_tambah-p.adj_potong)))+
-          mini('Total pembayaran', rp(p.total_bayar),'text-indigo-700')+mini('Sisa belum dibayar', rp(Math.max(0,p.sisa)), p.sisa>0.5?'text-red-600':'text-emerald-600')+'</div>'+
-        (p.adjustments.length ? '<table class="w-full mt-3"><tbody>'+adjRows+'</tbody></table>' : '<div class="text-xs text-slate-400 mt-3">Belum ada tambahan / potongan.</div>')+
-        '<div class="flex flex-wrap gap-2 mt-4">'+acts+'</div></div>';
-    }).join('');
+      var mini = function(l, v, cls){ return '<div><div class="text-[11px] font-semibold text-slate-500">'+l+'</div><div class="text-[15px] font-extrabold tabular-nums '+(cls||'text-slate-800')+'">'+v+'</div></div>'; };
+      var detail = !open ? '' : '<div class="px-4 pb-4 border-t border-slate-100">'+
+        '<div class="grid grid-cols-2 md:grid-cols-5 gap-4 py-4">'+mini('Pekerja', p.pekerja)+mini('Hari kerja', num0(p.hari))+mini('Gaji + lembur', rp(p.gaji+p.lembur_rp))+
+          mini('Tambahan / potongan', (p.adj_tambah-p.adj_potong===0?'–':(p.adj_tambah-p.adj_potong>0?'+':'−')+rp(Math.abs(p.adj_tambah-p.adj_potong))))+
+          mini('Sisa belum dibayar', rp(Math.max(0,p.sisa)), p.sisa>0.5?'text-red-600':'text-emerald-600')+'</div>'+
+        (p.catatan && !/^Dikembalikan:/.test(p.catatan) ? '<div class="text-xs text-slate-600 mb-2"><span class="font-semibold text-slate-500">Keterangan lapangan:</span> '+esc(p.catatan)+'</div>' : '')+
+        '<div data-pj-rows="'+esc(p.id)+'" class="text-xs text-slate-500">Memuat rincian per pekerja…</div>'+
+        '<div class="mt-4 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Tambahan / potongan</div>'+
+        (p.adjustments.length ? '<table class="w-full"><tbody>'+adjRows+'</tbody></table>' : '<div class="text-xs text-slate-500 mt-1">Belum ada tambahan / potongan.</div>')+
+        '<div class="flex flex-wrap gap-2 mt-4">'+sec+'</div></div>';
+      return '<div class="bg-white rounded-2xl border '+((p.status==='diajukan'||p.status==='disetujui')?'border-indigo-200':'border-slate-200')+' shadow-sm mb-3">'+
+        '<div class="flex items-center gap-3 flex-wrap p-4">'+
+          '<div class="min-w-0 flex-1 basis-56"><div class="font-extrabold text-slate-800 leading-tight">'+esc(p.project_nama)+'</div>'+
+            '<div class="text-xs text-slate-500 mt-0.5">'+esc(fmtTglPendek(p.tgl_mulai))+' – '+esc(fmtTglPendek(p.tgl_akhir))+' '+p.tgl_akhir.slice(0,4)+' · '+p.pekerja+' pekerja'+(p.pj_nama?' · PJ '+esc(p.pj_nama):'')+'</div>'+
+            '<div class="text-xs text-slate-500 mt-1">'+esc(note)+'</div>'+(periodFlagNote(p) ? '<div class="mt-1.5">'+periodFlagNote(p)+'</div>' : '')+'</div>'+
+          '<div class="text-right"><div class="text-lg font-extrabold tabular-nums text-slate-900">'+rp(p.total_bayar)+'</div><div class="mt-1">'+periodStatusBadge(p.status)+'</div></div>'+
+          '<div class="flex items-center gap-2 w-full sm:w-auto">'+(primary ? '<div class="flex-1 sm:flex-none">'+primary+'</div>' : '')+
+            '<button type="button" data-pj-open="'+esc(p.id)+'" aria-expanded="'+(open?'true':'false')+'" class="'+btnGhostSm+' flex items-center gap-1 shrink-0">Rincian <i data-lucide="chevron-down" class="w-4 h-4 transition-transform '+(open?'rotate-180':'')+'"></i></button></div>'+
+        '</div>'+detail+'</div>';
+    }).join('')+(pj.length>shown.length ? '<button type="button" data-pj-more class="w-full text-center text-sm font-bold text-indigo-600 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50">Tampilkan lebih banyak ('+(pj.length-shown.length)+')</button>' : '');
     icons();
     var P = function(id){ return G.data.periods.find(function(x){ return x.id===id; }); };
     var on = function(sel, attr, fn){ host.querySelectorAll(sel).forEach(function(b){ b.onclick = function(){ fn(P(b.getAttribute(attr))); }; }); };
     on('[data-pj-adj]','data-pj-adj', openAdjustment); on('[data-pj-bayar]','data-pj-bayar', openPayment);
     on('[data-pj-ajukan]','data-pj-ajukan', doAjukan); on('[data-pj-kembali]','data-pj-kembali', doKembalikan); on('[data-pj-head]','data-pj-head', openHeader);
     on('[data-pj-setuju]','data-pj-setuju', doSetujui); on('[data-pj-trf]','data-pj-trf', function(p){ exportTransfer(p); });
+    on('[data-pj-bukti]','data-pj-bukti', function(p){ pilihBukti(p.payments); });
     on('[data-pj-xls]','data-pj-xls', function(p){ exportAbsenUpah(p); }); on('[data-pj-pdf]','data-pj-pdf', function(p){ exportDaftarBayar(p); });
+    host.querySelectorAll('[data-pj-open]').forEach(function(b){ b.onclick = function(){ var id = b.getAttribute('data-pj-open'), cur = (id in G.pOpen) ? G.pOpen[id] : b.getAttribute('aria-expanded')==='true'; G.pOpen[id] = !cur; drawPeriods(); }; });
+    var more = host.querySelector('[data-pj-more]'); if(more) more.onclick = function(){ G.pMax += 8; drawPeriods(); };
+    host.querySelectorAll('[data-pj-rows]').forEach(function(box){
+      var p = P(box.getAttribute('data-pj-rows')); if(!p) return;
+      var fill = function(d){ if(box.isConnected) box.innerHTML = periodRowsTable(p, d); };
+      var key = p.id+'|'+p.sisa+'|'+p.total_bayar+'|'+p.status;
+      if(G.pd[p.id] && G.pd[p.id].key===key) fill(G.pd[p.id].d);
+      else periodData(p).then(function(d){ G.pd[p.id] = {key:key, d:d}; fill(d); }).catch(function(e){ if(box.isConnected) box.textContent = 'Gagal memuat rincian: '+e.message; });
+    });
     host.querySelectorAll('[data-adj-del]').forEach(function(b){
       b.onclick = function(){ confirmModal('Hapus Penyesuaian','Hapus baris ini dari periode?', function(){
         apiFetch('/payroll_adjustments.php?id='+encodeURIComponent(b.getAttribute('data-adj-del')), {method:'DELETE'}).then(function(){ toast('Dihapus.'); load(); }).catch(function(e){ toast(e.message, true); });
@@ -2945,7 +3089,7 @@ function payrollView(c, mode){
           });
           var gcb = document.querySelector('[data-py-grp]'); if(gcb && gcb.checked) items.push({worker_id:null, jumlah:Math.round(grp*100)/100});
           if(!items.length){ toast('Pilih minimal satu pembayaran.', true); return; }
-          post('/payroll_periods.php', {action:'bayar', project_id:p.project_id, tgl:p.tgl_mulai, tgl_bayar:fv('py_tgl'), metode:fv('py_met'), items:items}, 'Pembayaran tercatat ✓');
+          post('/payroll_periods.php', {action:'bayar', project_id:p.project_id, tgl:p.tgl_mulai, tgl_bayar:fv('py_tgl'), metode:fv('py_met'), items:items}, 'Pembayaran tercatat ✓').then(function(r){ if(r && r.bukti_no) tawarkanBukti(r.bukti_no, r.dibayar); });
         });
       var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Catat Dibayar';
     }).catch(function(e){ toast(e.message, true); });
@@ -3017,7 +3161,6 @@ function payrollView(c, mode){
   onv('q','input', function(){ G.PG.page=1; if(G.data) draw(); });
   onv('gjBayar','change', function(){ G.PG.page=1; if(G.data) draw(); });
   onv('gjTim','change', function(){ G.PG.page=1; if(G.data) draw(); });
-  onv('gjSt','change', function(){ G.st = this.value; if(G.data){ if(G.tab!=='gaji') setTab('gaji'); else { drawCards(); drawPeriods(); bindExports(); } } });
   onv('fProj','change', function(){ G.PG.page=1; load(); });
   onv('gjPreset','change', function(){ if(this.value!=='kustom'){ setPreset(this.value); } G.PG.page=1; load(); });
   ['gjFrom','gjTo'].forEach(function(id){

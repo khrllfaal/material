@@ -57,3 +57,9 @@ function kasbon_request_service(): \App\Application\KasbonRequestService {
     if ($s === null) $s = new \App\Application\KasbonRequestService(db(), new \App\Infrastructure\KasbonRequestRepository(db()), 'audit', 'require_project_access', 'payroll_week');
     return $s;
 }
+
+function bukti_service(): \App\Application\BuktiService {
+    static $s = null;
+    if ($s === null) $s = new \App\Application\BuktiService(new \App\Infrastructure\PeriodRepository(db()), payroll_services()['payroll']);
+    return $s;
+}

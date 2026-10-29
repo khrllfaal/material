@@ -52,7 +52,7 @@ const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String
  const visit=async(user,pw,mobile,pages)=>{const ctx=await br.newContext(mobile?{viewport:{width:390,height:800},isMobile:true,hasTouch:true}:{viewport:{width:1280,height:900}});const p=await ctx.newPage();let dlg=0;p.on('dialog',d=>{dlg++;d.dismiss()});
   await p.goto('http://127.0.0.1:8899/frontend/index.html');await p.fill('#loginEmail',user);await p.fill('#loginPassword',pw);await p.click('#loginSubmit');await p.waitForTimeout(2300);
   for(const pg of pages){const sel=pg[0]==='#'||pg[0]==='['?pg:'.nav-link[data-page="'+pg+'"]';await p.click(sel,{timeout:2500}).catch(()=>{});await p.waitForTimeout(1300);
-   if(pg==='pengajuan'){await p.click('[data-pj-adj]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(500);await p.keyboard.press('Escape')}}
+   if(pg==='pengajuan'){if(!(await p.$('[data-pj-adj]'))){await p.click('[data-pj-open]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(500)}await p.click('[data-pj-adj]',{timeout:2500}).catch(()=>{});await p.waitForTimeout(500);await p.keyboard.press('Escape')}}
   const x=await p.evaluate(()=>window.__xss||0);await ctx.close();return x+dlg};
  const xa=await visit('akun1','AkuntanTest123',false,['pengajuan','rekap','pekerja']);
  const xp=await visit('adminp','AdminTest123',false,['dashboard','pekerja','proyek','pengguna','log','audit']);

@@ -33,6 +33,7 @@ DROP TABLE IF EXISTS `attendance`;
 DROP TABLE IF EXISTS `payroll_periods`;
 DROP TABLE IF EXISTS `payroll_adjustments`;
 DROP TABLE IF EXISTS `payroll_payments`;
+DROP TABLE IF EXISTS `doc_counters`;
 DROP TABLE IF EXISTS `kasbon`;
 DROP TABLE IF EXISTS `kasbon_requests`;
 DROP TABLE IF EXISTS `php_sessions`;
@@ -333,10 +334,20 @@ CREATE TABLE payroll_payments (
   ket           VARCHAR(255) NOT NULL DEFAULT '',
   created_by    VARCHAR(40) NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  bukti_no      VARCHAR(30) NULL,                 -- nomor Bukti Pembayaran (satu nomor untuk satu kali bayar)
   INDEX idx_pay_period (period_id),
+  INDEX idx_pay_bukti (bukti_no),
   FOREIGN KEY (period_id) REFERENCES payroll_periods(id) ON DELETE CASCADE,
   FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Penghitung nomor dokumen berurut per bulan (BP/2026/10/0001). Naik di dalam transaksi pembayaran: tanpa nomor ganda, tanpa lubang.
+CREATE TABLE IF NOT EXISTS doc_counters (
+  kode     VARCHAR(8) NOT NULL,
+  periode  CHAR(7) NOT NULL,
+  terakhir INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (kode, periode)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Kasbon yang diberikan. Saldo = kasbon diberikan - potongan kasbon pada gaji.
 -- worker_id NULL = kasbon atas nama grup/penanggung jawab.

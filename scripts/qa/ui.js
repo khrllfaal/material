@@ -62,7 +62,7 @@ const toastTxt=async p=>{await p.waitForTimeout(900);return (await p.$$eval('#to
  await d.click('.nav-link[data-page="pengajuan"]');await d.waitForTimeout(2500);
  const hasFlagUi=await d.evaluate(()=>document.body.innerText.includes('Tim borongan')||document.body.innerText.includes('borongan'));
  ok('Akuntan: halaman Pengajuan memuat tim borongan tanpa error',hasFlagUi||true);
- await d.click('[data-pj-adj]').catch(()=>{});await d.waitForSelector('#ad_w',{timeout:4000}).catch(()=>{});
+ if(!(await d.$('[data-pj-adj]'))){await d.click('[data-pj-open]').catch(()=>{});await d.waitForTimeout(500)}await d.click('[data-pj-adj]').catch(()=>{});await d.waitForSelector('#ad_w',{timeout:4000}).catch(()=>{});
  const opts=await d.$$eval('#ad_w option',e=>e.map(x=>x.textContent)).catch(()=>[]);
  ok('Akuntan: pilihan "Untuk" pada Tambahan memuat Tim Aluminium (Tim borongan)',opts.some(o=>/Tim Aluminium/.test(o)&&/borongan/i.test(o)),opts.join(' | '));
  ok('Akuntan: petunjuk borongan tampil di jendela Tambahan',/Tim borongan: pilih timnya/.test(await d.textContent('#modalBody').catch(()=>'')));

@@ -97,7 +97,7 @@ final class PeriodService {
     public function bayar(array $user, string $projectId, string $tgl, array $b, string $tglBayar): array {
         self::peran($user, ['akuntan'], 'Hanya Akuntan yang bisa mencatat pembayaran.');
         $metode = (($b['metode'] ?? '') === 'transfer') ? 'transfer' : 'tunai';
-        [$pid, $total, $n, $open] = $this->repo->transaksi(function () use ($user, $projectId, $tgl, $b, $tglBayar, $metode) {
+        [$pid, $total, $n, $open, $bukti] = $this->repo->transaksi(function () use ($user, $projectId, $tgl, $b, $tglBayar, $metode) {
             $p = $this->repo->kunci($projectId, $tgl);
             $pid = $p['id'];
             PeriodRules::pastikanBisaDibayar($p['status']);
@@ -117,6 +117,7 @@ final class PeriodService {
             if (!$items) throw new DomainError('Tidak ada pembayaran yang perlu dicatat.', 422);
 
             $total = 0.0; $seen = [];
+            $bukti = $this->repo->nomorBerikutnya('BP', $tglBayar); // satu nomor untuk satu kali bayar (semua penerima di bawahnya)
             foreach ($items as $it) {
                 $key = $it['worker_id'] ?? '_grup';
                 if (isset($seen[$key])) throw new DomainError('Satu pekerja hanya boleh muncul sekali dalam satu pembayaran.', 422);
@@ -128,7 +129,7 @@ final class PeriodService {
                     if (!isset($sisaW[$it['worker_id']])) throw new DomainError('Pekerja tidak termasuk dalam periode ini.', 422);
                     if ($it['jumlah'] <= 0 || $it['jumlah'] > $sisaW[$it['worker_id']] + 0.005) throw new DomainError('Jumlah bayar melebihi sisa gaji pekerja.', 422);
                 }
-                $this->repo->catatPembayaran($pid, $it['worker_id'], $it['jumlah'], $tglBayar, $metode, self::potong($b['ket'] ?? '', 255), $user['id']);
+                $this->repo->catatPembayaran($pid, $it['worker_id'], $it['jumlah'], $tglBayar, $metode, self::potong($b['ket'] ?? '', 255), $user['id'], $bukti);
                 $total += $it['jumlah'];
             }
             // ditutup begitu tidak ada yang tersisa
@@ -137,9 +138,9 @@ final class PeriodService {
             foreach ($after['periods'] as $x) if ($x['id'] === $pid) $grupSisa = $x['grup_net'] - $x['grup_dibayar'];
             $open = PeriodRules::terbuka($after['totals']['sisa'], $grupSisa);
             if (!$open) $this->repo->tandaiDibayar($pid, $user['id']);
-            return [$pid, $total, count($items), $open];
+            return [$pid, $total, count($items), $open, $bukti];
         });
-        $this->catat('update', 'payroll_payments', $pid, sprintf('%d baris, total %s, %s%s', $n, $total, $metode, $open ? '' : ' — LUNAS'));
-        return ['ok' => true, 'dibayar' => $total, 'lunas' => !$open, 'status' => $open ? 'disetujui' : 'dibayar'];
+        $this->catat('update', 'payroll_payments', $pid, sprintf('%s: %d baris, total %s, %s%s', $bukti, $n, $total, $metode, $open ? '' : ' — LUNAS'));
+        return ['ok' => true, 'dibayar' => $total, 'lunas' => !$open, 'status' => $open ? 'disetujui' : 'dibayar', 'bukti_no' => $bukti];
     }
 }
