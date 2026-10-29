@@ -1,0 +1,24 @@
+// HP lapangan: kotak "Pengajuan kasbon" hanya memuat minggu gaji ini + yang masih menunggu; yang lama di balik tombol Riwayat.
+const {chromium,devices}=require('/opt/node22/lib/node_modules/playwright');const {execSync}=require('child_process');const {C}=require('./lib.js');
+const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String(d).slice(0,150):''));
+(async()=>{const l=new C(),k=new C();await l.login('lap1','LapanganTest123');await k.login('akun1','AkuntanTest123');
+ const mk=async n=>(await l.r('workers.php','POST',{project_id:'proj_a',nama:n,grade:'TK',tim:'Tim A'})).j.id;
+ const [w1,w2,w3]=[await mk('Lama Selesai'),await mk('Lama Menunggu'),await mk('Baru Ini')];
+ const rq=async(w,id)=>(await l.r('kasbon_requests.php','POST',{id,project_id:'proj_a',worker_id:w,jumlah:100000,ket:'uji'})).j;
+ await rq(w1,'ksr_old000000001');await rq(w2,'ksr_old000000002');await rq(w3,'ksr_new000000001');
+ await k.r('kasbon_requests.php','POST',{action:'setujui',id:'ksr_old000000001'});
+ execSync("mysql -uroot material -e \"UPDATE kasbon_requests SET created_at = NOW() - INTERVAL 12 DAY WHERE id LIKE 'ksr_old%'\"");
+ const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});const ctx=await br.newContext({...devices['Pixel 7']});const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('http://127.0.0.1:8899/frontend/index.html');await p.fill('#loginEmail','lap1');await p.fill('#loginPassword','LapanganTest123');await p.click('#loginSubmit');await p.waitForTimeout(2300);
+ await p.click('#mNav [data-sec="absen"]');await p.waitForSelector('#abKasbonBox',{timeout:8000});await p.waitForTimeout(1200);
+ let t=await p.evaluate(()=>document.getElementById('abKasbonBox').innerText);
+ ok('minggu ini: pengajuan "Baru Ini" tampil',/Baru Ini/.test(t),t.replace(/\s+/g,' '));
+ ok('pengajuan lama yang masih menunggu tetap tampil ("Lama Menunggu")',/Lama Menunggu/.test(t));
+ ok('pengajuan lama yang sudah selesai disembunyikan ("Lama Selesai")',!/Lama Selesai/.test(t));
+ ok('tombol "Lihat riwayat minggu lalu (1)" tampil',/Lihat riwayat minggu lalu \(1\)/.test(t));
+ await p.click('#abKRiwayat');await p.waitForTimeout(400);t=await p.evaluate(()=>document.getElementById('abKasbonBox').innerText);
+ ok('klik riwayat: yang lama ikut tampil',/Lama Selesai/.test(t)&&/Sembunyikan riwayat/.test(t));
+ await p.click('#abKRiwayat');await p.waitForTimeout(400);t=await p.evaluate(()=>document.getElementById('abKasbonBox').innerText);
+ ok('klik lagi: kembali ringkas',!/Lama Selesai/.test(t));
+ ok('tidak ada error halaman',errs.length===0,errs.join('|'));
+ await br.close();console.log(R.join('\n'));console.log('== ui kasbon riwayat: PASS '+R.filter(r=>r.startsWith('PASS')).length+' / FAIL '+R.filter(r=>r.startsWith('FAIL')).length);})();

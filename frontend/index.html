@@ -4092,6 +4092,7 @@ function drawAbsen(c){
 
   c.innerHTML = card(head) + banner + tools + '<div id="abKasbonBox"></div>' + quick + timChips + filters + empty + '<div id="abList"></div>' + ajukan + '<div id="abBar"></div>';
   document.getElementById('abKasbonBox').innerHTML = kasbonBoxHtml();
+  var kr = document.getElementById('abKRiwayat'); if(kr) kr.onclick = function(){ ABSEN.kAll = !ABSEN.kAll; document.getElementById('abKasbonBox').innerHTML = kasbonBoxHtml(); var k2 = document.getElementById('abKRiwayat'); if(k2) k2.onclick = kr.onclick; };
   icons();
   renderAbSummary(); renderAbList();
   bindAbsen(c);
@@ -4104,7 +4105,10 @@ function kasbonBoxHtml(){
       return {batch:'_q'+o.payload.project_id, status:'_antre', ket:o.payload.ket, lines:items.map(function(i){ return {nama:(ABSEN.workers.find(function(w){ return w.id===i.worker_id; })||{}).nama || (i.tim ? timLabel(i.tim) : 'Grup / penanggung jawab'), jumlah:i.jumlah}; })}; });
   // rows that belong to one request (same batch_id) are shown together as one card
   var groups = [], idx = {};
+  // Layar tetap pendek: hanya pengajuan minggu gaji ini dan yang masih menunggu; yang lama ada di "Riwayat".
+  var wkFrom = weekOf(today()).from, hidden = 0;
   (ABSEN.kreq||[]).forEach(function(k){
+    if(!ABSEN.kAll && k.status!=='diajukan' && String(k.tgl_wib||'') < wkFrom){ hidden++; return; }
     var key = k.batch_id || k.id;
     if(!(key in idx)){ idx[key] = groups.length; groups.push({batch:key, status:k.status, ket:k.ket, catatan:k.catatan, lines:[]}); }
     groups[idx[key]].lines.push({nama:kreqName(k), jumlah:k.jumlah});
@@ -4117,7 +4121,8 @@ function kasbonBoxHtml(){
       '<div class="text-xs text-slate-400 truncate">'+esc(g.ket||'')+(g.status==='ditolak'&&g.catatan?' · '+esc(g.catatan):'')+'</div></div>'+
       '<div class="text-right shrink-0"><div class="text-sm font-extrabold tabular-nums">'+fmtIdNum(total)+'</div><span class="text-[10px] font-bold px-2 py-0.5 rounded-full '+st[0]+'">'+st[1]+'</span></div></div>';
   }).join('');
-  return list ? '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2 mb-3"><div class="text-[11px] font-extrabold uppercase tracking-wide text-slate-400 pt-1.5">Pengajuan kasbon</div>'+list+'</div>' : '';
+  var more = (hidden || ABSEN.kAll) ? '<button type="button" id="abKRiwayat" class="w-full text-center text-xs font-bold text-indigo-600 py-2.5 border-t border-slate-100">'+(ABSEN.kAll ? 'Sembunyikan riwayat' : 'Lihat riwayat minggu lalu ('+hidden+')')+'</button>' : '';
+  return (list || more) ? '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2 mb-3"><div class="text-[11px] font-extrabold uppercase tracking-wide text-slate-400 pt-1.5">Pengajuan kasbon</div>'+(list || '<div class="text-xs text-slate-500 py-2.5">Belum ada pengajuan minggu ini.</div>')+more+'</div>' : '';
 }
 
 /* The big "Ajukan" box. One glance tells the state by colour:
