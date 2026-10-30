@@ -9,6 +9,7 @@
    - `node scripts/qa/audit_keamanan.js` — 23 pemeriksaan keamanan (sesi, isolasi data, XSS, batas beban); database baru.
    - `node scripts/qa/ui_kasbon_riwayat.js` — HP lapangan: kotak pengajuan kasbon ringkas + tombol riwayat.
    - `node scripts/qa/ui_kasbon_riwayat.js` — HP lapangan: kotak pengajuan kasbon ringkas + tombol riwayat.
+   - `node scripts/qa/kasbon_ubah.js` — potongan kasbon mingguan bisa diturunkan Akuntan saat Setujui (jam terkunci); `ui_kasbon_ubah.js` untuk layarnya (jam nyata).
    - `node scripts/qa/keamanan.js` — batas login per IP.
    - `node scripts/qa/aksesibilitas.js` — audit kontras teks, tombol tanpa nama, isian tanpa label (hanya membaca; jalankan setelah borongan_nonaktif_induk.js agar halaman berisi).
    - `node scripts/qa/golden2.js` — 134 respons pekerja/absen/kasbon harus identik dengan `golden2.json` (database baru; tanggal minggu 23–29 Okt 2026).

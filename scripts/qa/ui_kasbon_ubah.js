@@ -1,0 +1,24 @@
+// Layar Setujui (Akuntan): kolom potongan kasbon terisi otomatis, bisa diturunkan, tidak bisa dinaikkan. Jam nyata.
+const {chromium}=require('/opt/node22/lib/node_modules/playwright');const {C}=require('./lib.js');
+const R=[];const ok=(n,c,d='')=>R.push((c?'PASS':'FAIL')+' | '+n+(d?' | '+String(d).slice(0,160):''));
+(async()=>{const a=new C(),k=new C();await a.login('adminp','AdminTest123');await k.login('akun1','AkuntanTest123');
+ const P='proj_a',D='2026-10-20';
+ await a.r('labor_rates.php','POST',{project_id:P,grade:'TK',tarif_harian:140000,tarif_lembur:17500});
+ const w1=(await a.r('workers.php','POST',{project_id:P,nama:'Budi',grade:'TK',tim:'Tim A'})).j.id,w2=(await a.r('workers.php','POST',{project_id:P,nama:'Cecep',grade:'TK',tim:'Tim A'})).j.id;
+ await a.r('attendance.php','POST',{project_id:P,tgl:D,entries:[{worker_id:w1,hari:1,lembur_jam:0},{worker_id:w2,hari:1,lembur_jam:0}]});
+ for(const i of [w1,w2]) await k.r('kasbon.php','POST',{project_id:P,tgl:D,worker_id:i,jumlah:500000,ket:'kasbon'});
+ await k.r('payroll_periods.php','POST',{action:'ajukan',project_id:P,tgl:D,pj_nama:'PJ'});
+ const br=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});const d=await (await br.newContext({viewport:{width:1280,height:900}})).newPage();const errs=[];d.on('pageerror',e=>errs.push(e.message));
+ await d.goto('http://127.0.0.1:8899/frontend/index.html');await d.fill('#loginEmail','akun1');await d.fill('#loginPassword','AkuntanTest123');await d.click('#loginSubmit');await d.waitForTimeout(2300);
+ await d.click('.nav-link[data-page="pengajuan"]');await d.waitForSelector('[data-pj-setuju]',{timeout:8000});
+ await d.click('[data-pj-setuju]');await d.waitForSelector('#kp_0',{timeout:6000});
+ const v=async id=>d.inputValue(id);
+ ok('dua kolom potongan, terisi otomatis sebesar gaji (140.000)',(await v('#kp_0'))==='140.000'&&(await v('#kp_1'))==='140.000',await v('#kp_0')+'/'+await v('#kp_1'));
+ ok('kolom punya nama aksesibel',/Potongan kasbon/.test(await d.getAttribute('#kp_0','aria-label')));
+ await d.fill('#kp_0','200.000');await d.click('#mSave');await d.waitForTimeout(500);
+ ok('lebih dari otomatis ditolak di layar (modal tetap terbuka)',await d.isVisible('#kp_0'));
+ await d.fill('#kp_0','50.000');await d.fill('#kp_1','0');await d.click('#mSave');await d.waitForTimeout(1800);
+ const x=await k.r('payroll.php?project_id='+P+'&tgl_from=2026-10-16&tgl_to=2026-10-22');const net=id=>Math.round(x.j.rows.find(r=>r.worker_id===id).net);
+ ok('tersimpan: Budi 140.000-50.000=90.000, Cecep tidak dipotong 140.000',net(w1)===90000&&net(w2)===140000,net(w1)+'/'+net(w2));
+ ok('tanpa error halaman',errs.length===0,errs.join('|'));
+ await br.close();console.log(R.join('\n'));console.log('== ui kasbon ubah: PASS '+R.filter(r=>r[0]==='P').length+' / FAIL '+R.filter(r=>r[0]==='F').length);})().catch(e=>{console.log(R.join('\n'));console.log('ERR',e.message);process.exit(1)});

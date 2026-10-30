@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#0ea5e9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'">
-<link rel="stylesheet" href="vendor/tailwind.css?v=20261030">
-<script src="vendor/icons.js?v=20261030"></script>
+<link rel="stylesheet" href="vendor/tailwind.css?v=20261031">
+<script src="vendor/icons.js?v=20261031"></script>
 <style>
   /* Platform-native font stack, not a self-hosted webfont: Inter was
      referenced here but never actually loaded (no @font-face), so the
@@ -865,7 +865,7 @@ function loadExcelJS(){
   if(_exceljsLoading) return _exceljsLoading;
   _exceljsLoading=new Promise(function(resolve,reject){
     var s=document.createElement('script');
-    s.src='vendor/exceljs.min.js?v=20261030';
+    s.src='vendor/exceljs.min.js?v=20261031';
     s.onload=function(){ resolve(); };
     s.onerror=function(){ _exceljsLoading=null; reject(new Error('Gagal memuat modul Excel.')); };
     document.head.appendChild(s);
@@ -971,10 +971,10 @@ function loadJsPdf(){
   if(_jspdfLoading) return _jspdfLoading;
   _jspdfLoading=new Promise(function(resolve,reject){
     var s1=document.createElement('script');
-    s1.src='vendor/jspdf.umd.min.js?v=20261030';
+    s1.src='vendor/jspdf.umd.min.js?v=20261031';
     s1.onload=function(){
       var s2=document.createElement('script');
-      s2.src='vendor/jspdf.autotable.min.js?v=20261030';
+      s2.src='vendor/jspdf.autotable.min.js?v=20261031';
       s2.onload=function(){ resolve(); };
       s2.onerror=function(){ _jspdfLoading=null; reject(new Error('Gagal memuat modul PDF.')); };
       document.head.appendChild(s2);
@@ -3039,8 +3039,8 @@ function payrollView(c, mode){
     if(!plan || !plan.items || !plan.items.length) return '<div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500"><b class="text-slate-700">Kasbon:</b> tidak ada saldo kasbon yang harus dipotong pada periode ini.</div>';
     return '<div class="rounded-xl border border-sky-200 bg-sky-50 p-3"><div class="flex items-center justify-between mb-1.5"><div class="text-sm font-bold text-sky-900">Potongan kasbon otomatis</div><div class="text-sm font-extrabold text-sky-900 tabular-nums">'+rp(plan.total)+'</div></div>'+
       '<table class="w-full text-xs"><thead class="text-sky-700"><tr><th class="text-left font-semibold py-0.5">Nama</th><th class="text-right font-semibold">Saldo kasbon</th><th class="text-right font-semibold">Dipotong</th></tr></thead><tbody>'+
-      plan.items.map(function(x){ return '<tr class="border-t border-sky-100"><td class="py-1">'+esc(x.nama)+'</td><td class="py-1 text-right tabular-nums">'+rp(x.saldo)+'</td><td class="py-1 text-right tabular-nums font-bold">'+(x.potong>0?rp(x.potong):'<span class="font-normal text-slate-400">ditunda</span>')+'</td></tr>'; }).join('')+'</tbody></table>'+
-      '<div class="text-[11px] text-sky-800 mt-1.5">Dipotong dari gaji periode ini sebesar saldo yang masih ada (tidak lebih dari gaji). Sisa saldo dipotong di pembayaran berikutnya. Yang saldonya nol tidak dipotong.</div></div>';
+      plan.items.map(function(x,i){ return '<tr class="border-t border-sky-100"><td class="py-1">'+esc(x.nama)+'</td><td class="py-1 text-right tabular-nums">'+rp(x.saldo)+'</td><td class="py-1 text-right">'+(x.potong>0 ? numInputHtml('kp_'+i, x.potong, 'w-28 text-right tabular-nums font-bold rounded-lg border border-sky-300 bg-white px-2 py-1 text-xs', ' data-max="'+x.potong+'" aria-label="Potongan kasbon '+esc(x.nama)+'"') : '<span class="font-normal text-slate-400">ditunda</span>')+'</td></tr>'; }).join('')+'</tbody></table>'+
+      '<div class="text-[11px] text-sky-800 mt-1.5">Otomatis: sebesar saldo yang masih ada, tidak lebih dari gaji. Angka di kolom Dipotong boleh dikurangi (isi 0 bila tidak dipotong minggu ini); sisanya tetap jadi saldo dan dipotong di pembayaran berikutnya. Tidak bisa lebih dari angka otomatis.</div></div>';
   }
   function doSetujui(p){
     Promise.all([periodData(p), apiFetch('/payroll_periods.php?action=kasbon_plan&project_id='+encodeURIComponent(p.project_id)+'&tgl='+p.tgl_mulai).catch(function(){ return null; })]).then(function(rs){
@@ -3060,7 +3060,18 @@ function payrollView(c, mode){
           '<div class="text-xs text-slate-400">Setelah disetujui, Anda bisa mencatat pembayaran. Jika absen diubah lagi oleh siapa pun, persetujuan ini otomatis dibatalkan.</div>'+
         '</div>',
         function(){
-          post('/payroll_periods.php', {action:'setujui', project_id:p.project_id, tgl:p.tgl_mulai}, 'Disetujui — siap dibayar ✓');
+          var ubah = {}, salah = '';
+          ((plan && plan.items) || []).forEach(function(x,i){
+            var el = document.getElementById('kp_'+i); if(!el) return;
+            var v = parseIdNum(el.value); if(el.value==='' ) v = 0;
+            if(Number.isNaN(v) || v<0){ salah = 'Potongan kasbon '+x.nama+' tidak valid.'; return; }
+            if(v > x.potong + 0.5){ salah = 'Potongan kasbon '+x.nama+' maksimal '+rp(x.potong)+'.'; return; }
+            if(v < x.potong - 0.5) ubah[x.worker_id ? x.worker_id : (x.tim ? 't:'+x.tim : '')] = v;
+          });
+          if(salah){ toast(salah, true); return; }
+          var body = {action:'setujui', project_id:p.project_id, tgl:p.tgl_mulai};
+          if(Object.keys(ubah).length) body.potong = ubah;
+          post('/payroll_periods.php', body, 'Disetujui — siap dibayar ✓');
         });
       var sv = document.getElementById('mSave'); if(sv) sv.textContent = 'Setujui';
     }).catch(function(e){ toast(e.message, true); });

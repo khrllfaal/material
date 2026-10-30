@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace App\Application;
 
 use App\Domain\DomainError;
+use App\Domain\KasbonPlanner;
 use App\Domain\PeriodRules;
 use App\Infrastructure\PeriodRepository;
 
@@ -54,9 +55,9 @@ final class PeriodService {
         return ['ok' => true, 'status' => 'diajukan'];
     }
 
-    public function setujui(array $user, string $projectId, string $tgl): array {
+    public function setujui(array $user, string $projectId, string $tgl, array $b = []): array {
         self::peran($user, ['akuntan'], 'Hanya Akuntan yang memeriksa dan menyetujui absen untuk dibayar.');
-        [$p, $plan, $n] = $this->repo->transaksi(function () use ($user, $projectId, $tgl) {
+        [$p, $plan, $n] = $this->repo->transaksi(function () use ($user, $projectId, $tgl, $b) {
             $p = $this->repo->kunci($projectId, $tgl);
             PeriodRules::pastikanBisaDisetujui($p['status']);
             $tanpaTarif = $this->repo->pekerjaTanpaTarif($projectId, $p['tgl_mulai'], $p['tgl_akhir']);
@@ -68,6 +69,7 @@ final class PeriodService {
             // Potong kasbon otomatis dihitung ulang dari saldo sebenarnya saat persetujuan (baris otomatis lama diganti).
             $this->repo->hapusKasbonOtomatis($p['id']);
             $plan = $this->kasbon->rencanaPotong($projectId, $p);
+            $plan = KasbonPlanner::terapkanUbahan($plan, (array)($b['potong'] ?? []));
             $n = 0;
             foreach ($plan['items'] as $it) if ($it['potong'] > 0.005) { $this->repo->tambahKasbonOtomatis($p['id'], $it['worker_id'], $it['tim'], $it['potong'], $user['id']); $n++; }
             $this->repo->tandaiDisetujui($p['id'], $user['id']);

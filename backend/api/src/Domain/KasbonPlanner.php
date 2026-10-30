@@ -56,4 +56,31 @@ final class KasbonPlanner {
         }
         return ['items' => $items, 'total' => round($total, 2)];
     }
+
+    /** Kunci ubahan: worker_id, 't:'.tim, atau '' (grup). */
+    public static function kunciItem(array $it): string { return $it['worker_id'] ?? ($it['tim'] !== '' ? 't:' . $it['tim'] : ''); }
+
+    /**
+     * Akuntan boleh MENURUNKAN potongan otomatis (mis. kasbon besar, gaji minggu ini mau disisakan). Tidak boleh menaikkan
+     * melebihi rencana, tidak boleh negatif. Sisanya tetap jadi saldo kasbon dan dipotong di pembayaran berikutnya.
+     * @param array<string,mixed> $ubah kunci => jumlah yang diinginkan
+     */
+    public static function terapkanUbahan(array $plan, array $ubah): array {
+        if (!$ubah) return $plan;
+        $total = 0.0;
+        foreach ($plan['items'] as &$it) {
+            $k = self::kunciItem($it);
+            if (array_key_exists($k, $ubah)) {
+                $v = $ubah[$k];
+                if (!is_numeric($v) || (float)$v < 0) throw new DomainError('Jumlah potongan kasbon tidak valid (' . $it['nama'] . ').', 422);
+                $v = round((float)$v, 2);
+                if ($v > $it['potong'] + 0.005) throw new DomainError('Potongan kasbon ' . $it['nama'] . ' melebihi batas (' . number_format($it['potong'], 0, ',', '.') . '): tidak boleh lebih dari saldo atau gaji.', 422);
+                $it['potong'] = $v;
+            }
+            $total += $it['potong'];
+        }
+        unset($it);
+        $plan['total'] = round($total, 2);
+        return $plan;
+    }
 }

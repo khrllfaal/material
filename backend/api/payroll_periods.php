@@ -67,7 +67,7 @@ $svc = payroll_services()['period'];
 switch ($action) {
     case 'header':     json_response($svc->header($user, $projectId, $tgl, $b));
     case 'ajukan':     json_response($svc->ajukan($user, $projectId, $tgl, $b));
-    case 'setujui':    json_response($svc->setujui($user, $projectId, $tgl));
+    case 'setujui':    json_response($svc->setujui($user, $projectId, $tgl, $b));
     case 'kembalikan':
     case 'buka':       json_response($svc->kembalikan($user, $projectId, $tgl, $b));
     case 'bayar':      json_response($svc->bayar($user, $projectId, $tgl, $b, require_valid_date($b['tgl_bayar'] ?? date('Y-m-d'), 'Tanggal bayar')));
